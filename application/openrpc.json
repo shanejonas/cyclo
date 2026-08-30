@@ -1,0 +1,472 @@
+{
+  "openrpc": "1.2.6",
+  "info": {
+    "title": "Cyclo control API",
+    "version": "0.3.0"
+  },
+  "servers": [
+    {
+      "name": "local",
+      "url": "http://127.0.0.1:8197"
+    }
+  ],
+  "methods": [
+    {
+      "name": "rpc.discover",
+      "summary": "Describe the Cyclo control API",
+      "paramStructure": "by-name",
+      "params": [],
+      "result": {
+        "name": "document",
+        "schema": { "type": "object" }
+      }
+    },
+    {
+      "name": "cyclo.getState",
+      "summary": "Read the current TUI state and selection",
+      "paramStructure": "by-name",
+      "params": [],
+      "result": {
+        "name": "state",
+        "schema": { "$ref": "#/components/schemas/State" }
+      }
+    },
+    {
+      "name": "cyclo.waitForChange",
+      "summary": "Wait for the TUI revision to advance or the timeout to expire",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "afterRevision",
+          "required": true,
+          "schema": { "type": "integer", "minimum": 0 }
+        },
+        {
+          "name": "timeoutMs",
+          "required": false,
+          "schema": { "type": "integer", "minimum": 0, "maximum": 60000, "default": 30000 }
+        }
+      ],
+      "result": {
+        "name": "state",
+        "schema": { "$ref": "#/components/schemas/State" }
+      },
+      "examples": [
+        {
+          "name": "checkForChange",
+          "params": [
+            { "name": "afterRevision", "value": 0 },
+            { "name": "timeoutMs", "value": 0 }
+          ],
+          "result": { "name": "state", "value": {} }
+        }
+      ]
+    },
+    {
+      "name": "cyclo.getReport",
+      "summary": "Read the complete ranked complexity report",
+      "paramStructure": "by-name",
+      "params": [],
+      "result": {
+        "name": "report",
+        "schema": { "$ref": "#/components/schemas/Report" }
+      }
+    },
+    {
+      "name": "cyclo.setFocus",
+      "summary": "Focus a TUI pane",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "pane",
+          "required": true,
+          "schema": { "type": "string", "enum": ["files", "functions", "source"] }
+        }
+      ],
+      "result": {
+        "name": "state",
+        "schema": { "$ref": "#/components/schemas/State" }
+      },
+      "examples": [
+        {
+          "name": "focusFunctions",
+          "params": [{ "name": "pane", "value": "functions" }],
+          "result": { "name": "state", "value": {} }
+        }
+      ]
+    },
+    {
+      "name": "cyclo.selectFile",
+      "summary": "Select a ranked file by zero-based index",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "index",
+          "required": true,
+          "schema": { "type": "integer", "minimum": 0 }
+        }
+      ],
+      "result": {
+        "name": "state",
+        "schema": { "$ref": "#/components/schemas/State" }
+      },
+      "examples": [
+        {
+          "name": "selectFirstFile",
+          "params": [{ "name": "index", "value": 0 }],
+          "result": { "name": "state", "value": {} }
+        }
+      ]
+    },
+    {
+      "name": "cyclo.selectFunction",
+      "summary": "Select a function in the current file by zero-based index",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "index",
+          "required": true,
+          "schema": { "type": "integer", "minimum": 0 }
+        }
+      ],
+      "result": {
+        "name": "state",
+        "schema": { "$ref": "#/components/schemas/State" }
+      },
+      "examples": [
+        {
+          "name": "selectFirstFunction",
+          "params": [{ "name": "index", "value": 0 }],
+          "result": { "name": "state", "value": {} }
+        }
+      ]
+    },
+    {
+      "name": "cyclo.scrollSource",
+      "summary": "Scroll the selected function source by a signed line count",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "lines",
+          "required": true,
+          "schema": { "type": "integer" }
+        }
+      ],
+      "result": {
+        "name": "state",
+        "schema": { "$ref": "#/components/schemas/State" }
+      },
+      "examples": [
+        {
+          "name": "scrollDown",
+          "params": [{ "name": "lines", "value": 1 }],
+          "result": { "name": "state", "value": {} }
+        }
+      ]
+    },
+    {
+      "name": "cyclo.revealLines",
+      "summary": "Select and reveal source lines in the selected function",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "startLine",
+          "required": true,
+          "description": "Displayed source line, or a one-based line relative to the selected function",
+          "schema": { "type": "integer", "minimum": 1 }
+        },
+        {
+          "name": "endLine",
+          "required": false,
+          "description": "Inclusive end line in the same coordinate system as startLine",
+          "schema": { "type": "integer", "minimum": 1 }
+        }
+      ],
+      "result": {
+        "name": "state",
+        "schema": { "$ref": "#/components/schemas/State" }
+      },
+      "examples": [
+        {
+          "name": "revealFirstLine",
+          "params": [{ "name": "startLine", "value": 1 }],
+          "result": { "name": "state", "value": {} }
+        }
+      ]
+    },
+    {
+      "name": "cyclo.clearLineSelection",
+      "summary": "Clear the highlighted source line reference",
+      "paramStructure": "by-name",
+      "params": [],
+      "result": {
+        "name": "state",
+        "schema": { "$ref": "#/components/schemas/State" }
+      }
+    },
+    {
+      "name": "cyclo.annotateLines",
+      "summary": "Add an annotation without changing the visible TUI selection",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "startLine",
+          "required": true,
+          "description": "Displayed source line, or a one-based line relative to the selected function",
+          "schema": { "type": "integer", "minimum": 1 }
+        },
+        {
+          "name": "endLine",
+          "required": false,
+          "description": "Inclusive end line in the same coordinate system as startLine",
+          "schema": { "type": "integer", "minimum": 1 }
+        },
+        {
+          "name": "message",
+          "required": true,
+          "schema": { "type": "string", "minLength": 1, "maxLength": 160 }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": { "$ref": "#/components/schemas/AnnotationResult" }
+      },
+      "examples": [
+        {
+          "name": "annotateFirstLine",
+          "params": [
+            { "name": "startLine", "value": 1 },
+            { "name": "endLine", "value": 1 },
+            { "name": "message", "value": "Review this control flow" }
+          ],
+          "result": { "name": "result", "value": {} }
+        }
+      ]
+    },
+    {
+      "name": "cyclo.removeAnnotation",
+      "summary": "Delete one source annotation by ID",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "annotationId",
+          "required": true,
+          "schema": { "type": "string", "minLength": 1 }
+        }
+      ],
+      "result": {
+        "name": "state",
+        "schema": { "$ref": "#/components/schemas/State" }
+      },
+      "examples": [
+        {
+          "name": "removeFirstAnnotation",
+          "params": [{ "name": "annotationId", "value": "annotation-1" }],
+          "result": { "name": "state", "value": {} }
+        }
+      ]
+    },
+    {
+      "name": "cyclo.refresh",
+      "summary": "Reanalyze the configured paths and return the resulting state",
+      "paramStructure": "by-name",
+      "params": [],
+      "result": {
+        "name": "state",
+        "schema": { "$ref": "#/components/schemas/State" }
+      }
+    }
+  ],
+  "components": {
+    "schemas": {
+      "State": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["revision", "controlPort", "paths", "focus", "refreshing", "report", "selection", "visualSelectionActive", "annotations"],
+        "properties": {
+          "revision": { "type": "integer", "minimum": 0 },
+          "controlPort": { "type": "integer", "minimum": 0, "maximum": 65535 },
+          "paths": { "type": "array", "items": { "type": "string" } },
+          "focus": { "type": "string", "enum": ["files", "functions", "source"] },
+          "refreshing": { "type": "boolean" },
+          "error": { "type": "string" },
+          "report": { "$ref": "#/components/schemas/ReportSummary" },
+          "selection": { "$ref": "#/components/schemas/Selection" },
+          "cursor": { "$ref": "#/components/schemas/SourceCursor" },
+          "lineSelection": { "$ref": "#/components/schemas/LineSelection" },
+          "visualSelectionActive": { "type": "boolean" },
+          "annotations": { "type": "array", "items": { "$ref": "#/components/schemas/Annotation" } },
+          "activeAnnotationId": { "type": "string" }
+        }
+      },
+      "SourceCursor": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sourceLine"],
+        "properties": {
+          "sourceLine": { "type": "integer", "minimum": 1 }
+        }
+      },
+      "LineSelection": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["anchorLine", "startLine", "endLine", "text"],
+        "properties": {
+          "anchorLine": { "type": "integer", "minimum": 1 },
+          "startLine": { "type": "integer", "minimum": 1 },
+          "endLine": { "type": "integer", "minimum": 1 },
+          "text": { "type": "string" }
+        }
+      },
+      "Annotation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "path", "function", "functionLine", "startLine", "endLine", "message", "text"],
+        "properties": {
+          "id": { "type": "string" },
+          "path": { "type": "string" },
+          "function": { "type": "string" },
+          "functionLine": { "type": "integer", "minimum": 1 },
+          "startLine": { "type": "integer", "minimum": 1 },
+          "endLine": { "type": "integer", "minimum": 1 },
+          "message": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "text": { "type": "string" }
+        }
+      },
+      "AnnotationResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["annotation", "state"],
+        "properties": {
+          "annotation": { "$ref": "#/components/schemas/Annotation" },
+          "state": { "$ref": "#/components/schemas/State" }
+        }
+      },
+      "ReportSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["root", "fileCount", "functions", "total", "average", "cognitiveTotal", "cognitiveAverage"],
+        "properties": {
+          "root": { "type": "string" },
+          "fileCount": { "type": "integer", "minimum": 0 },
+          "functions": { "type": "integer", "minimum": 0 },
+          "total": { "type": "integer", "minimum": 0 },
+          "average": { "type": "number", "minimum": 0 },
+          "cognitiveTotal": { "type": "integer", "minimum": 0 },
+          "cognitiveAverage": { "type": "number", "minimum": 0 }
+        }
+      },
+      "Selection": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sourceOffset"],
+        "properties": {
+          "fileIndex": { "type": "integer", "minimum": 0 },
+          "file": { "$ref": "#/components/schemas/FileSummary" },
+          "functionIndex": { "type": "integer", "minimum": 0 },
+          "function": { "$ref": "#/components/schemas/Function" },
+          "sourceOffset": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "Report": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["root", "files", "functions", "total", "average", "cognitiveTotal", "cognitiveAverage"],
+        "properties": {
+          "root": { "type": "string" },
+          "files": { "type": "array", "items": { "$ref": "#/components/schemas/File" } },
+          "functions": { "type": "integer", "minimum": 0 },
+          "total": { "type": "integer", "minimum": 0 },
+          "average": { "type": "number", "minimum": 0 },
+          "cognitiveTotal": { "type": "integer", "minimum": 0 },
+          "cognitiveAverage": { "type": "number", "minimum": 0 }
+        }
+      },
+      "File": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "functions", "total", "peak", "average", "cognitiveTotal", "cognitivePeak", "cognitiveAverage"],
+        "properties": {
+          "path": { "type": "string" },
+          "functions": { "type": "array", "items": { "$ref": "#/components/schemas/FunctionSummary" } },
+          "total": { "type": "integer", "minimum": 0 },
+          "peak": { "type": "integer", "minimum": 0 },
+          "average": { "type": "number", "minimum": 0 },
+          "cognitiveTotal": { "type": "integer", "minimum": 0 },
+          "cognitivePeak": { "type": "integer", "minimum": 0 },
+          "cognitiveAverage": { "type": "number", "minimum": 0 }
+        }
+      },
+      "FileSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "functionCount", "total", "peak", "average", "cognitiveTotal", "cognitivePeak", "cognitiveAverage"],
+        "properties": {
+          "path": { "type": "string" },
+          "functionCount": { "type": "integer", "minimum": 0 },
+          "total": { "type": "integer", "minimum": 0 },
+          "peak": { "type": "integer", "minimum": 0 },
+          "average": { "type": "number", "minimum": 0 },
+          "cognitiveTotal": { "type": "integer", "minimum": 0 },
+          "cognitivePeak": { "type": "integer", "minimum": 0 },
+          "cognitiveAverage": { "type": "number", "minimum": 0 }
+        }
+      },
+      "Function": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["package", "name", "complexity", "cognitiveComplexity", "line", "endLine", "column", "source"],
+        "properties": {
+          "package": { "type": "string" },
+          "name": { "type": "string" },
+          "complexity": { "type": "integer", "minimum": 0 },
+          "cyclomaticDiagnostics": { "type": "array", "items": { "$ref": "#/components/schemas/CyclomaticDiagnostic" } },
+          "cognitiveComplexity": { "type": "integer", "minimum": 0 },
+          "cognitiveDiagnostics": { "type": "array", "items": { "$ref": "#/components/schemas/CognitiveDiagnostic" } },
+          "line": { "type": "integer", "minimum": 0 },
+          "endLine": { "type": "integer", "minimum": 0 },
+          "column": { "type": "integer", "minimum": 0 },
+          "source": { "type": "string" }
+        }
+      },
+      "FunctionSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["package", "name", "complexity", "cognitiveComplexity", "line", "endLine", "column"],
+        "properties": {
+          "package": { "type": "string" },
+          "name": { "type": "string" },
+          "complexity": { "type": "integer", "minimum": 0 },
+          "cyclomaticDiagnostics": { "type": "array", "items": { "$ref": "#/components/schemas/CyclomaticDiagnostic" } },
+          "cognitiveComplexity": { "type": "integer", "minimum": 0 },
+          "cognitiveDiagnostics": { "type": "array", "items": { "$ref": "#/components/schemas/CognitiveDiagnostic" } },
+          "line": { "type": "integer", "minimum": 0 },
+          "endLine": { "type": "integer", "minimum": 0 },
+          "column": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "CyclomaticDiagnostic": {
+		"type": "object",
+		"additionalProperties": false,
+		"required": ["kind", "line", "column"],
+		"properties": {
+		  "kind": { "type": "string" },
+		  "line": { "type": "integer", "minimum": 1 },
+		  "column": { "type": "integer", "minimum": 1 }
+		}
+	  },
+	  "CognitiveDiagnostic": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["increment", "nesting", "kind", "line", "column"],
+        "properties": {
+          "increment": { "type": "integer", "minimum": 1 },
+          "nesting": { "type": "integer", "minimum": 0 },
+          "kind": { "type": "string" },
+          "line": { "type": "integer", "minimum": 1 },
+          "column": { "type": "integer", "minimum": 1 }
+        }
+      }
+    }
+  }
+}
