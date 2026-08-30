@@ -4,28 +4,94 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"testing"
+
+	"github.com/cucumber/godog"
 )
 
-func TestStartWithTheCurrentRepository(t *testing.T) {
-	runProbe(t, "self-scan")
+func TestFeatures(t *testing.T) {
+	state := featureState{t: t}
+	suite := godog.TestSuite{
+		Name:                "gherky",
+		ScenarioInitializer: state.initialize,
+		Options:             gherkyOptions(t),
+	}
+	if suite.Run() != 0 {
+		t.Fail()
+	}
 }
 
-func TestRankFilesAndFunctionsByComplexity(t *testing.T) {
-	runProbe(t, "ranking")
+type featureState struct {
+	t *testing.T
 }
 
-func TestNavigateFilesAndFunctions(t *testing.T) {
-	runProbe(t, "navigation")
+func (s featureState) initialize(scenario *godog.ScenarioContext) {
+	scenario.Step(`^its own repository has been analyzed$`, s.run("self-scan"))
+	scenario.Step(`^the wide complexity view is shown$`, s.run("ranking"))
+	scenario.Step(`^the developer moves between panes and ranked entries$`, s.run("navigation"))
+	scenario.Step(`^the developer presses "r"$`, s.run("refresh"))
+	scenario.Step(`^the developer cycles pane focus$`, s.run("narrow"))
+
+	for _, step := range probeVerifiedSteps {
+		scenario.Step("^"+regexp.QuoteMeta(step)+"$", func() {})
+	}
 }
 
-func TestRefreshAnAnalysis(t *testing.T) {
-	runProbe(t, "refresh")
+func (s featureState) run(probe string) func() {
+	return func() {
+		runProbe(s.t, probe)
+	}
 }
 
-func TestKeepNarrowTerminalsUsefulAndEasyToLeave(t *testing.T) {
-	runProbe(t, "narrow")
+func gherkyOptions(t *testing.T) *godog.Options {
+	options := &godog.Options{
+		Format:   "pretty",
+		NoColors: true,
+		Paths:    []string{"01-complexity-tui.feature"},
+		Strict:   true,
+		TestingT: t,
+	}
+	path := os.Getenv("GHERKY_FEATURE_PATH")
+	if path == "" {
+		return options
+	}
+
+	source, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read Gherky feature: %v", err)
+	}
+	options.Paths = nil
+	options.FeatureContents = []godog.Feature{{
+		Name:     filepath.Base(path),
+		Contents: source,
+	}}
+	return options
+}
+
+var probeVerifiedSteps = []string{
+	"the complexity TUI is started without a path",
+	"the current directory is the scan target",
+	"its production functions have complexity at most 10",
+	"the scan summary is visible",
+	"an analyzed path contains Go files with different complexity",
+	"files are ranked by aggregate complexity",
+	"the selected file's functions are ranked by complexity",
+	"function details show cyclomatic paths, cognitive load, and physical size",
+	"cognitive increments are purple in the source",
+	"a compact header, focus gutter, and muted green and blue palette frame the view",
+	"the wide complexity view has multiple files and functions",
+	"the focus gutter follows the selected entry",
+	"the detail pane follows the selected file and function",
+	"the analyzed path has changed since the view loaded",
+	"the same path is analyzed again",
+	"the refreshed ranking replaces the stale results",
+	"the terminal is too narrow for three panes",
+	"one complete focused pane is visible at a time",
+	"no rendered line exceeds the terminal width",
+	"the compact key footer remains visible",
+	`either "q" or "ctrl+c" quits`,
 }
 
 func runProbe(t *testing.T, scenario string) {
