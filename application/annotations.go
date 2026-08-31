@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/shanejonas/cyclomatic-complexity-tui/domain"
+	"github.com/shanejonas/cyclo/domain"
 )
 
 const maximumAnnotationLength = 160

@@ -74,9 +74,9 @@ import (
 	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/shanejonas/cyclomatic-complexity-tui/adapters/gocyclo"
-	"github.com/shanejonas/cyclomatic-complexity-tui/application"
-	"github.com/shanejonas/cyclomatic-complexity-tui/domain"
+	"github.com/shanejonas/cyclo/adapters/gocyclo"
+	"github.com/shanejonas/cyclo/application"
+	"github.com/shanejonas/cyclo/domain"
 )
 
 type sequenceAnalyzer struct {

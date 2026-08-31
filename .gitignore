@@ -1,0 +1,4 @@
+dist/
+npm/platforms/*/bin/
+npm/test/host-bin
+npm/test/host-bin.exe

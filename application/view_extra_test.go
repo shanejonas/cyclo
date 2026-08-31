@@ -8,7 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/shanejonas/cyclomatic-complexity-tui/domain"
+	"github.com/shanejonas/cyclo/domain"
 )
 
 func TestViewUsesAlternateScreen(t *testing.T) {
@@ -180,13 +180,56 @@ func TestScrollbarThumbSizeStaysFixedWhilePositionChanges(t *testing.T) {
 func TestScrollablePanesShowAMutedThumb(t *testing.T) {
 	files := make([]domain.File, 10)
 	for index := range files {
-		files[index] = domain.File{Path: fmt.Sprintf("file-%d.go", index)}
+		files[index] = domain.File{
+			Path: fmt.Sprintf("file-%d.go", index), Total: 214, Average: 3.4, Peak: 9, CognitivePeak: 10,
+		}
 	}
 	model := Model{report: domain.Report{Files: files}}
-	assertMutedScrollbar(t, model.fileTable(30, 6), 2)
+	fileLines := model.fileTable(48, 6)
+	assertMutedScrollbar(t, fileLines, 2)
+	if row := ansi.Strip(fileLines[2]); !strings.Contains(row, "214  3.4   9  10 █") {
+		t.Fatalf("scrollbar clips file metrics: %q", row)
+	}
+
+	functions := make([]domain.Function, 10)
+	for index := range functions {
+		functions[index] = domain.Function{
+			Name: fmt.Sprintf("function-%d", index), Complexity: 7, CognitiveComplexity: 2, Line: 10, EndLine: 11,
+		}
+	}
+	model = Model{report: domain.Report{Files: []domain.File{{Functions: functions}}}}
+	functionLines := model.functionTable(39, 6)
+	assertMutedScrollbar(t, functionLines, 2)
+	if row := ansi.Strip(functionLines[2]); !strings.Contains(row, "  7   2     2 █") {
+		t.Fatalf("scrollbar clips function metrics: %q", row)
+	}
 
 	model = sourceWorkspaceModel()
 	assertMutedScrollbar(t, model.sourceLines(40, 8, "Source"), 4)
+}
+
+func TestPaneContentKeepsRightInsetWithoutScrollbar(t *testing.T) {
+	model := Model{report: domain.Report{Files: []domain.File{{
+		Path: "one.go",
+		Functions: []domain.Function{{
+			Name: "one", Line: 1, EndLine: 1, Source: "func one() {}",
+		}},
+	}}}}
+
+	for _, pane := range []struct {
+		width int
+		lines []string
+	}{
+		{48, model.fileTable(48, 6)},
+		{39, model.functionTable(39, 6)},
+		{40, model.sourceLines(40, 8, "Source")},
+	} {
+		for _, line := range pane.lines {
+			if !strings.HasSuffix(ansi.Strip(line), strings.Repeat(" ", paneRightInset(pane.width))) {
+				t.Fatalf("pane content has no permanent right inset: %q", ansi.Strip(line))
+			}
+		}
+	}
 }
 
 func assertMutedScrollbar(t *testing.T, lines []string, contentStart int) {
@@ -200,6 +243,18 @@ func assertMutedScrollbar(t *testing.T, lines []string, contentStart int) {
 	}
 	if !strings.Contains(rendered, "38;2;118;130;134") {
 		t.Fatal("scrollbar thumb is not muted")
+	}
+	for _, line := range lines[contentStart:] {
+		plain := ansi.Strip(line)
+		if strings.Contains(plain, "█") {
+			if !strings.HasSuffix(plain, strings.Repeat(" ", scrollbarGutterWidth-1)+"█") {
+				t.Fatalf("scrollbar has no gutter: %q", plain)
+			}
+			continue
+		}
+		if !strings.HasSuffix(plain, strings.Repeat(" ", scrollbarGutterWidth)) {
+			t.Fatalf("scrollbar track overlaps content: %q", plain)
+		}
 	}
 }
 
@@ -337,7 +392,7 @@ func TestSourceShowsAddedAndDeletedDiffLines(t *testing.T) {
 	}
 }
 
-func TestReturnColorsOnlyReturnedValues(t *testing.T) {
+func TestReturnColorsTheOutcome(t *testing.T) {
 	errorLine := styledReturn(
 		"        return nil, nil, fmt.Errorf(\"boom: %w\", err)",
 		danger,
@@ -355,15 +410,26 @@ func TestReturnColorsOnlyReturnedValues(t *testing.T) {
 	}
 
 	happyLine := styledReturn("    return result, roots, nil", green, false)
-	happyValue := strings.TrimSuffix(green.Render("result, roots"), "\x1b[m")
+	happyValue := strings.TrimSuffix(green.Render("return result, roots"), "\x1b[m")
 	if !strings.Contains(happyLine, happyValue) {
-		t.Fatalf("returned result is not colored: %q", happyLine)
-	}
-	if strings.Contains(happyLine, strings.TrimSuffix(green.Render("return"), "\x1b[m")) {
-		t.Fatalf("return keyword uses the success color: %q", happyLine)
+		t.Fatalf("successful return is not colored: %q", happyLine)
 	}
 	if strings.Contains(happyLine, strings.TrimSuffix(green.Render("nil"), "\x1b[m")) {
 		t.Fatalf("nil error result uses the success color: %q", happyLine)
+	}
+}
+
+func TestSourceColorsSuccessfulReturnsInsideGuards(t *testing.T) {
+	lines := sourceCodeLines(domain.Function{
+		Line:   10,
+		Source: "func footer(width int, details bool) string {\n\tif width < 80 {\n\t\treturn truncate(keys, width)\n\t}\n\tif details {\n\t\treturn truncate(keys, width)\n\t}\n\treturn truncate(keys, width)\n}",
+	})
+
+	want := strings.TrimSuffix(green.Render("return truncate(keys, width)"), "\x1b[m")
+	for _, index := range []int{2, 5, 7} {
+		if !strings.Contains(lines[index], want) {
+			t.Fatalf("successful return at line %d is not green: %q", index, lines[index])
+		}
 	}
 }
 

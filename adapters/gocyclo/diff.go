@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/shanejonas/cyclomatic-complexity-tui/domain"
+	"github.com/shanejonas/cyclo/domain"
 )
 
 var diffHunk = regexp.MustCompile(`^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@`)

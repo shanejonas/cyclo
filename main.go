@@ -8,9 +8,9 @@ import (
 	"os"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/shanejonas/cyclomatic-complexity-tui/adapters/gocyclo"
-	"github.com/shanejonas/cyclomatic-complexity-tui/adapters/sqlite"
-	"github.com/shanejonas/cyclomatic-complexity-tui/application"
+	"github.com/shanejonas/cyclo/adapters/gocyclo"
+	"github.com/shanejonas/cyclo/adapters/sqlite"
+	"github.com/shanejonas/cyclo/application"
 )
 
 const defaultControlPort = 8197

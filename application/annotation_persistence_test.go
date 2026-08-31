@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/shanejonas/cyclomatic-complexity-tui/adapters/sqlite"
-	"github.com/shanejonas/cyclomatic-complexity-tui/domain"
+	"github.com/shanejonas/cyclo/adapters/sqlite"
+	"github.com/shanejonas/cyclo/domain"
 )
 
 func TestModelReloadsPersistedAnnotations(t *testing.T) {

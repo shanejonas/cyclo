@@ -1,4 +1,4 @@
-module github.com/shanejonas/cyclomatic-complexity-tui
+module github.com/shanejonas/cyclo
 
 go 1.25.0
 

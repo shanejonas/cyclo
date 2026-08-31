@@ -8,7 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/shanejonas/cyclomatic-complexity-tui/domain"
+	"github.com/shanejonas/cyclo/domain"
 )
 
 const (
@@ -107,7 +107,7 @@ func (m Model) workspaceHeight(linesAbove int) int {
 
 func workspaceWidths(width int) []int {
 	files := max(width*28/100, 22)
-	functions := max(width*31/100, 24)
+	functions := max(width*31/100-10, 24)
 	source := max(width-files-functions-6, 1)
 
 	return []int{files, functions, source}
@@ -172,19 +172,20 @@ func (m Model) footer(width int) string {
 }
 
 func (m Model) fileTable(width int, height int) []string {
+	tableWidth := paneContentWidth(width)
 	lines := []string{
 		m.paneTitle(fmt.Sprintf("Files · %d", len(m.report.Files)), filesPane),
-		muted.Render(fileTableHeader(width)),
+		muted.Render(fileTableHeader(tableWidth)),
 	}
 	if m.err != nil {
-		return fitLines(append(lines, danger.Render("Error: "+m.err.Error())), width, height)
+		return fitPaneLines(append(lines, danger.Render("Error: "+m.err.Error())), width, height)
 	}
 	if len(m.report.Files) == 0 {
-		return fitLines(append(lines, muted.Render("No Go files")), width, height)
+		return fitPaneLines(append(lines, muted.Render("No Go files")), width, height)
 	}
 
 	for index, file := range m.report.Files {
-		lines = append(lines, m.fileRow(file, width, index == m.fileIndex))
+		lines = append(lines, m.fileRow(file, tableWidth, index == m.fileIndex))
 	}
 
 	return tableWindow(lines, m.fileIndex, width, height)
@@ -243,17 +244,18 @@ func fileTablePath(root string, path string, width int) string {
 }
 
 func (m Model) functionTable(width int, height int) []string {
+	file, ok := m.selectedFile()
+	tableWidth := paneContentWidth(width)
 	lines := []string{
 		m.paneTitle("Functions", functionsPane),
-		muted.Render(functionTableHeader(width)),
+		muted.Render(functionTableHeader(tableWidth)),
 	}
-	file, ok := m.selectedFile()
 	if !ok || len(file.Functions) == 0 {
-		return fitLines(append(lines, muted.Render("No functions")), width, height)
+		return fitPaneLines(append(lines, muted.Render("No functions")), width, height)
 	}
 
 	for index, function := range file.Functions {
-		lines = append(lines, m.functionRow(function, width, index == m.functionIndex))
+		lines = append(lines, m.functionRow(function, tableWidth, index == m.functionIndex))
 	}
 
 	return tableWindow(lines, m.functionIndex, width, height)
@@ -283,6 +285,7 @@ func functionLineCount(function domain.Function) int {
 }
 
 func (m Model) sourceLines(width int, height int, title string) []string {
+	contentWidth := paneContentWidth(width)
 	titleLine := m.paneTitle(title, detailsPane)
 	if count := len(m.visibleAnnotations()); count > 0 {
 		noun := "NOTE"
@@ -301,23 +304,23 @@ func (m Model) sourceLines(width int, height int, title string) []string {
 		lines = append(lines, danger.Render(m.annotationError.Error()))
 	}
 	if !fileOK || !functionOK {
-		return fitLines(append(lines, muted.Render("No function selected")), width, height)
+		return fitPaneLines(append(lines, muted.Render("No function selected")), width, height)
 	}
 
 	lines = append(
 		lines,
-		blue.Render(sourceLocation(m.report.Root, file.Path, function.Line, function.Column, width)),
+		blue.Render(sourceLocation(m.report.Root, file.Path, function.Line, function.Column, contentWidth)),
 		text.Render(function.Package+" · "+function.Name),
 	)
-	lines = append(lines, rule(width))
+	lines = append(lines, rule(contentWidth))
 	code := m.selectedSourceCodeLines(function)
 	contentStart := len(lines)
 	available := max(height-len(lines), 0)
 	if height == 0 {
 		available = len(code)
 	}
-	lines = append(lines, m.sourceDisplayWindow(code, function, width, available)...)
-	rendered := fitLines(lines, width, height)
+	lines = append(lines, m.sourceDisplayWindow(code, function, contentWidth, available)...)
+	rendered := fitPaneLines(lines, width, height)
 	if height == 0 {
 		return rendered
 	}
@@ -340,11 +343,11 @@ func renderSourceCodeLines(function domain.Function, model Model, interactive bo
 	}
 
 	lines := normalizedSourceLines(function.Source)
-	happyReturns := happyPathReturnLines(lines)
+	successfulReturns := successfulReturnLines(lines)
 	result := make([]string, 0, len(lines))
 	for index, line := range lines {
 		lineNumber := function.Line + index
-		numberStyle, styledLine := styledSourceLine(function, lineNumber, line, happyReturns[index])
+		numberStyle, styledLine := styledSourceLine(function, lineNumber, line, successfulReturns[index])
 		gutter := muted.Render("  ")
 		if interactive {
 			gutter, numberStyle = model.sourceGutter(lineNumber, numberStyle)
@@ -373,7 +376,7 @@ func renderSourceCodeLines(function domain.Function, model Model, interactive bo
 	return result
 }
 
-func styledSourceLine(function domain.Function, lineNumber int, line string, happyReturn bool) (lipgloss.Style, string) {
+func styledSourceLine(function domain.Function, lineNumber int, line string, successfulReturn bool) (lipgloss.Style, string) {
 	cyclomaticLine := cyclomaticBearingLine(function.CyclomaticDiagnostics, lineNumber)
 	cognitiveLine := cognitiveBearingLine(function.CognitiveDiagnostics, lineNumber)
 	numberStyle := muted
@@ -381,7 +384,7 @@ func styledSourceLine(function domain.Function, lineNumber int, line string, hap
 	switch {
 	case errorReturn(line):
 		return numberStyle, styledReturn(line, danger, true)
-	case happyReturn:
+	case successfulReturn:
 		return numberStyle, styledReturn(line, green, false)
 	case cyclomaticLine && cognitiveLine:
 		style := amber.Background(cognitiveBackground)
@@ -573,12 +576,14 @@ func (m Model) sourceHeaderHeight() int {
 }
 
 func styledReturn(line string, style lipgloss.Style, finalValueOnly bool) string {
-	start := returnedValuesStart(line)
+	valuesStart := returnedValuesStart(line)
+	start := valuesStart
 	end := len(line)
 	if finalValueOnly {
-		start = finalReturnedValueStart(line, start)
+		start = finalReturnedValueStart(line, valuesStart)
 	} else {
-		end = successfulReturnedValuesEnd(line, start)
+		start = strings.Index(line, "return")
+		end = successfulReturnedValuesEnd(line, valuesStart)
 	}
 	if start >= end {
 		return text.Render(line)
@@ -640,22 +645,10 @@ func returnedValueAfter(line string, comma int) int {
 	return start
 }
 
-func happyPathReturnLines(lines []string) []bool {
+func successfulReturnLines(lines []string) []bool {
 	result := make([]bool, len(lines))
-	indentation := -1
 	for index, line := range lines {
-		if !returnLine(line) || errorReturn(line) {
-			continue
-		}
-		lineIndentation, _ := splitIndent(line)
-		switch {
-		case indentation == -1 || len(lineIndentation) < indentation:
-			clear(result)
-			indentation = len(lineIndentation)
-			result[index] = true
-		case len(lineIndentation) == indentation:
-			result[index] = true
-		}
+		result[index] = returnLine(line) && !errorReturn(line)
 	}
 
 	return result
@@ -736,7 +729,7 @@ func (m Model) selection(label string, target pane, selected bool, annotated boo
 
 func tableWindow(lines []string, selected int, width int, height int) []string {
 	if height == 0 || len(lines) <= height {
-		return fitLines(lines, width, height)
+		return fitPaneLines(lines, width, height)
 	}
 
 	data := lines[2:]
@@ -746,7 +739,20 @@ func tableWindow(lines []string, selected int, width int, height int) []string {
 	visible := append([]string{}, lines[:2]...)
 	visible = append(visible, data[start:end]...)
 
-	return verticalScrollbar(fitLines(visible, width, height), 2, start, len(data), available, width)
+	return verticalScrollbar(fitPaneLines(visible, width, height), 2, start, len(data), available, width)
+}
+
+func paneContentWidth(width int) int {
+	return max(width-paneRightInset(width), 1)
+}
+
+const scrollbarGutterWidth = 2
+
+func paneRightInset(width int) int {
+	if width < 30 {
+		return 1
+	}
+	return scrollbarGutterWidth
 }
 
 func verticalScrollbar(
@@ -762,10 +768,20 @@ func verticalScrollbar(
 	}
 
 	trackHeight := min(viewportLength, len(lines)-contentStart)
-	start, height := scrollbarThumb(trackHeight, position, contentLength, trackHeight)
-	for row := start; row < start+height; row++ {
+	thumbStart, thumbHeight := scrollbarThumb(trackHeight, position, contentLength, trackHeight)
+	if thumbHeight == 0 {
+		return lines
+	}
+
+	gutterWidth := paneRightInset(width)
+	contentWidth := max(width-gutterWidth, 0)
+	for row := range trackHeight {
 		index := contentStart + row
-		lines[index] = truncate(lines[index], width-1) + muted.Render("█")
+		gutter := strings.Repeat(" ", gutterWidth)
+		if thumbStart <= row && row < thumbStart+thumbHeight {
+			gutter = strings.Repeat(" ", gutterWidth-1) + muted.Render("█")
+		}
+		lines[index] = styledCell(lines[index], contentWidth) + gutter
 	}
 	return lines
 }
@@ -807,6 +823,11 @@ func joinedRows(panes [][]string, widths []int) []string {
 	}
 
 	return result
+}
+
+func fitPaneLines(lines []string, width int, height int) []string {
+	lines = fitLines(lines, paneContentWidth(width), height)
+	return fitLines(lines, width, height)
 }
 
 func fitLines(lines []string, width int, height int) []string {

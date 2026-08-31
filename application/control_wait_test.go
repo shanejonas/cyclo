@@ -3,7 +3,7 @@ package application
 import (
 	"testing"
 
-	"github.com/shanejonas/cyclomatic-complexity-tui/domain"
+	"github.com/shanejonas/cyclo/domain"
 )
 
 func TestWaitForChangeAnswersWhenTheRevisionAdvances(t *testing.T) {

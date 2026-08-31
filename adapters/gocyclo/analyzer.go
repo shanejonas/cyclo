@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	cyclo "github.com/fzipp/gocyclo"
-	"github.com/shanejonas/cyclomatic-complexity-tui/domain"
+	"github.com/shanejonas/cyclo/domain"
 	cognit "github.com/uudashr/gocognit"
 )
 

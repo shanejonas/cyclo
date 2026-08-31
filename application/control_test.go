@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/shanejonas/cyclomatic-complexity-tui/application"
-	"github.com/shanejonas/cyclomatic-complexity-tui/domain"
+	"github.com/shanejonas/cyclo/application"
+	"github.com/shanejonas/cyclo/domain"
 )
 
 func TestControlAPIAdvertisesItsRuntimeAddressAndMethods(t *testing.T) {

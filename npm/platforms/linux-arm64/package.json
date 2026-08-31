@@ -1,0 +1,23 @@
+{
+  "name": "@shanejonas/cyclo-linux-arm64",
+  "version": "0.0.0",
+  "description": "cyclo prebuilt binary for linux/arm64",
+  "homepage": "https://github.com/shanejonas/cyclo",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shanejonas/cyclo.git"
+  },
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "files": [
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

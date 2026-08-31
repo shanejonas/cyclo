@@ -4,7 +4,7 @@ import (
 	"sort"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/shanejonas/cyclomatic-complexity-tui/domain"
+	"github.com/shanejonas/cyclo/domain"
 )
 
 type Analyzer interface {

@@ -2,18 +2,32 @@
 
 See cyclomatic paths and cognitive load in Go code in a TUI or hand it to an agent
 
+## Install
+
+Install `cyclo` globally with Go:
+
+```sh
+go install github.com/shanejonas/cyclo@latest
+```
+
+Or install the prebuilt binary from npm:
+
+```sh
+npm install --global @shanejonas/cyclo
+```
+
 ## Run
 
 Scan the current directory:
 
 ```sh
-go run .
+cyclo .
 ```
 
 Pass one or more files or directories to scan them instead:
 
 ```sh
-go run . ./domain ./adapters
+cyclo ./domain ./adapters
 ```
 
 Inside Git, Cyclo automatically shows added and deleted source lines against `main` or `master`.
