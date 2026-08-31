@@ -10,12 +10,6 @@ Install `cyclo` globally with Go:
 go install github.com/shanejonas/cyclo@latest
 ```
 
-Or install the prebuilt binary from npm:
-
-```sh
-npm install --global @shanejonas/cyclo
-```
-
 ## Run
 
 Scan the current directory:

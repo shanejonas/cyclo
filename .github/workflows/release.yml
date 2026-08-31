@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: write
-  id-token: write
 
 jobs:
   release:
@@ -26,20 +25,6 @@ jobs:
       - name: Test
         run: make check
 
-      - name: Set up Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-          registry-url: https://registry.npmjs.org
-          package-manager-cache: false
-
-      - name: Test npm shim
-        run: |
-          go build -buildvcs=false -o npm/test/host-bin .
-          node --test npm/test/*.test.mjs
-        env:
-          CYCLO_TEST_BINARY: npm/test/host-bin
-
       - name: Release binaries
         uses: goreleaser/goreleaser-action@v7
         with:
@@ -48,9 +33,3 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish npm packages
-        run: node npm/scripts/publish.mjs
-        env:
-          VERSION: ${{ github.ref_name }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
