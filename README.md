@@ -24,6 +24,11 @@ Pass one or more files or directories to scan them instead:
 cyclo ./domain ./adapters
 ```
 
+The treemap combines both complexity scores: tile area shows cyclomatic complexity,
+and color shows cognitive complexity from green to red. Files group their function
+tiles. Click a tile to inspect its source and both scores. The map appears in
+terminals at least 100 columns wide and 30 rows tall.
+
 Inside Git, Cyclo automatically shows added and deleted source lines against `main` or `master`.
 
 Cyclo starts a localhost JSON-RPC control API on port `8197`. Pick another port with `--control-port`:

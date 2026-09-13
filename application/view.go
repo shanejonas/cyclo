@@ -565,7 +565,7 @@ func (m Model) sourceViewportHeight() int {
 	width := m.terminalWidth()
 	linesAbove := 2
 	if m.showAnalytics(width) {
-		linesAbove += len(m.analyticsLines(width)) + 1
+		linesAbove += analyticsHeight + 1
 	}
 	return max(m.workspaceHeight(linesAbove)-m.sourceHeaderHeight(), 0)
 }

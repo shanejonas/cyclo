@@ -106,6 +106,8 @@ func (m Model) updateInput(message tea.Msg) (Model, tea.Cmd) {
 		return m.updateKey(message)
 	case tea.MouseWheelMsg:
 		m = m.updateMouseWheel(message)
+	case tea.MouseClickMsg:
+		m = m.selectTreemap(message)
 	}
 	return m, nil
 }

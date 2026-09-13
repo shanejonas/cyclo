@@ -73,10 +73,13 @@ func TestWideViewUsesAnalyticsTablesAndSource(t *testing.T) {
 	}
 
 	view := ansi.Strip(model.View().Content)
+	if strings.Count(view, "COMPLEXITY TREEMAP") != 1 || strings.Contains(view, "CYCLOMATIC · CC") || strings.Contains(view, "COGNITIVE · COG") {
+		t.Fatal("analytics must combine both metrics in one treemap")
+	}
 	for _, text := range []string{
-		"CC PEAK · PATHS",
-		"COG PEAK · LOAD",
-		"CC function distribution",
+		"COMPLEXITY TREEMAP",
+		"Area: cyclomatic complexity",
+		"Color: cognitive complexity",
 		"FILE",
 		"SUM",
 		"MAX COG",
@@ -483,14 +486,6 @@ func TestFunctionTableShowsFunctionLength(t *testing.T) {
 	}
 	if !strings.Contains((Model{}).functionRow(function, 40, false), "38;2;167;139;250") {
 		t.Fatal("cognitive complexity does not use purple")
-	}
-}
-
-func TestLargeNumber(t *testing.T) {
-	want := []string{"█████", "█   █", "█████", "    █", "█████"}
-	got := largeNumber(9)
-	if strings.Join(got, "\n") != strings.Join(want, "\n") {
-		t.Fatalf("large number = %q, want %q", got, want)
 	}
 }
 

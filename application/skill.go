@@ -27,6 +27,8 @@ Use Cyclo to locate Go code whose control flow deserves inspection. Treat comple
 
 Run ` + "`cyclo .`" + ` for the current repository or ` + "`cyclo [paths...]`" + ` for selected Go files and directories.
 
+The treemap combines both scores: area shows cyclomatic complexity, and color shows cognitive complexity from green to red. Files contain function tiles. Click a tile to select its source; the white outline marks the selected function. The map needs at least 100 columns and 30 rows.
+
 - Files shows cyclomatic aggregates and a purple cognitive peak as space allows.
 - Functions shows cyclomatic complexity as ` + "`CC`" + `, purple cognitive complexity as ` + "`COG`" + `, and physical size as ` + "`LINES`" + `.
 - Source shows the selected function. Cyclomatic source uses amber text. Cognitive source gets a dark purple background. Shared lines show amber on purple. Line numbers stay neutral. Red connectors enclose guards that return errors. Red return values are errors. Green return values are successful results; a trailing nil error remains neutral.

@@ -2,157 +2,112 @@ package application
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
+	"image"
 
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/shanejonas/cyclo/domain"
 )
 
-var digitRows = map[rune][5]string{
-	'0': {"█████", "█   █", "█   █", "█   █", "█████"},
-	'1': {"  █  ", " ██  ", "  █  ", "  █  ", "█████"},
-	'2': {"█████", "    █", "█████", "█    ", "█████"},
-	'3': {"█████", "    █", "█████", "    █", "█████"},
-	'4': {"█   █", "█   █", "█████", "    █", "    █"},
-	'5': {"█████", "█    ", "█████", "    █", "█████"},
-	'6': {"█████", "█    ", "█████", "█   █", "█████"},
-	'7': {"█████", "    █", "   █ ", "  █  ", "  █  "},
-	'8': {"█████", "█   █", "█████", "█   █", "█████"},
-	'9': {"█████", "█   █", "█████", "    █", "█████"},
-}
-
-func largeNumber(value int) []string {
-	digits := strconv.Itoa(max(value, 0))
-	lines := make([]string, 5)
-	for _, digit := range digits {
-		rows := digitRows[digit]
-		for row := range lines {
-			if lines[row] != "" {
-				lines[row] += " "
-			}
-			lines[row] += rows[row]
-		}
-	}
-
-	return lines
-}
-
-func reportPeak(report domain.Report) int {
-	peak := 0
-	for _, file := range report.Files {
-		peak = max(peak, file.Peak)
-	}
-
-	return peak
-}
-
-func cognitivePeak(report domain.Report) int {
-	peak := 0
-	for _, file := range report.Files {
-		peak = max(peak, file.CognitivePeak)
-	}
-
-	return peak
-}
-
-func complexityDistribution(report domain.Report) [3]int {
-	counts := [3]int{}
-	for _, file := range report.Files {
-		for _, function := range file.Functions {
-			switch {
-			case function.Complexity <= 5:
-				counts[0]++
-			case function.Complexity <= 10:
-				counts[1]++
-			default:
-				counts[2]++
-			}
-		}
-	}
-
-	return counts
-}
-
-func complexityBar(value int, maximum int, width int) string {
-	if width <= 0 {
-		return ""
-	}
-	if value <= 0 || maximum <= 0 {
-		return strings.Repeat("░", width)
-	}
-
-	filled := min((value*width+maximum-1)/maximum, width)
-	return strings.Repeat("█", filled) + strings.Repeat("░", width-filled)
-}
+const (
+	treemapHeight   = 11
+	analyticsHeight = treemapHeight + 3
+)
 
 func (m Model) analyticsLines(width int) []string {
-	peak := reportPeak(m.report)
-	load := cognitivePeak(m.report)
-	scoreWidth := min(max(width/6, 18), 24)
-	graphWidth := max(width-scoreWidth*2-6, 1)
-
-	score := []string{blue.Render("CC PEAK · PATHS")}
-	for _, line := range largeNumber(peak) {
-		score = append(score, metricStyle(peak).Bold(true).Render(line))
-	}
-	score = append(score, metricStyle(peak).Bold(true).Render(complexityStatus(peak)))
-	cognitiveScore := []string{cognitive.Render("COG PEAK · LOAD")}
-	for _, line := range largeNumber(load) {
-		cognitiveScore = append(cognitiveScore, cognitive.Bold(true).Render(line))
-	}
-	cognitiveScore = append(cognitiveScore, cognitive.Bold(true).Render("MENTAL LOAD"))
-
-	counts := complexityDistribution(m.report)
-	maximum := max(counts[0], counts[1], counts[2])
-	graph := []string{
-		blue.Render("CC function distribution"),
-		fmt.Sprintf(
-			"%s %s %s  %s %s  ·  %s %s %s  %s %s",
-			blue.Render("CC"),
-			muted.Render("TOTAL"),
-			text.Render(strconv.Itoa(m.report.Total)),
-			muted.Render("AVG"),
-			text.Render(fmt.Sprintf("%.1f", m.report.Average)),
-			cognitive.Render("COG"),
-			muted.Render("TOTAL"),
-			text.Render(strconv.Itoa(m.report.CognitiveTotal)),
-			muted.Render("AVG"),
-			text.Render(fmt.Sprintf("%.1f", m.report.CognitiveAverage)),
-		),
-		"",
-		distributionLine("LOW", "1–5", counts[0], maximum, graphWidth, green),
-		distributionLine("WATCH", "6–10", counts[1], maximum, graphWidth, amber),
-		distributionLine("HIGH", "11+", counts[2], maximum, graphWidth, danger),
-		muted.Render(fmt.Sprintf("%d files · %d functions", len(m.report.Files), m.report.Functions)),
-	}
-
+	widths := analyticsWidths(width)
+	chart := m.complexityTreemap(widths[0])
 	return joinedRows(
-		[][]string{score, cognitiveScore, graph},
-		[]int{scoreWidth, scoreWidth, graphWidth},
+		[][]string{
+			m.treemapLines(chart),
+			m.treemapLegend(widths[1]),
+		},
+		widths,
 	)
 }
 
-func distributionLine(
-	label string,
-	rangeLabel string,
-	count int,
-	maximum int,
-	width int,
-	style lipgloss.Style,
-) string {
-	barWidth := max(width-23, 4)
-	bar := style.Render(complexityBar(count, maximum, barWidth))
-	return fmt.Sprintf("%-6s %-5s %s %d", label, rangeLabel, bar, count)
+func analyticsWidths(width int) []int {
+	return []int{width - 35, 32}
 }
 
-func complexityStatus(value int) string {
-	if value > 10 {
-		return "HIGH"
-	}
-	if value > 5 {
-		return "WATCH"
-	}
+func (m Model) treemapLines(s treemap) []string {
+	lines := []string{blue.Render("COMPLEXITY TREEMAP")}
+	lines = append(lines, s.render(m.fileIndex, m.functionIndex)...)
+	count := float64(max(s.count, 1))
+	return append(lines,
+		text.Render(fmt.Sprintf("CC %d · peak %d · avg %.1f", s.total, s.peak, float64(s.total)/count)),
+		muted.Render(fmt.Sprintf("COG %d · peak %d · avg %.1f", s.cognitiveTotal, s.cognitivePeak, float64(s.cognitiveTotal)/count)),
+	)
+}
 
-	return "LOW"
+func (m Model) treemapLegend(width int) []string {
+	lines := []string{
+		blue.Render("SELECTION"),
+		muted.Render("Area: cyclomatic complexity"),
+		muted.Render("Color: cognitive complexity"),
+		muted.Render("COG scale"),
+		treemapSwatch(0) + " 0  " + treemapSwatch(10) + " 10  " + treemapSwatch(20) + " 20  " + treemapSwatch(30) + " 30+",
+		"",
+	}
+	if m.refreshing {
+		return append(lines, muted.Render("Scanning Go code…"))
+	}
+	if m.err != nil {
+		return append(lines, danger.Render("Scan failed · r to retry"))
+	}
+	file, ok := m.selectedFile()
+	if !ok {
+		return append(lines, muted.Render("No Go functions to map"))
+	}
+	lines = append(lines,
+		text.Render(truncate(displayPath(m.report.Root, file.Path), width)),
+		fmt.Sprintf("CC %d · COG %d", file.Total, file.CognitiveTotal),
+	)
+	function, ok := m.selectedFunction()
+	if ok {
+		lines = append(lines,
+			text.Bold(true).Render(truncate(function.Name, width)),
+			fmt.Sprintf("CC %d · COG %d", function.Complexity, function.CognitiveComplexity),
+		)
+	}
+	return append(lines,
+		muted.Render("White outline = selected"),
+		muted.Render("Click a tile · j/k to move"),
+		muted.Render(fmt.Sprintf("%d files · %d functions", len(m.report.Files), m.report.Functions)),
+	)
+}
+
+func treemapSwatch(score int) string {
+	return lipgloss.NewStyle().Foreground(treemapColor(score)).Render("█")
+}
+
+func (m Model) selectTreemap(message tea.MouseClickMsg) Model {
+	if m.annotating || message.Button != tea.MouseLeft {
+		return m
+	}
+	tile, ok := m.treemapTileAt(message.X, message.Y)
+	if !ok {
+		return m
+	}
+	m.fileIndex = tile.file
+	m.functionIndex = max(tile.function, 0)
+	m.focus = functionsPane
+	if tile.function < 0 {
+		m.focus = filesPane
+	}
+	m = m.resetSourceWorkspace()
+	m.revision++
+	return m
+}
+
+func (m Model) treemapTileAt(x int, y int) (treemapTile, bool) {
+	if !m.showAnalytics(m.terminalWidth()) {
+		return treemapTile{}, false
+	}
+	y -= 3 // Header, rule, chart title.
+	widths := analyticsWidths(m.terminalWidth())
+	if !image.Pt(x, y).In(image.Rect(0, 0, widths[0], treemapHeight)) {
+		return treemapTile{}, false
+	}
+	chart := m.complexityTreemap(widths[0])
+	return chart.tileAt(image.Pt(x, y*2))
 }
