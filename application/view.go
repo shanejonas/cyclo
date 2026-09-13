@@ -149,7 +149,7 @@ func (m Model) footer(width int) string {
 		keys := green.Render("tab") + muted.Render(" panes · ") +
 			green.Render("j/k") + muted.Render(" move · ") +
 			green.Render(",/.") + muted.Render(" files · ") +
-			green.Render("[/]") + muted.Render(" notes · ") +
+			green.Render("[/]") + muted.Render(m.annotationNavigationLabel()+" · ") +
 			green.Render("r") + muted.Render(" · ") + green.Render("q")
 		if m.focus == detailsPane {
 			keys += muted.Render(" · ") + green.Render("v/a/d") + muted.Render(" source")
@@ -160,7 +160,7 @@ func (m Model) footer(width int) string {
 	keys := green.Render("tab/shift+tab") + muted.Render(" panes · ") +
 		green.Render("j/k") + muted.Render(" move · ") +
 		green.Render(",/.") + muted.Render(" files · ") +
-		green.Render("[/]") + muted.Render(" notes · ") +
+		green.Render("[/]") + muted.Render(m.annotationNavigationLabel()+" · ") +
 		green.Render("r") + muted.Render(" refresh · ") +
 		green.Render("q") + muted.Render(" quit")
 	if m.focus == detailsPane {
@@ -270,7 +270,7 @@ func (m Model) functionRow(function domain.Function, width int, selected bool) s
 	nameWidth := max(width-16, 1)
 	count := 0
 	if file, ok := m.selectedFile(); ok {
-		count = m.functionAnnotationCount(file.Path, function.Line)
+		count = m.functionAnnotationCount(file.Path, function)
 	}
 	name := text.Render(padText(truncate(function.Name, nameWidth), nameWidth))
 	complexity := metricStyle(function.Complexity).Render(fmt.Sprintf(" %3d", function.Complexity))
@@ -285,21 +285,14 @@ func functionLineCount(function domain.Function) int {
 }
 
 func (m Model) sourceLines(width int, height int, title string) []string {
-	contentWidth := paneContentWidth(width)
-	titleLine := m.paneTitle(title, detailsPane)
-	if count := len(m.visibleAnnotations()); count > 0 {
-		noun := "NOTE"
-		if count > 1 {
-			noun = "NOTES"
-		}
-		titleLine += muted.Render(" · ") + amber.Bold(true).Render(fmt.Sprintf("◆ %d %s", count, noun))
+	annotation, ok := m.unmatchedAnnotation()
+	if ok {
+		return m.savedAnnotationLines(annotation, width, height, title)
 	}
+	contentWidth := paneContentWidth(width)
 	file, fileOK := m.selectedFile()
 	function, functionOK := m.selectedFunction()
-	if functionOK {
-		titleLine += diffTitle(m.report.DiffBase, function.DiffLines)
-	}
-	lines := []string{titleLine}
+	lines := []string{m.sourceTitle(title, function)}
 	if m.annotationError != nil {
 		lines = append(lines, danger.Render(m.annotationError.Error()))
 	}
@@ -313,13 +306,30 @@ func (m Model) sourceLines(width int, height int, title string) []string {
 		text.Render(function.Package+" · "+function.Name),
 	)
 	lines = append(lines, rule(contentWidth))
+	return m.sourceBody(lines, function, width, height)
+}
+
+func (m Model) sourceTitle(title string, function domain.Function) string {
+	line := m.paneTitle(title, detailsPane)
+	count := len(m.visibleAnnotations())
+	if count > 0 {
+		noun := "NOTE"
+		if count > 1 {
+			noun = "NOTES"
+		}
+		line += muted.Render(" · ") + amber.Bold(true).Render(fmt.Sprintf("◆ %d %s", count, noun))
+	}
+	return line + diffTitle(m.report.DiffBase, function.DiffLines)
+}
+
+func (m Model) sourceBody(lines []string, function domain.Function, width int, height int) []string {
 	code := m.selectedSourceCodeLines(function)
 	contentStart := len(lines)
 	available := max(height-len(lines), 0)
 	if height == 0 {
 		available = len(code)
 	}
-	lines = append(lines, m.sourceDisplayWindow(code, function, contentWidth, available)...)
+	lines = append(lines, m.sourceDisplayWindow(code, function, paneContentWidth(width), available)...)
 	rendered := fitPaneLines(lines, width, height)
 	if height == 0 {
 		return rendered
@@ -334,7 +344,14 @@ func sourceCodeLines(function domain.Function) []string {
 }
 
 func (m Model) selectedSourceCodeLines(function domain.Function) []string {
-	return renderSourceCodeLines(function, m, true)
+	lines := renderSourceCodeLines(function, m, true)
+	if function.Source == "" {
+		return lines
+	}
+	for index := range lines {
+		lines[index] = m.highlightSourceLine(function.Line+index, lines[index])
+	}
+	return lines
 }
 
 func renderSourceCodeLines(function domain.Function, model Model, interactive bool) []string {
@@ -348,54 +365,45 @@ func renderSourceCodeLines(function domain.Function, model Model, interactive bo
 	for index, line := range lines {
 		lineNumber := function.Line + index
 		numberStyle, styledLine := styledSourceLine(function, lineNumber, line, successfulReturns[index])
-		gutter := muted.Render("  ")
-		if interactive {
-			gutter, numberStyle = model.sourceGutter(lineNumber, numberStyle)
-		}
-		diff := ""
-		if len(function.DiffLines) > 0 {
-			diff = diffMarker(function.DiffLines, lineNumber)
-		}
-		number := numberStyle.Render(fmt.Sprintf("%4d │ ", lineNumber))
-		result = append(
-			result,
-			gutter+diff+number+strings.Repeat(" ", sourceOverlayPadding)+styledLine,
-		)
+		prefix := model.sourceLinePrefix(function, lineNumber, numberStyle, interactive)
+		result = append(result, prefix+styledLine)
 	}
 
 	prefixWidth := sourceLinePrefixWidth
 	if len(function.DiffLines) > 0 {
 		prefixWidth++
 	}
-	result = overlayErrorPaths(result, lines, prefixWidth)
+	return overlayErrorPaths(result, lines, prefixWidth)
+}
+
+func (m Model) sourceLinePrefix(function domain.Function, line int, numberStyle lipgloss.Style, interactive bool) string {
+	gutter := muted.Render("  ")
 	if interactive {
-		for index := range result {
-			result[index] = model.highlightSourceLine(function.Line+index, result[index])
-		}
+		gutter, numberStyle = m.sourceGutter(line, numberStyle)
 	}
-	return result
+	diff := ""
+	if len(function.DiffLines) > 0 {
+		diff = diffMarker(function.DiffLines, line)
+	}
+	number := numberStyle.Render(fmt.Sprintf("%4d │ ", line))
+	return gutter + diff + number + strings.Repeat(" ", sourceOverlayPadding)
 }
 
 func styledSourceLine(function domain.Function, lineNumber int, line string, successfulReturn bool) (lipgloss.Style, string) {
-	cyclomaticLine := cyclomaticBearingLine(function.CyclomaticDiagnostics, lineNumber)
-	cognitiveLine := cognitiveBearingLine(function.CognitiveDiagnostics, lineNumber)
-	numberStyle := muted
-
-	switch {
-	case errorReturn(line):
-		return numberStyle, styledReturn(line, danger, true)
-	case successfulReturn:
-		return numberStyle, styledReturn(line, green, false)
-	case cyclomaticLine && cognitiveLine:
-		style := amber.Background(cognitiveBackground)
-		return numberStyle, style.Render(line)
-	case cyclomaticLine:
-		return numberStyle, amber.Render(line)
-	case cognitiveLine:
-		return numberStyle, text.Background(cognitiveBackground).Render(line)
-	default:
-		return numberStyle, text.Render(line)
+	if errorReturn(line) {
+		return muted, styledReturn(line, danger, true)
 	}
+	if successfulReturn {
+		return muted, styledReturn(line, green, false)
+	}
+	style := text
+	if cyclomaticBearingLine(function.CyclomaticDiagnostics, lineNumber) {
+		style = amber
+	}
+	if cognitiveBearingLine(function.CognitiveDiagnostics, lineNumber) {
+		style = style.Background(cognitiveBackground)
+	}
+	return muted, style.Render(line)
 }
 
 func normalizedSourceLines(source string) []string {
@@ -408,7 +416,7 @@ func normalizedSourceLines(source string) []string {
 
 func (m Model) sourceGutter(line int, numberStyle lipgloss.Style) (string, lipgloss.Style) {
 	cursor := m.focus == detailsPane && line == m.sourceLine()
-	selected := m.lineSelection != nil && m.lineSelection.StartLine <= line && line <= m.lineSelection.EndLine
+	selected := m.lineSelection.contains(line)
 	marker := " "
 	if selected {
 		marker = "│"
@@ -513,21 +521,24 @@ func (m Model) sourceAnnotationRows(line int, width int) []string {
 			position = fmt.Sprintf("%d/%d ", index+1, len(annotations))
 		}
 		prefix := muted.Render("      ╰─") + amber.Bold(true).Render("◆ "+position)
-		messageWidth := max(width-ansi.StringWidth(prefix), 1)
-		messages := strings.Split(ansi.Wrap(annotation.Message, messageWidth, ""), "\n")
-		for messageIndex, message := range messages {
-			indent := strings.Repeat(" ", ansi.StringWidth(prefix))
-			if messageIndex == 0 {
-				indent = prefix
-			}
-			rows = append(rows, indent+amber.Render(message))
-		}
+		rows = append(rows, annotationMessageRows(annotation.Message, prefix, width)...)
+	}
+	return rows
+}
+
+func annotationMessageRows(message string, prefix string, width int) []string {
+	indent := strings.Repeat(" ", ansi.StringWidth(prefix))
+	messageWidth := max(width-ansi.StringWidth(prefix), 1)
+	rows := strings.Split(ansi.Wrap(message, messageWidth, ""), "\n")
+	for index, row := range rows {
+		rows[index] = prefix + amber.Render(row)
+		prefix = indent
 	}
 	return rows
 }
 
 func (m Model) highlightSourceLine(line int, rendered string) string {
-	if m.lineSelection != nil && m.lineSelection.StartLine <= line && line <= m.lineSelection.EndLine {
+	if m.lineSelection.contains(line) {
 		return withBackground(rendered, "\x1b[48;2;45;52;54m")
 	}
 	for _, annotation := range m.visibleAnnotations() {
@@ -838,7 +849,7 @@ func fitLines(lines []string, width int, height int) []string {
 	for _, line := range lines {
 		result = append(result, styledCell(line, width))
 	}
-	for height > 0 && len(result) < height {
+	for len(result) < height {
 		result = append(result, strings.Repeat(" ", width))
 	}
 

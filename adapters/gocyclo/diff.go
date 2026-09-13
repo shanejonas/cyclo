@@ -52,33 +52,54 @@ func gitText(root string, args ...string) (string, error) {
 	return string(output), err
 }
 
+func (d gitDiff) apply(file domain.File) domain.File {
+	if d.root == "" {
+		return file
+	}
+	return fileWithDiff(file, d.lines(file.Path))
+}
+
+type diffPosition struct {
+	oldLine int
+	newLine int
+}
+
 func parseDiff(output string) []domain.DiffLine {
 	result := make([]domain.DiffLine, 0)
-	oldLine, newLine := 0, 0
+	position := diffPosition{}
 	inHunk := false
 	for _, line := range strings.Split(output, "\n") {
 		matches := diffHunk.FindStringSubmatch(line)
 		if matches != nil {
-			oldLine, newLine = hunkLines(matches)
+			position.oldLine, position.newLine = hunkLines(matches)
 			inHunk = true
 			continue
 		}
 		if !inHunk || line == "" {
 			continue
 		}
-		switch line[0] {
-		case '-':
-			result = append(result, domain.DiffLine{Kind: domain.DiffDeleted, OldLine: oldLine, NewLine: newLine, Text: line[1:]})
-			oldLine++
-		case '+':
-			result = append(result, domain.DiffLine{Kind: domain.DiffAdded, OldLine: oldLine, NewLine: newLine, Text: line[1:]})
-			newLine++
-		case ' ':
-			oldLine++
-			newLine++
+		change := position.advance(line)
+		if change.Kind != "" {
+			result = append(result, change)
 		}
 	}
 	return result
+}
+
+func (p *diffPosition) advance(line string) domain.DiffLine {
+	change := domain.DiffLine{OldLine: p.oldLine, NewLine: p.newLine, Text: line[1:]}
+	switch line[0] {
+	case '-':
+		change.Kind = domain.DiffDeleted
+		p.oldLine++
+	case '+':
+		change.Kind = domain.DiffAdded
+		p.newLine++
+	case ' ':
+		p.oldLine++
+		p.newLine++
+	}
+	return change
 }
 
 func hunkLines(matches []string) (int, int) {
@@ -105,11 +126,20 @@ func fileWithDiff(file domain.File, lines []domain.DiffLine) domain.File {
 func functionDiff(lines []domain.DiffLine, start int, end int) []domain.DiffLine {
 	result := make([]domain.DiffLine, 0)
 	for _, line := range lines {
-		inside := line.Kind == domain.DiffAdded && start <= line.NewLine && line.NewLine <= end
-		inside = inside || line.Kind == domain.DiffDeleted && start <= line.NewLine && line.NewLine <= end+1
-		if inside {
+		if diffInsideFunction(line, start, end) {
 			result = append(result, line)
 		}
 	}
 	return result
+}
+
+func diffInsideFunction(line domain.DiffLine, start int, end int) bool {
+	switch line.Kind {
+	case domain.DiffDeleted:
+		end++
+	case domain.DiffAdded:
+	default:
+		return false
+	}
+	return start <= line.NewLine && line.NewLine <= end
 }

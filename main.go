@@ -28,7 +28,7 @@ func main() {
 	}
 }
 
-func run(args []string, output io.Writer) (result error) {
+func run(args []string, output io.Writer) error {
 	if len(args) > 0 && args[0] == "--skill" {
 		if len(args) != 1 {
 			return errors.New("usage: cyclo --skill")
@@ -40,6 +40,10 @@ func run(args []string, output io.Writer) (result error) {
 	if err != nil {
 		return err
 	}
+	return runTUI(options, output)
+}
+
+func runTUI(options runOptions, output io.Writer) (result error) {
 	statePath, err := sqlite.StatePath()
 	if err != nil {
 		return err

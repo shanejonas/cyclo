@@ -35,7 +35,7 @@ Inside a Git worktree, Source automatically shows the diff against ` + "`main`" 
 
 Use ` + "`tab`" + ` and ` + "`shift+tab`" + ` to change panes, ` + "`j/k`" + ` to move, ` + "`,`" + ` and ` + "`.`" + ` to change files from any pane, ` + "`r`" + ` to refresh, and ` + "`q`" + ` to quit.
 
-Press ` + "`[`" + ` and ` + "`]`" + ` from any pane to visit the previous or next note across the report. Cyclo selects its file and function, then reveals it in Source. Files and Functions mark rows containing notes with amber diamonds.
+Press ` + "`[`" + ` and ` + "`]`" + ` from any pane to visit the previous or next note across the report. Navigation includes all saved notes and wraps at either end. The footer shows your position. Matched notes reveal their current source. Unmatched notes show their saved text in Source; ` + "`j/k`" + ` scrolls it and ` + "`d`" + ` removes the note. Files and Functions mark rows containing notes with amber diamonds.
 
 In Source, ` + "`j/k`" + ` moves a line cursor and keeps it visible. Press ` + "`v`" + ` to start or clear a visual line selection, then ` + "`a`" + ` to attach a note. Use ` + "`d`" + ` to remove the note under the cursor. ` + "`esc`" + ` clears the line selection.
 

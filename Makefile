@@ -5,7 +5,7 @@ check:
 	$(MAKE) complexity
 
 complexity:
-	go run -buildvcs=false github.com/fzipp/gocyclo/cmd/gocyclo -over 10 -ignore '_test.go' .
+	go run -buildvcs=false github.com/fzipp/gocyclo/cmd/gocyclo -over 6 -ignore '_test.go' .
 
 fmt:
 	go fmt ./...

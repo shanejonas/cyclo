@@ -73,7 +73,7 @@ func gherkyOptions(t *testing.T) *godog.Options {
 var probeVerifiedSteps = []string{
 	"the complexity TUI is started without a path",
 	"the current directory is the scan target",
-	"its production functions have complexity at most 10",
+	"its production functions have complexity at most 6",
 	"the scan summary is visible",
 	"an analyzed path contains Go files with different complexity",
 	"files are ranked by aggregate complexity",
@@ -213,8 +213,8 @@ func selfScan() error {
 	}
 
 	path, function, maximum := maximumProductionComplexity(analyzer.report)
-	if maximum > 10 {
-		return fmt.Errorf("production complexity ceiling exceeded: %s %s = %d, want <= 10", path, function, maximum)
+	if maximum > 6 {
+		return fmt.Errorf("production complexity ceiling exceeded: %s %s = %d, want <= 6", path, function, maximum)
 	}
 
 	view := plain(model.View().Content)

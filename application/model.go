@@ -81,25 +81,33 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	previousRevision := m.revision
 	var command tea.Cmd
 	switch message := message.(type) {
-	case tea.WindowSizeMsg:
-		m.width = message.Width
-		m.height = message.Height
 	case reportMsg:
 		m = m.withReport(message)
 	case controlCommand:
 		m, command = m.updateControl(message)
 	case changeWaiterTimeoutMsg:
 		m = m.timeoutChangeWaiter(message)
-	case tea.KeyPressMsg:
-		m, command = m.updateKey(message)
-	case tea.MouseWheelMsg:
-		m = m.updateMouseWheel(message)
+	default:
+		m, command = m.updateInput(message)
 	}
 
 	if m.revision > previousRevision {
 		m = m.answerChangeWaiters()
 	}
 	return m, command
+}
+
+func (m Model) updateInput(message tea.Msg) (Model, tea.Cmd) {
+	switch message := message.(type) {
+	case tea.WindowSizeMsg:
+		m.width = message.Width
+		m.height = message.Height
+	case tea.KeyPressMsg:
+		return m.updateKey(message)
+	case tea.MouseWheelMsg:
+		m = m.updateMouseWheel(message)
+	}
+	return m, nil
 }
 
 func (m Model) analyze() tea.Cmd {
@@ -119,6 +127,7 @@ func (m Model) withReport(message reportMsg) Model {
 		m.functionIndex = 0
 		m = m.resetSourceWorkspace()
 		m = m.loadAnnotations()
+		m = m.relocateAnnotations()
 	}
 
 	if m.refreshReply != nil {
@@ -143,7 +152,8 @@ func (m Model) updateKey(message tea.KeyPressMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) updateGlobalKey(key string) (Model, tea.Cmd, bool) {
-	if next, handled := m.updateReviewNavigationKey(key); handled {
+	next, handled := m.updateReviewNavigationKey(key)
+	if handled {
 		return next, nil, true
 	}
 
@@ -157,6 +167,14 @@ func (m Model) updateGlobalKey(key string) (Model, tea.Cmd, bool) {
 		m.refreshing = true
 		m.revision++
 		return m, m.analyze(), true
+	default:
+		next, handled = m.updateFocusKey(key)
+		return next, nil, handled
+	}
+}
+
+func (m Model) updateFocusKey(key string) (Model, bool) {
+	switch key {
 	case "tab":
 		m = m.setFocus(nextPane(m.focus, 1))
 	case "shift+tab":
@@ -164,9 +182,9 @@ func (m Model) updateGlobalKey(key string) (Model, tea.Cmd, bool) {
 	case "esc":
 		m = m.clearLineSelection()
 	default:
-		return m, nil, false
+		return m, false
 	}
-	return m, nil, true
+	return m, true
 }
 
 func (m Model) updateReviewNavigationKey(key string) (Model, bool) {
