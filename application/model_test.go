@@ -147,8 +147,8 @@ func selfScan() error {
 	}
 
 	path, function, maximum := maximumProductionComplexity(analyzer.report)
-	if maximum > 10 {
-		return fmt.Errorf("production complexity ceiling exceeded: %s %s = %d, want <= 10", path, function, maximum)
+	if maximum > 6 {
+		return fmt.Errorf("production complexity ceiling exceeded: %s %s = %d, want <= 6", path, function, maximum)
 	}
 
 	view := plain(model.View().Content)

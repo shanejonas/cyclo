@@ -27,6 +27,8 @@ Use Cyclo to locate Go code whose control flow deserves inspection. Treat comple
 
 Run ` + "`cyclo .`" + ` for the current repository or ` + "`cyclo [paths...]`" + ` for selected Go files and directories.
 
+The treemap combines both scores: area shows cyclomatic complexity, and color shows cognitive complexity from green to red. Files contain function tiles. Click a tile to select its source; the white outline marks the selected function. The map needs at least 100 columns and 30 rows.
+
 - Files shows cyclomatic aggregates and a purple cognitive peak as space allows.
 - Functions shows cyclomatic complexity as ` + "`CC`" + `, purple cognitive complexity as ` + "`COG`" + `, and physical size as ` + "`LINES`" + `.
 - Source shows the selected function. Cyclomatic source uses amber text. Cognitive source gets a dark purple background. Shared lines show amber on purple. Line numbers stay neutral. Red connectors enclose guards that return errors. Red return values are errors. Green return values are successful results; a trailing nil error remains neutral.
@@ -35,7 +37,7 @@ Inside a Git worktree, Source automatically shows the diff against ` + "`main`" 
 
 Use ` + "`tab`" + ` and ` + "`shift+tab`" + ` to change panes, ` + "`j/k`" + ` to move, ` + "`,`" + ` and ` + "`.`" + ` to change files from any pane, ` + "`r`" + ` to refresh, and ` + "`q`" + ` to quit.
 
-Press ` + "`[`" + ` and ` + "`]`" + ` from any pane to visit the previous or next note across the report. Cyclo selects its file and function, then reveals it in Source. Files and Functions mark rows containing notes with amber diamonds.
+Press ` + "`[`" + ` and ` + "`]`" + ` from any pane to visit the previous or next note across the report. Navigation includes all saved notes and wraps at either end. The footer shows your position. Matched notes reveal their current source. Unmatched notes show their saved text in Source; ` + "`j/k`" + ` scrolls it and ` + "`d`" + ` removes the note. Files and Functions mark rows containing notes with amber diamonds.
 
 In Source, ` + "`j/k`" + ` moves a line cursor and keeps it visible. Press ` + "`v`" + ` to start or clear a visual line selection, then ` + "`a`" + ` to attach a note. Use ` + "`d`" + ` to remove the note under the cursor. ` + "`esc`" + ` clears the line selection.
 

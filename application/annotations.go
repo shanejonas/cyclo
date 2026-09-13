@@ -19,6 +19,10 @@ type LineSelection struct {
 	Text       string `json:"text"`
 }
 
+func (s *LineSelection) contains(line int) bool {
+	return s != nil && s.StartLine <= line && line <= s.EndLine
+}
+
 type Annotation = domain.Annotation
 
 type AnnotationStore interface {
@@ -39,6 +43,9 @@ func (m Model) resetSourceWorkspace() Model {
 }
 
 func (m Model) moveSourceCursor(delta int) Model {
+	if annotation, ok := m.unmatchedAnnotation(); ok {
+		return m.scrollSavedAnnotation(annotation, delta)
+	}
 	lines := m.selectedSourceLines()
 	if len(lines) == 0 {
 		return m
@@ -285,17 +292,21 @@ func (m Model) visibleAnnotations() []Annotation {
 
 	result := make([]Annotation, 0)
 	for _, annotation := range m.annotations {
-		if annotation.Path == file.Path && annotation.FunctionLine == function.Line {
+		if annotation.Path == file.Path && annotationMatchesFunction(annotation, function) {
 			result = append(result, annotation)
 		}
 	}
 	sort.SliceStable(result, func(left int, right int) bool {
-		if result[left].StartLine != result[right].StartLine {
-			return result[left].StartLine < result[right].StartLine
-		}
-		return result[left].EndLine < result[right].EndLine
+		return annotationBefore(result[left], result[right])
 	})
 	return result
+}
+
+func annotationBefore(left Annotation, right Annotation) bool {
+	if left.StartLine != right.StartLine {
+		return left.StartLine < right.StartLine
+	}
+	return left.EndLine < right.EndLine
 }
 
 func (m Model) fileAnnotationCount(path string) int {
@@ -308,10 +319,10 @@ func (m Model) fileAnnotationCount(path string) int {
 	return count
 }
 
-func (m Model) functionAnnotationCount(path string, line int) int {
+func (m Model) functionAnnotationCount(path string, function domain.Function) int {
 	count := 0
 	for _, annotation := range m.annotations {
-		if annotation.Path == path && annotation.FunctionLine == line {
+		if annotation.Path == path && annotationMatchesFunction(annotation, function) {
 			count++
 		}
 	}
@@ -330,7 +341,10 @@ func (m Model) annotationAtCursor() (Annotation, bool) {
 }
 
 func (m Model) removeAnnotationAtCursor() Model {
-	annotation, ok := m.annotationAtCursor()
+	annotation, ok := m.unmatchedAnnotation()
+	if !ok {
+		annotation, ok = m.annotationAtCursor()
+	}
 	if !ok {
 		return m
 	}
@@ -378,11 +392,13 @@ func (m Model) focusAdjacentAnnotation(delta int) Model {
 	m.functionIndex = target.functionIndex
 	m = m.resetSourceWorkspace()
 	m.focus = detailsPane
-	m.sourceCursor = annotation.EndLine - annotation.FunctionLine
 	m.activeAnnotationID = annotation.ID
-	m = m.keepSourceCursorVisible()
 	m.revision++
-	return m
+	if target.functionIndex < 0 {
+		return m
+	}
+	m.sourceCursor = annotation.EndLine - annotation.FunctionLine
+	return m.keepSourceCursorVisible()
 }
 
 type annotationTarget struct {
@@ -393,22 +409,30 @@ type annotationTarget struct {
 
 func (m Model) annotationTargets() []annotationTarget {
 	targets := make([]annotationTarget, 0, len(m.annotations))
-	for fileIndex, file := range m.report.Files {
-		for functionIndex, function := range file.Functions {
-			for _, annotation := range m.annotations {
-				if annotation.Path != file.Path || annotation.FunctionLine != function.Line {
-					continue
-				}
-				targets = append(targets, annotationTarget{
-					Annotation: annotation, fileIndex: fileIndex, functionIndex: functionIndex,
-				})
-			}
-		}
+	for _, annotation := range m.annotations {
+		targets = append(targets, m.annotationTarget(annotation))
 	}
 	sort.SliceStable(targets, func(left int, right int) bool {
 		return annotationTargetBefore(targets[left], targets[right])
 	})
 	return targets
+}
+
+func (m Model) annotationTarget(annotation Annotation) annotationTarget {
+	target := annotationTarget{Annotation: annotation, fileIndex: len(m.report.Files), functionIndex: -1}
+	for fileIndex, file := range m.report.Files {
+		if file.Path != annotation.Path {
+			continue
+		}
+		target.fileIndex = fileIndex
+		for functionIndex, function := range file.Functions {
+			if annotationMatchesFunction(annotation, function) {
+				target.functionIndex = functionIndex
+				return target
+			}
+		}
+	}
+	return target
 }
 
 func annotationTargetBefore(left annotationTarget, right annotationTarget) bool {
@@ -418,10 +442,7 @@ func annotationTargetBefore(left annotationTarget, right annotationTarget) bool 
 	if left.functionIndex != right.functionIndex {
 		return left.functionIndex < right.functionIndex
 	}
-	if left.StartLine != right.StartLine {
-		return left.StartLine < right.StartLine
-	}
-	return left.EndLine < right.EndLine
+	return annotationBefore(left.Annotation, right.Annotation)
 }
 
 func (m Model) adjacentAnnotationTargetIndex(targets []annotationTarget, delta int) int {
@@ -431,13 +452,21 @@ func (m Model) adjacentAnnotationTargetIndex(targets []annotationTarget, delta i
 		}
 	}
 	if delta > 0 {
-		for index, target := range targets {
-			if m.annotationTargetAfterCursor(target) {
-				return index
-			}
-		}
-		return 0
+		return m.nextAnnotationTargetIndex(targets)
 	}
+	return m.previousAnnotationTargetIndex(targets)
+}
+
+func (m Model) nextAnnotationTargetIndex(targets []annotationTarget) int {
+	for index, target := range targets {
+		if m.annotationTargetAfterCursor(target) {
+			return index
+		}
+	}
+	return 0
+}
+
+func (m Model) previousAnnotationTargetIndex(targets []annotationTarget) int {
 	for index := len(targets) - 1; index >= 0; index-- {
 		if m.annotationTargetBeforeCursor(targets[index]) {
 			return index
@@ -450,6 +479,9 @@ func (m Model) annotationTargetAfterCursor(target annotationTarget) bool {
 	if target.fileIndex != m.fileIndex {
 		return target.fileIndex > m.fileIndex
 	}
+	if target.functionIndex < 0 {
+		return true
+	}
 	if target.functionIndex != m.functionIndex {
 		return target.functionIndex > m.functionIndex
 	}
@@ -459,6 +491,9 @@ func (m Model) annotationTargetAfterCursor(target annotationTarget) bool {
 func (m Model) annotationTargetBeforeCursor(target annotationTarget) bool {
 	if target.fileIndex != m.fileIndex {
 		return target.fileIndex < m.fileIndex
+	}
+	if target.functionIndex < 0 {
+		return true
 	}
 	if target.functionIndex != m.functionIndex {
 		return target.functionIndex < m.functionIndex

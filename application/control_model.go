@@ -136,6 +136,13 @@ func (m Model) updateSourceControl(command controlCommand) (Model, tea.Cmd) {
 		return m.scrollSource(command)
 	case revealLinesAction:
 		return m.revealLines(command)
+	default:
+		return m.updateReviewControl(command)
+	}
+}
+
+func (m Model) updateReviewControl(command controlCommand) (Model, tea.Cmd) {
+	switch command.action {
 	case clearLineSelectionAction:
 		return m.clearControlLineSelection(command)
 	case annotateLinesAction:

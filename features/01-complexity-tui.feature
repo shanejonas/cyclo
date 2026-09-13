@@ -6,7 +6,7 @@ Feature: Explore Go complexity in the terminal
     Given the complexity TUI is started without a path
     When its own repository has been analyzed
     Then the current directory is the scan target
-    And its production functions have complexity at most 10
+    And its production functions have complexity at most 6
     And the scan summary is visible
 
   Scenario: Rank files and functions by complexity

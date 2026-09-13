@@ -29,19 +29,15 @@ func (Analyzer) Analyze(paths []string) (domain.Report, error) {
 	}
 
 	report := domain.Report{Root: commonRoot(roots)}
-	diff, hasDiff := newGitDiff(report.Root)
-	if hasDiff {
-		report.DiffBase = diff.base
-	}
+	diff, _ := newGitDiff(report.Root)
+	report.DiffBase = diff.base
 	for _, path := range files {
 		file, err := analyzeFile(path)
 		if err != nil {
 			return domain.Report{}, err
 		}
 
-		if hasDiff {
-			file = fileWithDiff(file, diff.lines(path))
-		}
+		file = diff.apply(file)
 		report.Files = append(report.Files, file)
 		report.Functions += len(file.Functions)
 		report.Total += file.Total
@@ -63,29 +59,11 @@ func sourceFiles(paths []string) ([]string, []string, error) {
 	files := map[string]struct{}{}
 	roots := make([]string, 0, len(paths))
 	for _, path := range paths {
-		root, err := filepath.Abs(path)
+		root, err := collectSourcePath(path, files)
 		if err != nil {
-			return nil, nil, fmt.Errorf("resolve %q: %w", path, err)
+			return nil, nil, err
 		}
-
-		info, err := os.Stat(root)
-		if err != nil {
-			return nil, nil, fmt.Errorf("inspect %q: %w", path, err)
-		}
-
 		roots = append(roots, root)
-		if !info.IsDir() {
-			if filepath.Ext(root) != ".go" {
-				return nil, nil, fmt.Errorf("%q is not a Go source file", path)
-			}
-			files[root] = struct{}{}
-			continue
-		}
-
-		err = filepath.WalkDir(root, collectGoFile(root, files))
-		if err != nil {
-			return nil, nil, fmt.Errorf("scan %q: %w", path, err)
-		}
 	}
 
 	result := make([]string, 0, len(files))
@@ -97,19 +75,43 @@ func sourceFiles(paths []string) ([]string, []string, error) {
 	return result, roots, nil
 }
 
+func collectSourcePath(path string, files map[string]struct{}) (string, error) {
+	root, err := filepath.Abs(path)
+	if err != nil {
+		return "", fmt.Errorf("resolve %q: %w", path, err)
+	}
+	info, err := os.Stat(root)
+	if err != nil {
+		return "", fmt.Errorf("inspect %q: %w", path, err)
+	}
+	if !info.IsDir() {
+		if filepath.Ext(root) != ".go" {
+			return "", fmt.Errorf("%q is not a Go source file", path)
+		}
+		files[root] = struct{}{}
+		return root, nil
+	}
+	err = filepath.WalkDir(root, collectGoFile(root, files))
+	if err != nil {
+		return "", fmt.Errorf("scan %q: %w", path, err)
+	}
+	return root, nil
+}
+
 func collectGoFile(root string, files map[string]struct{}) fs.WalkDirFunc {
 	return func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if path != root && entry.IsDir() && skipDirectory(entry.Name()) {
-			return filepath.SkipDir
-		}
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".go" {
+		if !entry.IsDir() {
+			if filepath.Ext(entry.Name()) == ".go" {
+				files[path] = struct{}{}
+			}
 			return nil
 		}
-
-		files[path] = struct{}{}
+		if path != root && skipDirectory(entry.Name()) {
+			return filepath.SkipDir
+		}
 		return nil
 	}
 }
@@ -155,15 +157,22 @@ func analyzeFile(path string) (domain.File, error) {
 		})
 	}
 	sort.SliceStable(functions, func(left int, right int) bool {
-		if functions[left].Complexity != functions[right].Complexity {
-			return functions[left].Complexity > functions[right].Complexity
-		}
-		if functions[left].Line != functions[right].Line {
-			return functions[left].Line < functions[right].Line
-		}
-		return functions[left].Name < functions[right].Name
+		return functionComplexityBefore(functions[left], functions[right])
 	})
+	return summarizeFile(path, functions), nil
+}
 
+func functionComplexityBefore(left domain.Function, right domain.Function) bool {
+	if left.Complexity != right.Complexity {
+		return left.Complexity > right.Complexity
+	}
+	if left.Line != right.Line {
+		return left.Line < right.Line
+	}
+	return left.Name < right.Name
+}
+
+func summarizeFile(path string, functions []domain.Function) domain.File {
 	file := domain.File{Path: path, Functions: functions}
 	for _, function := range functions {
 		file.Total += function.Complexity
@@ -176,7 +185,7 @@ func analyzeFile(path string) (domain.File, error) {
 		file.CognitiveAverage = float64(file.CognitiveTotal) / float64(len(functions))
 	}
 
-	return file, nil
+	return file
 }
 
 func cognitiveStatsByOffset(file *ast.File, fileSet *token.FileSet) map[int]cognit.Stat {
@@ -244,6 +253,22 @@ func cyclomaticIncrement(node ast.Node) (string, token.Pos) {
 		return "if", node.Pos()
 	case *ast.ForStmt, *ast.RangeStmt:
 		return "for", node.Pos()
+	case *ast.BinaryExpr:
+		return logicalIncrement(node)
+	default:
+		return caseIncrement(node)
+	}
+}
+
+func logicalIncrement(node *ast.BinaryExpr) (string, token.Pos) {
+	if node.Op != token.LAND && node.Op != token.LOR {
+		return "", token.NoPos
+	}
+	return node.Op.String(), node.OpPos
+}
+
+func caseIncrement(node ast.Node) (string, token.Pos) {
+	switch node := node.(type) {
 	case *ast.CaseClause:
 		if node.List != nil {
 			return "case", node.Pos()
@@ -251,10 +276,6 @@ func cyclomaticIncrement(node ast.Node) (string, token.Pos) {
 	case *ast.CommClause:
 		if node.Comm != nil {
 			return "case", node.Pos()
-		}
-	case *ast.BinaryExpr:
-		if node.Op == token.LAND || node.Op == token.LOR {
-			return node.Op.String(), node.OpPos
 		}
 	}
 
