@@ -76,3 +76,14 @@ func TestRejectInvalidControlPort(t *testing.T) {
 		t.Fatal("invalid control port succeeded")
 	}
 }
+
+func TestBugReducerHelpDoesNotStartTUI(t *testing.T) {
+	var output bytes.Buffer
+	err := run([]string{"bug-reducer", "--help"}, &output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "Minimize an input") {
+		t.Fatalf("help = %q", output.String())
+	}
+}

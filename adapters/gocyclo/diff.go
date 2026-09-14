@@ -39,7 +39,7 @@ func (d gitDiff) lines(path string) []domain.DiffLine {
 		return nil
 	}
 
-	output, err := gitText(d.root, "diff", "--no-color", "--no-ext-diff", "--unified=0", d.base, "--", relative)
+	output, err := gitText(d.root, "--literal-pathspecs", "diff", "--no-color", "--no-ext-diff", "--no-textconv", "--unified=0", d.base, "--", relative)
 	if err != nil {
 		return nil
 	}

@@ -105,3 +105,33 @@ func TestDeletionOnlyHunksStayBetweenTheirCurrentLines(t *testing.T) {
 		t.Fatalf("deletion anchor = %#v, want current line 4", lines)
 	}
 }
+
+func TestAnalyzerScoresFunctionLiteralReproducer(t *testing.T) {
+	const source = "package example\nvar handle = func() {\n\tif true {\n\t}\n}\n"
+	path := filepath.Join(t.TempDir(), "repro.go")
+	err := os.WriteFile(path, []byte(source), 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	report, err := NewAnalyzer().Analyze([]string{path})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Files) != 1 || len(report.Files[0].Functions) != 1 {
+		t.Fatalf("unexpected report: %+v", report)
+	}
+	function := report.Files[0].Functions[0]
+	if function.Complexity != 2 || function.CognitiveComplexity != 1 {
+		t.Fatalf("scores = cyclomatic %d, cognitive %d; want 2, 1", function.Complexity, function.CognitiveComplexity)
+	}
+	if len(function.CognitiveDiagnostics) != 1 {
+		t.Fatalf("diagnostics = %+v, want one if", function.CognitiveDiagnostics)
+	}
+	diagnostic := function.CognitiveDiagnostics[0]
+	if diagnostic.Line != 3 || diagnostic.Column != 2 || diagnostic.Increment != 1 || diagnostic.Nesting != 0 {
+		t.Fatalf("incorrect diagnostic: %+v", diagnostic)
+	}
+	if report.CognitiveTotal != 1 || report.CognitiveAverage != 1 || report.Files[0].CognitivePeak != 1 {
+		t.Fatalf("incorrect cognitive aggregates: %+v", report)
+	}
+}
