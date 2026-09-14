@@ -16,7 +16,7 @@ func WriteSkill(writer io.Writer) error {
 
 const agentSkill = `---
 name: cyclo
-description: Inspect Go codebases with the Cyclo TUI to find cyclomatic paths, cognitive load, and control-flow hotspots.
+description: Inspect Go code complexity with the Cyclo TUI and minimize bug reproducers with a command-based checker.
 ---
 
 # Cyclo
@@ -95,4 +95,23 @@ The ` + "`-o`" + ` flag reconnects Cyclo to the terminal after ` + "`xargs`" + `
 Use ` + "`CC`" + ` to find path-heavy functions and ` + "`COG`" + ` to find code that is hard to follow. A wide gap between them is useful evidence. Prefer guard clauses, early returns, and flatter control flow. Do not extract helpers solely to lower a metric or trade readable code for a smaller number.
 
 After editing, run the relevant tests and Cyclo again. Report what became easier to follow, not only how the score changed.
+
+## Reduce a bug reproducer
+
+Use the CLI-only bug reducer once you have an input that reproduces a specific failure and a deterministic checker for that failure. It works with inputs for any codebase and removes whole lines; it does not find or fix bugs itself.
+
+` + "```sh" + `
+cyclo bug-reducer command.sh -- ./checker.sh
+cyclo bug-reducer --timeout 30s --output reduced.sh command.sh -- ./checker.sh
+` + "```" + `
+
+Here, ` + "`command.sh`" + ` is the input file being minimized. ` + "`checker.sh`" + ` receives the absolute candidate file path as its last argument, after any checker arguments supplied on the command line. The reducer invokes the checker; the checker decides how to run or inspect the candidate. Input can also be Go source, JSON, or another file format.
+
+Write the checker to exit **0 only when the same bug still occurs**. An ordinary nonzero exit rejects the candidate. Reject unrelated syntax errors, build failures, or different crashes. Confirm that the original reproduces the failure before reducing it. For project-dependent checks, arrange the required build workspace or overlay in the checker.
+
+The checker runs in the launch directory, inherits the environment, receives no stdin, and has its output suppressed. Candidates are temporary single files. Input must be a regular file. The original stays intact; output defaults to ` + "`command.sh.reduced`" + ` and must not already exist. Flags go before the input; the default timeout is 10 seconds per check.
+
+Timeout, Ctrl-C, Unix SIGTERM, checker signals, and launch errors stop reduction. After the original is accepted, the best accepted candidate is saved even when the run stops with an error. Unix runs clean up the checker's process group; detached descendants and child-process cleanup on other platforms need checker-managed cleanup.
+
+Recheck the reduced file, use it as a regression test, and then fix the bug. Report the original and reduced sizes, the checker used, and validation results. The result is a local minimum for line deletion, not a guarantee of the smallest possible reproducer. Use ` + "`cyclo bug-reducer --help`" + ` for the current CLI contract.
 `

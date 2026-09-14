@@ -136,7 +136,10 @@ func analyzeFile(path string) (domain.File, error) {
 		return domain.File{}, fmt.Errorf("parse %q: %w", path, err)
 	}
 
+	fileSet = physicalFileSet(fileSet.File(parsed.Pos()))
+	literalNames := normalizeFunctionInitializers(parsed, fileSet)
 	stats := cyclo.AnalyzeASTFile(parsed, fileSet, nil)
+	nameFunctionLiterals(stats, literalNames)
 	cognitiveStats := cognitiveStatsByOffset(parsed, fileSet)
 	ranges := functionRanges(parsed, fileSet)
 	functions := make([]domain.Function, 0, len(stats))
@@ -193,7 +196,34 @@ func cognitiveStatsByOffset(file *ast.File, fileSet *token.FileSet) map[int]cogn
 	for _, stat := range cognit.ComplexityStatsWithDiagnostic(file, fileSet, nil, true) {
 		result[stat.Pos.Offset] = stat
 	}
+	ast.Inspect(file, func(node ast.Node) bool {
+		switch node := node.(type) {
+		case *ast.FuncDecl:
+			// Its nested literals already contribute to the declaration's score.
+			return false
+		case *ast.FuncLit:
+			stat := cognitiveLiteralStat(node, fileSet)
+			result[stat.Pos.Offset] = stat
+			return false
+		default:
+			return true
+		}
+	})
 	return result
+}
+
+func cognitiveLiteralStat(literal *ast.FuncLit, fileSet *token.FileSet) cognit.Stat {
+	// gocognit scans declarations only. Reuse the literal's body and positions
+	// as a declaration so its own body starts at nesting level zero.
+	file := &ast.File{
+		Name: ast.NewIdent("_"),
+		Decls: []ast.Decl{&ast.FuncDecl{
+			Name: ast.NewIdent("_"),
+			Type: literal.Type,
+			Body: literal.Body,
+		}},
+	}
+	return cognit.ComplexityStatsWithDiagnostic(file, fileSet, nil, true)[0]
 }
 
 func cognitiveDiagnostics(diagnostics []cognit.Diagnostic) []domain.CognitiveDiagnostic {

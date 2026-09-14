@@ -1,16 +1,19 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/shanejonas/cyclo/adapters/gocyclo"
 	"github.com/shanejonas/cyclo/adapters/sqlite"
 	"github.com/shanejonas/cyclo/application"
+	"github.com/shanejonas/cyclo/internal/bugreducer"
 )
 
 const defaultControlPort = 8197
@@ -29,11 +32,14 @@ func main() {
 }
 
 func run(args []string, output io.Writer) error {
+	if len(args) > 0 && args[0] == "bug-reducer" {
+		ctx, cancel := signal.NotifyContext(context.Background(), reducerSignals()...)
+		defer cancel()
+		return bugreducer.Run(ctx, args[1:], output)
+	}
+
 	if len(args) > 0 && args[0] == "--skill" {
-		if len(args) != 1 {
-			return errors.New("usage: cyclo --skill")
-		}
-		return application.WriteSkill(output)
+		return writeSkill(args, output)
 	}
 
 	options, err := parseRunOptions(args)
@@ -85,4 +91,11 @@ func parseRunOptions(args []string) (runOptions, error) {
 	}
 
 	return runOptions{controlPort: *controlPort, paths: flags.Args()}, nil
+}
+
+func writeSkill(args []string, output io.Writer) error {
+	if len(args) != 1 {
+		return errors.New("usage: cyclo --skill")
+	}
+	return application.WriteSkill(output)
 }
