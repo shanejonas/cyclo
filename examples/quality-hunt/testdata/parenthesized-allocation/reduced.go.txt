@@ -1,0 +1,11 @@
+package repro
+type State struct { Count int; Items []int; Values map[string]int; Array [1]int }
+func Case4_base(shared *State) {
+local := new(State); local.Count++
+}
+func Case4_parentheses(shared *State) {
+
+	local := (new)(State)
+	((local).Count)++
+
+}

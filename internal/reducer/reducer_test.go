@@ -55,3 +55,44 @@ func TestAcceptedEmptyInputSurvivesCheckerError(t *testing.T) {
 		t.Fatalf("lost accepted empty result: %#v, %v", reduced, err)
 	}
 }
+
+func TestProgressDescribesChecksAndAcceptedDeletions(t *testing.T) {
+	source := []byte("noise\nbug\nmore noise\n")
+	best := source
+	var started *Progress
+	checks := 0
+	result, err := ReduceWithProgress(source, func(candidate []byte) (bool, error) {
+		return bytes.Contains(candidate, []byte("bug")), nil
+	}, func(p Progress) {
+		if p.Checking {
+			if started != nil {
+				t.Fatal("overlapping checks")
+			}
+			started = &p
+			return
+		}
+		if started == nil || !bytes.Equal(started.Candidate, p.Candidate) {
+			t.Fatal("completion without matching start")
+		}
+		started = nil
+		checks++
+		if p.Seed {
+			if checks != 1 || !bytes.Equal(p.Candidate, source) {
+				t.Fatal("seed must come first")
+			}
+			return
+		}
+		lines := bytes.SplitAfter(best, []byte("\n"))
+		want := append([][]byte(nil), lines[:p.StartLine]...)
+		want = append(want, lines[p.StartLine+p.RemovedLines:]...)
+		if !bytes.Equal(bytes.Join(want, nil), p.Candidate) || p.ChunkSize < p.RemovedLines {
+			t.Fatalf("incorrect deletion metadata: %+v", p)
+		}
+		if p.Accepted {
+			best = p.Candidate
+		}
+	})
+	if err != nil || string(result) != "bug\n" || checks < 3 || started != nil {
+		t.Fatalf("result = %q, error = %v, checks = %d", result, err, checks)
+	}
+}

@@ -34,11 +34,15 @@ func TestInterruptionStopsCheckerChild(t *testing.T) {
 }
 
 func checkerLeavesChild(t *testing.T, source []byte, mode string) (bool, error) {
+	return checkerLeavesChildWithOutput(t, source, mode, nil)
+}
+
+func checkerLeavesChildWithOutput(t *testing.T, source []byte, mode string, output *checkerOutput) (bool, error) {
 	t.Helper()
 	directory := t.TempDir()
 	pidPath := filepath.Join(directory, "child.pid")
 	t.Setenv("BUG_REDUCER_CHILD_PID", pidPath)
-	c := checker{command: []string{"sh"}, path: filepath.Join(directory, "check.sh"), timeout: 100 * time.Millisecond}
+	c := checker{command: []string{"sh"}, path: filepath.Join(directory, "check.sh"), timeout: 100 * time.Millisecond, output: output}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	expectedError := context.DeadlineExceeded
@@ -69,9 +73,11 @@ func checkerLeavesChild(t *testing.T, source []byte, mode string) (bool, error) 
 		return false, fmt.Errorf("checker error = %v, want %v", err, expectedError)
 	}
 	// A killed process may briefly remain a zombie until its new parent reaps it.
+	// Once reaped, /proc disappears: ENOENT surfaces as os.IsNotExist while a
+	// mid-exit read can surface ESRCH ("no such process"). Both mean gone.
 	for range 50 {
 		status, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
-		if os.IsNotExist(err) {
+		if os.IsNotExist(err) || errors.Is(err, syscall.ESRCH) {
 			return false, nil
 		}
 		if err != nil {
@@ -83,6 +89,28 @@ func checkerLeavesChild(t *testing.T, source []byte, mode string) (bool, error) 
 		time.Sleep(5 * time.Millisecond)
 	}
 	return true, nil
+}
+
+func TestDashboardOutputPreservesChildCleanup(t *testing.T) {
+	for _, mode := range []string{"success", "rejection", "timeout", "cancellation"} {
+		t.Run(mode, func(t *testing.T) {
+			fixture := "normal-exit-child.sh"
+			if mode == "timeout" || mode == "cancellation" {
+				fixture = "timeout-child.sh"
+			}
+			source, err := os.ReadFile(filepath.Join("testdata", fixture))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if mode == "rejection" {
+				source = append(source, []byte("exit 1\n")...)
+			}
+			leaked, err := checkerLeavesChildWithOutput(t, source, mode, &checkerOutput{})
+			if err != nil || leaked {
+				t.Fatalf("child leaked = %v, checker error = %v", leaked, err)
+			}
+		})
+	}
 }
 
 func TestNormalCheckerExitStopsChild(t *testing.T) {

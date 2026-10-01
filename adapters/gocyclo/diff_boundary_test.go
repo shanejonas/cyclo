@@ -1,6 +1,23 @@
 package gocyclo
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+
+	"github.com/shanejonas/cyclo/domain"
+)
+
+func TestMixedHunkPositionsIncludeContextLines(t *testing.T) {
+	lines := parseDiff("@@ -10,3 +20,4 @@\n before\n-old\n+new\n+extra\n after\n\\ No newline at end of file\n")
+	want := []domain.DiffLine{
+		{Kind: domain.DiffDeleted, OldLine: 11, NewLine: 21, Text: "old"},
+		{Kind: domain.DiffAdded, OldLine: 12, NewLine: 21, Text: "new"},
+		{Kind: domain.DiffAdded, OldLine: 12, NewLine: 22, Text: "extra"},
+	}
+	if !reflect.DeepEqual(lines, want) {
+		t.Fatalf("mixed hunk lines = %#v, want %#v", lines, want)
+	}
+}
 
 func TestDeletionOnlyHunkBoundaries(t *testing.T) {
 	for _, test := range []struct {

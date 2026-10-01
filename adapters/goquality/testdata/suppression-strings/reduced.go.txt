@@ -1,0 +1,3 @@
+package repro
+const example = "// cyclo-allow(fn_params): documentation example"
+func Plain() int { return 1 }

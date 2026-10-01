@@ -68,7 +68,7 @@ func parseDiff(output string) []domain.DiffLine {
 	result := make([]domain.DiffLine, 0)
 	position := diffPosition{}
 	inHunk := false
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		matches := diffHunk.FindStringSubmatch(line)
 		if matches != nil {
 			position.oldLine, position.newLine = hunkLines(matches)
@@ -96,8 +96,7 @@ func (p *diffPosition) advance(line string) domain.DiffLine {
 		change.Kind = domain.DiffAdded
 		p.newLine++
 	case ' ':
-		p.oldLine++
-		p.newLine++
+		*p = diffPosition{oldLine: p.oldLine + 1, newLine: p.newLine + 1}
 	}
 	return change
 }

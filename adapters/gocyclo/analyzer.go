@@ -28,9 +28,10 @@ func (Analyzer) Analyze(paths []string) (domain.Report, error) {
 		return domain.Report{}, err
 	}
 
-	report := domain.Report{Root: commonRoot(roots)}
-	diff, _ := newGitDiff(report.Root)
-	report.DiffBase = diff.base
+	root := commonRoot(roots)
+	diff, _ := newGitDiff(root)
+	var analyzed []domain.File
+	var functions, total, cognitiveTotal int
 	for _, path := range files {
 		file, err := analyzeFile(path)
 		if err != nil {
@@ -38,17 +39,22 @@ func (Analyzer) Analyze(paths []string) (domain.Report, error) {
 		}
 
 		file = diff.apply(file)
-		report.Files = append(report.Files, file)
-		report.Functions += len(file.Functions)
-		report.Total += file.Total
-		report.CognitiveTotal += file.CognitiveTotal
+		analyzed = append(analyzed, file)
+		functions += len(file.Functions)
+		total += file.Total
+		cognitiveTotal += file.CognitiveTotal
 	}
-	if report.Functions > 0 {
-		report.Average = float64(report.Total) / float64(report.Functions)
-		report.CognitiveAverage = float64(report.CognitiveTotal) / float64(report.Functions)
+	var average, cognitiveAverage float64
+	if functions > 0 {
+		average = float64(total) / float64(functions)
+		cognitiveAverage = float64(cognitiveTotal) / float64(functions)
 	}
 
-	return report, nil
+	return domain.Report{
+		Root: root, DiffBase: diff.base, Files: analyzed,
+		Functions: functions, Total: total, CognitiveTotal: cognitiveTotal,
+		Average: average, CognitiveAverage: cognitiveAverage,
+	}, nil
 }
 
 func sourceFiles(paths []string) ([]string, []string, error) {

@@ -1,0 +1,9 @@
+package repro
+
+
+func Copy[T ~[1]int](shared T) int {
+    local := shared
+    local[0]++
+    return local[0]
+}
+

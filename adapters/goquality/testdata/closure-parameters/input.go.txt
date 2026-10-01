@@ -1,0 +1,25 @@
+package repro
+
+// Unrelated declarations are removable noise.
+type Metadata struct { Label string }
+
+func unrelated(value int) int {
+    if value > 0 { return value + 1 }
+    return 0
+}
+
+type State struct { Count int }
+
+// A conditional assignment must not erase the parameter boundary.
+func Mutate(shared *State) {
+    scratch := []int{1, 2, 3}; _ = scratch
+    closure := func(value *State) {
+        if false { value = new(State) }
+        value.Count++
+    }
+    closure(shared)
+}
+
+func anotherUnrelated() string {
+    return "noise"
+}

@@ -1,6 +1,7 @@
 package application
 
 import (
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -21,6 +22,8 @@ type ControlState struct {
 	VisualSelectionActive bool           `json:"visualSelectionActive"`
 	Annotations           []Annotation   `json:"annotations"`
 	ActiveAnnotationID    string         `json:"activeAnnotationId,omitempty"`
+	DetailsView           string         `json:"detailsView"`
+	QualityOffset         int            `json:"qualityOffset"`
 }
 
 type SourceCursor struct {
@@ -28,13 +31,14 @@ type SourceCursor struct {
 }
 
 type ReportSummary struct {
-	Root             string  `json:"root"`
-	FileCount        int     `json:"fileCount"`
-	Functions        int     `json:"functions"`
-	Total            int     `json:"total"`
-	Average          float64 `json:"average"`
-	CognitiveTotal   int     `json:"cognitiveTotal"`
-	CognitiveAverage float64 `json:"cognitiveAverage"`
+	Root             string                 `json:"root"`
+	FileCount        int                    `json:"fileCount"`
+	Functions        int                    `json:"functions"`
+	Total            int                    `json:"total"`
+	Average          float64                `json:"average"`
+	CognitiveTotal   int                    `json:"cognitiveTotal"`
+	CognitiveAverage float64                `json:"cognitiveAverage"`
+	Quality          *domain.QualitySummary `json:"quality,omitempty"`
 }
 
 type Selection struct {
@@ -57,13 +61,14 @@ type FileSummary struct {
 }
 
 type ControlReport struct {
-	Root             string        `json:"root"`
-	Files            []ControlFile `json:"files"`
-	Functions        int           `json:"functions"`
-	Total            int           `json:"total"`
-	Average          float64       `json:"average"`
-	CognitiveTotal   int           `json:"cognitiveTotal"`
-	CognitiveAverage float64       `json:"cognitiveAverage"`
+	Root             string                  `json:"root"`
+	Files            []ControlFile           `json:"files"`
+	Functions        int                     `json:"functions"`
+	Total            int                     `json:"total"`
+	Average          float64                 `json:"average"`
+	CognitiveTotal   int                     `json:"cognitiveTotal"`
+	CognitiveAverage float64                 `json:"cognitiveAverage"`
+	Quality          *domain.QualityAnalysis `json:"quality,omitempty"`
 }
 
 type ControlFile struct {
@@ -87,6 +92,7 @@ type FunctionSummary struct {
 	Line                  int                           `json:"line"`
 	EndLine               int                           `json:"endLine"`
 	Column                int                           `json:"column"`
+	Quality               *domain.FunctionQuality       `json:"quality,omitempty"`
 }
 
 type FunctionDetails struct {
@@ -121,7 +127,7 @@ func (m Model) updateControl(command controlCommand) (Model, tea.Cmd) {
 		m = m.setFocus(command.pane)
 		command.answer(m.controlState(), nil)
 	default:
-		return m.updateSourceControl(command)
+		return m.updateDetailsControl(command)
 	}
 	return m, nil
 }
@@ -191,6 +197,7 @@ func (m Model) revealLines(command controlCommand) (Model, tea.Cmd) {
 	}
 	function, _ := m.selectedFunction()
 	m.focus = detailsPane
+	m.qualityView = false
 	m.sourceOffset = startLine - function.Line
 	m.sourceCursor = endLine - function.Line
 	m.lineSelection = &LineSelection{
@@ -273,7 +280,8 @@ func (m Model) scrollSource(command controlCommand) (Model, tea.Cmd) {
 		return m, nil
 	}
 
-	m.sourceOffset = moveIndex(m.sourceOffset, command.lines, len(sourceCodeLines(function)))
+	m.sourceOffset = moveIndex(m.sourceOffset, command.lines, strings.Count(function.Source, "\n")+1)
+	m.qualityView = false
 	m.revision++
 	command.answer(m.controlState(), nil)
 	return m, nil
@@ -361,15 +369,17 @@ func (m Model) controlState() ControlState {
 			Average:          m.report.Average,
 			CognitiveTotal:   m.report.CognitiveTotal,
 			CognitiveAverage: m.report.CognitiveAverage,
+			Quality:          qualitySummary(m.report.Quality),
 		},
 		Selection:             m.controlSelection(),
 		LineSelection:         m.lineSelection,
 		VisualSelectionActive: m.visualSelectionActive,
 		Annotations:           append([]Annotation{}, m.annotations...),
 		ActiveAnnotationID:    m.activeAnnotationID,
+		DetailsView:           m.detailsViewName(), QualityOffset: m.qualityOffset,
 	}
-	if m.sourceLine() > 0 {
-		state.Cursor = &SourceCursor{SourceLine: m.sourceLine()}
+	if line := m.sourceLine(); line > 0 {
+		state.Cursor = &SourceCursor{SourceLine: line}
 	}
 	if m.err != nil {
 		state.Error = m.err.Error()
@@ -381,23 +391,25 @@ func (m Model) controlState() ControlState {
 }
 
 func (m Model) controlSelection() Selection {
-	selection := Selection{SourceOffset: m.sourceOffset}
 	file, ok := m.selectedFile()
 	if !ok {
-		return selection
+		return Selection{SourceOffset: m.sourceOffset}
 	}
 
 	fileIndex := m.fileIndex
-	selection.FileIndex = &fileIndex
-	selection.File = &FileSummary{
-		Path:             file.Path,
-		FunctionCount:    len(file.Functions),
-		Total:            file.Total,
-		Peak:             file.Peak,
-		Average:          file.Average,
-		CognitiveTotal:   file.CognitiveTotal,
-		CognitivePeak:    file.CognitivePeak,
-		CognitiveAverage: file.CognitiveAverage,
+	selection := Selection{
+		SourceOffset: m.sourceOffset,
+		FileIndex:    &fileIndex,
+		File: &FileSummary{
+			Path:             file.Path,
+			FunctionCount:    len(file.Functions),
+			Total:            file.Total,
+			Peak:             file.Peak,
+			Average:          file.Average,
+			CognitiveTotal:   file.CognitiveTotal,
+			CognitivePeak:    file.CognitivePeak,
+			CognitiveAverage: file.CognitiveAverage,
+		},
 	}
 	function, ok := m.selectedFunction()
 	if !ok {
@@ -420,6 +432,7 @@ func (m Model) controlReport() ControlReport {
 		Average:          m.report.Average,
 		CognitiveTotal:   m.report.CognitiveTotal,
 		CognitiveAverage: m.report.CognitiveAverage,
+		Quality:          m.report.Quality,
 	}
 	for _, file := range m.report.Files {
 		functions := make([]FunctionSummary, 0, len(file.Functions))
@@ -455,6 +468,7 @@ func functionSummary(function domain.Function) FunctionSummary {
 		Line:                  function.Line,
 		EndLine:               function.EndLine,
 		Column:                function.Column,
+		Quality:               function.Quality,
 	}
 }
 

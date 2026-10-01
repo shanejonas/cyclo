@@ -2,11 +2,14 @@ package application
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/shanejonas/cyclo/domain"
 )
 
@@ -32,6 +35,7 @@ type AnnotationStore interface {
 }
 
 func (m Model) resetSourceWorkspace() Model {
+	m.qualityOffset = 0
 	m.sourceOffset = 0
 	m.sourceCursor = 0
 	m.lineSelection = nil
@@ -46,12 +50,12 @@ func (m Model) moveSourceCursor(delta int) Model {
 	if annotation, ok := m.unmatchedAnnotation(); ok {
 		return m.scrollSavedAnnotation(annotation, delta)
 	}
-	lines := m.selectedSourceLines()
-	if len(lines) == 0 {
+	lineCount := m.selectedSourceLineCount()
+	if lineCount == 0 {
 		return m
 	}
 
-	m.sourceCursor = moveIndex(m.sourceCursor, delta, len(lines))
+	m.sourceCursor = moveIndex(m.sourceCursor, delta, lineCount)
 	m = m.keepSourceCursorVisible()
 	if m.visualSelectionActive {
 		m = m.selectFromAnchor(m.lineSelection.AnchorLine)
@@ -66,36 +70,79 @@ func (m Model) keepSourceCursorVisible() Model {
 		m.sourceOffset = m.sourceCursor
 		return m
 	}
-	for m.sourceOffset < m.sourceCursor && m.sourceDisplayRowCount(m.sourceOffset, m.sourceCursor) > visible {
+	counter := m.sourceRowCounter()
+	rows := counter.count(m.sourceOffset, m.sourceCursor)
+	for m.sourceOffset < m.sourceCursor && rows > visible {
+		rows -= counter.count(m.sourceOffset, m.sourceOffset)
 		m.sourceOffset++
 	}
 	return m
 }
 
 func (m Model) sourceDisplayRowCount(start int, end int) int {
+	return m.sourceRowCounter().count(start, end)
+}
+
+// sourceRowCounter snapshots the selected source and wrapping width for one
+// measurement operation. It does not persist derived state on the model.
+type sourceRowCounter struct {
+	function        domain.Function
+	annotations     []Annotation
+	width           int
+	lastSourceIndex int
+}
+
+func (m Model) sourceRowCounter() sourceRowCounter {
+	function, _ := m.selectedFunction()
+	return sourceRowCounter{
+		function:        function,
+		annotations:     m.visibleAnnotations(),
+		width:           paneContentWidth(m.sourcePaneWidth()),
+		lastSourceIndex: sourceLineCount(function.Source) - 1,
+	}
+}
+
+func (c sourceRowCounter) count(start int, end int) int {
 	if end < start {
 		return 0
 	}
 
 	count := end - start + 1
-	function, ok := m.selectedFunction()
-	if !ok {
-		return count
+	firstLine, lastLine := c.function.Line+start, c.function.Line+end
+	count += sourceDeletedRowCount(c.function.DiffLines, firstLine, lastLine)
+	count += sourceAnnotationRowCount(c.annotations, firstLine, lastLine, c.width)
+	if start <= c.lastSourceIndex && c.lastSourceIndex <= end {
+		count += sourceDeletedRowCount(c.function.DiffLines, c.function.EndLine+1, c.function.EndLine+1)
 	}
-	width := m.sourcePaneWidth()
-	for index := start; index <= end; index++ {
-		lineNumber := function.Line + index
-		count += len(sourceDeletedRows(function.DiffLines, lineNumber))
-		count += len(m.sourceAnnotationRows(lineNumber, width))
-		if index == len(m.selectedSourceLines())-1 {
-			count += len(sourceDeletedRows(function.DiffLines, function.EndLine+1))
+	return count
+}
+
+func sourceDeletedRowCount(lines []domain.DiffLine, start int, end int) int {
+	count := 0
+	for _, line := range lines {
+		if line.Kind != domain.DiffDeleted || line.NewLine < start || line.NewLine > end {
+			continue
 		}
+		count++
+	}
+	return count
+}
+
+func sourceAnnotationRowCount(annotations []Annotation, start int, end int, width int) int {
+	count := 0
+	for index, annotation := range annotations {
+		if annotation.EndLine < start || annotation.EndLine > end {
+			continue
+		}
+		prefix := sourceAnnotationPrefix(index, len(annotations))
+		messageWidth := max(width-ansi.StringWidth(prefix), 1)
+		count += strings.Count(ansi.Wrap(annotation.Message, messageWidth, ""), "\n") + 1
 	}
 	return count
 }
 
 func (m Model) toggleVisualSelection() Model {
-	if len(m.selectedSourceLines()) == 0 {
+	if m.selectedSourceLineCount() == 0 {
 		return m
 	}
 	if m.visualSelectionActive {
@@ -150,8 +197,9 @@ func (m Model) updateAnnotationInput(message tea.KeyPressMsg) Model {
 	case "backspace":
 		m.annotationDraft = trimLastRune(m.annotationDraft)
 	default:
-		if message.Text != "" && len([]rune(m.annotationDraft+message.Text)) <= maximumAnnotationLength {
-			m.annotationDraft += message.Text
+		draft := m.annotationDraft + message.Text
+		if message.Text != "" && utf8.RuneCountInString(draft) <= maximumAnnotationLength {
+			m.annotationDraft = draft
 		}
 	}
 	m.revision++
@@ -175,19 +223,17 @@ func (m Model) saveDraftAnnotation() Model {
 	if !ok {
 		return m
 	}
-	var err error
-	m, err = m.saveAnnotation(annotation)
+	next, err := m.saveAnnotation(annotation)
+	next.annotating = false
 	if err != nil {
-		m.annotationError = err
-		m.annotating = false
-		return m
+		next.annotationError = err
+		return next
 	}
-	m.activeAnnotationID = annotation.ID
-	m.visualSelectionActive = false
-	m.lineSelection = nil
-	m.annotating = false
-	m.annotationDraft = ""
-	return m.keepSourceCursorVisible()
+	next.activeAnnotationID = annotation.ID
+	next.visualSelectionActive = false
+	next.lineSelection = nil
+	next.annotationDraft = ""
+	return next.keepSourceCursorVisible()
 }
 
 func (m Model) saveAnnotation(annotation Annotation) (Model, error) {
@@ -197,7 +243,7 @@ func (m Model) saveAnnotation(annotation Annotation) (Model, error) {
 			return m, fmt.Errorf("save annotation: %w", err)
 		}
 	}
-	m.annotations = append(m.annotations, annotation)
+	m.annotations = slices.Concat(m.annotations, []Annotation{annotation})
 	m.annotationError = nil
 	return m, nil
 }
@@ -251,10 +297,10 @@ func (m *Model) newAnnotation(startLine int, endLine int, message string) (Annot
 
 func (m Model) validSourceRange(startLine int, endLine int) bool {
 	function, ok := m.selectedFunction()
-	if !ok || startLine > endLine {
+	if !ok || function.Source == "" || startLine > endLine {
 		return false
 	}
-	lastLine := function.Line + len(m.selectedSourceLines()) - 1
+	lastLine := function.Line + strings.Count(function.Source, "\n")
 	return startLine >= function.Line && endLine <= lastLine
 }
 
@@ -273,6 +319,18 @@ func (m Model) selectedSourceLines() []string {
 		return nil
 	}
 	return normalizedSourceLines(function.Source)
+}
+
+func (m Model) selectedSourceLineCount() int {
+	function, _ := m.selectedFunction()
+	return sourceLineCount(function.Source)
+}
+
+func sourceLineCount(source string) int {
+	if source == "" {
+		return 0
+	}
+	return strings.Count(source, "\n") + 1
 }
 
 func (m Model) sourceLine() int {
@@ -331,9 +389,10 @@ func (m Model) functionAnnotationCount(path string, function domain.Function) in
 
 func (m Model) annotationAtCursor() (Annotation, bool) {
 	annotations := m.visibleAnnotations()
+	line := m.sourceLine()
 	for index := len(annotations) - 1; index >= 0; index-- {
 		annotation := annotations[index]
-		if annotation.StartLine <= m.sourceLine() && m.sourceLine() <= annotation.EndLine {
+		if annotation.StartLine <= line && line <= annotation.EndLine {
 			return annotation, true
 		}
 	}
@@ -368,7 +427,7 @@ func (m Model) removeAnnotation(id string) (Model, error) {
 				return m, fmt.Errorf("delete annotation: %w", err)
 			}
 		}
-		m.annotations = append(m.annotations[:index], m.annotations[index+1:]...)
+		m.annotations = slices.Concat(m.annotations[:index], m.annotations[index+1:])
 		if m.activeAnnotationID == id {
 			m.activeAnnotationID = ""
 		}
@@ -392,6 +451,7 @@ func (m Model) focusAdjacentAnnotation(delta int) Model {
 	m.functionIndex = target.functionIndex
 	m = m.resetSourceWorkspace()
 	m.focus = detailsPane
+	m.qualityView = false
 	m.activeAnnotationID = annotation.ID
 	m.revision++
 	if target.functionIndex < 0 {

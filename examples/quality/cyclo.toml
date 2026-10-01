@@ -1,0 +1,39 @@
+# Unspecified settings retain defaults. Run from the repository root:
+# cyclo check --config examples/quality/cyclo.toml .
+granularity = "field"
+count_self = false
+min_statements = 3
+
+[fn_length]
+max = 50
+
+[fn_params]
+max = 4
+
+[mutation_per_target]
+max = 3
+
+[mutated_targets]
+max = 3
+
+[side_effect_density]
+# Set enabled = false to disable this gate while calibrating the policy.
+enabled = true
+max = 500
+
+[weights]
+mutation = 1
+io = 3
+network = 3
+global = 2
+unsafe = 4
+time = 1
+random = 1
+panic = 0
+unknown = 1
+
+# Paths use import-path.Type.Method without pointer/generic syntax.
+# Replace this example with your own package path.
+[[prefixes]]
+path = "example.com/project/storage.Store.Save"
+kind = "io"

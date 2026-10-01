@@ -1,0 +1,8 @@
+package repro
+type State struct { Count int; Items []int; Values map[string]int; Array [1]int }
+func Case0_base(shared *State) {
+local := shared; local.Count++
+}
+func Case0_discard(shared *State) {
+local := shared; local.Count++; ((_)) = 0
+}

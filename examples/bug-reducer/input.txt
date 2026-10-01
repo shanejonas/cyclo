@@ -1,0 +1,12 @@
+# Demo configuration: most of these lines are unrelated to the failure.
+name = example
+logging = verbose
+retries = 3
+mode = legacy
+cache = enabled
+workers = 4
+trigger = duplicate
+color = blue
+metrics = enabled
+timeout = 30
+# Only the mode and trigger lines must survive reduction.

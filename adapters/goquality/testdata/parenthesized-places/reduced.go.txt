@@ -1,0 +1,14 @@
+package repro
+
+
+type State struct {
+    Count int
+}
+
+
+func Mutate(shared *State) {
+    local := new(State)
+    ((local)) = shared
+    local.Count++
+}
+

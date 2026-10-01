@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"time"
 )
 
@@ -16,6 +17,7 @@ type checker struct {
 	path    string
 	timeout time.Duration
 	checks  int
+	output  *checkerOutput
 }
 
 func (c *checker) check(ctx context.Context, candidate []byte) (bool, error) {
@@ -29,12 +31,16 @@ func (c *checker) check(ctx context.Context, candidate []byte) (bool, error) {
 	c.checks++
 	checkContext, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
-	args := append(append([]string(nil), c.command[1:]...), c.path)
+	args := slices.Concat(c.command[1:], []string{c.path})
 	command := exec.CommandContext(checkContext, c.command[0], args...)
+	closeOutput, err := c.output.capture(command)
+	if err != nil {
+		return false, fmt.Errorf("capture checker output: %w", err)
+	}
 	command.WaitDelay = time.Second
 	configureCancellation(command)
 	err = command.Run()
-	cleanupErr := cleanupChecker(command)
+	cleanupErr := errors.Join(cleanupChecker(command), closeOutput())
 	if cleanupErr != nil {
 		return false, fmt.Errorf("clean up checker: %w", errors.Join(err, cleanupErr))
 	}

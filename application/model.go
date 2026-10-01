@@ -50,6 +50,8 @@ type Model struct {
 	functionIndex         int
 	sourceOffset          int
 	sourceCursor          int
+	qualityView           bool
+	qualityOffset         int
 	lineSelection         *LineSelection
 	visualSelectionActive bool
 	annotations           []Annotation
@@ -177,6 +179,8 @@ func (m Model) updateGlobalKey(key string) (Model, tea.Cmd, bool) {
 
 func (m Model) updateFocusKey(key string) (Model, bool) {
 	switch key {
+	case "e":
+		return m.toggleQualityView(), true
 	case "tab":
 		m = m.setFocus(nextPane(m.focus, 1))
 	case "shift+tab":
@@ -209,7 +213,7 @@ func (m Model) updateReviewNavigationKey(key string) (Model, bool) {
 }
 
 func (m Model) updateSourceKey(key string) (Model, bool) {
-	if m.focus != detailsPane {
+	if m.focus != detailsPane || m.qualityView {
 		return m, false
 	}
 	switch key {
@@ -226,17 +230,17 @@ func (m Model) updateSourceKey(key string) (Model, bool) {
 }
 
 func (m Model) updateMovementKey(key string) Model {
+	var delta int
 	switch key {
 	case "j":
-		before := m
-		m = m.move(1)
-		m = m.advanceNavigationRevision(before)
+		delta = 1
 	case "k":
-		before := m
-		m = m.move(-1)
-		m = m.advanceNavigationRevision(before)
+		delta = -1
+	default:
+		return m
 	}
-	return m
+	next := m.move(delta)
+	return next.advanceNavigationRevision(m)
 }
 
 func (m Model) updateMouseWheel(message tea.MouseWheelMsg) Model {
@@ -278,7 +282,7 @@ func (m Model) move(delta int) Model {
 		return m
 	}
 
-	return m.moveSourceCursor(delta)
+	return m.moveDetails(delta)
 }
 
 func (m Model) moveFile(delta int) Model {
@@ -298,14 +302,14 @@ func moveIndex(current int, delta int, length int) int {
 	}
 
 	next := current + delta
-	if next < 0 {
-		return 0
-	}
-	if next >= length {
+	// Overflow moves the sum in the opposite direction to the requested delta.
+	if delta > 0 && next < current {
 		return length - 1
 	}
-
-	return next
+	if delta < 0 && next > current {
+		return 0
+	}
+	return min(max(next, 0), length-1)
 }
 
 func rankReport(report domain.Report) domain.Report {

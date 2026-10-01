@@ -16,7 +16,7 @@ func WriteSkill(writer io.Writer) error {
 
 const agentSkill = `---
 name: cyclo
-description: Inspect Go code complexity with the Cyclo TUI and minimize bug reproducers with a command-based checker.
+description: Inspect Go complexity, check mutation and effect guardrails, and minimize bug reproducers.
 ---
 
 # Cyclo
@@ -32,6 +32,8 @@ The treemap combines both scores: area shows cyclomatic complexity, and color sh
 - Files shows cyclomatic aggregates and a purple cognitive peak as space allows.
 - Functions shows cyclomatic complexity as ` + "`CC`" + `, purple cognitive complexity as ` + "`COG`" + `, and physical size as ` + "`LINES`" + `.
 - Source shows the selected function. Cyclomatic source uses amber text. Cognitive source gets a dark purple background. Shared lines show amber on purple. Line numbers stay neutral. Red connectors enclose guards that return errors. Red return values are errors. Green return values are successful results; a trailing nil error remains neutral.
+
+The header shows ` + "`Q`" + ` with the quality finding count. Press ` + "`e`" + ` to switch the details pane between source and quality evidence, then j/k to scroll. Quality shows density, unknown coverage, rule findings, effects, and mutation events with source lines. Switching back preserves the source cursor. Use ` + "`cyclo --config PATH [paths...]`" + ` to apply the same TOML policy as the headless check. The TUI includes tests. Typed failures stay visible as quality failed; complexity inspection still works.
 
 Inside a Git worktree, Source automatically shows the diff against ` + "`main`" + ` or ` + "`master`" + `. It falls back to their ` + "`origin/*`" + ` refs, then ` + "`HEAD`" + `. The Source title shows the chosen base and change counts. Green ` + "`+`" + ` gutters mark added lines. Red ` + "`−`" + ` rows preserve deleted lines beside the current function. Outside Git, Source stays unchanged.
 
@@ -96,22 +98,45 @@ Use ` + "`CC`" + ` to find path-heavy functions and ` + "`COG`" + ` to find code
 
 After editing, run the relevant tests and Cyclo again. Report what became easier to follow, not only how the score changed.
 
+Quality is shared too. ` + "`cyclo.getReport`" + ` includes ` + "`quality.status`" + ` (ready or error) and, on success, ` + "`quality.report`" + ` with its summary, functions, and diagnostics. Function entries and ` + "`cyclo.getState.selection.function.quality`" + ` include density_milli, complete, unclassified_calls, effects, mutation_events, and diagnostics. Nested quality fields retain the headless report's snake_case names. Missing function quality means unavailable; it is not a clean result.
+
+Use ` + "`cyclo.setDetailsView`" + ` with ` + "`{\"view\":\"quality\"}`" + ` or ` + "`{\"view\":\"source\"}`" + ` to change the shared details pane. State includes detailsView and qualityOffset. ` + "`cyclo.revealLines`" + ` and ` + "`cyclo.scrollSource`" + ` return to source view. ` + "`cyclo.refresh`" + ` reruns complexity and typed quality analysis together.
+
+## Check quality guardrails
+
+Run ` + "`cyclo check --format json [paths...]`" + ` for typed Go mutation and side-effect diagnostics without a TUI. Directories scan packages recursively; Go file arguments report only those files after loading their enclosing packages. Run from the repository root. Use ` + "`--config PATH`" + ` for TOML policy, ` + "`--tests`" + ` to include tests, and ` + "`--tags TAGS`" + ` for build tags.
+
+The rules are fn_length, fn_params, mutation_per_target, mutated_targets, side_effect_density, and invalid_suppression. Findings carry actual, limit, rule_id, and source location. Density findings include effect kinds, labels, and lines; per-target findings include mutation evidence. Review that evidence before changing code. Preserve legitimate IO boundaries and do not extract helpers solely to lower a score.
+
+Static calls to named helpers in the same package use conservative body summaries. A helper with no modeled effects is effect-free; effectful helpers contribute evidence at the caller line. Recursive cycles, dynamic dispatch, missing bodies, and summary limits remain unknown. Prefix policy overrides still apply, including when reevaluating saved facts. Summaries do not remap parameter writes to caller-owned arguments. Intrinsic effects are syntactic; nested closure bodies contribute even if not called. Pointer-receiver calls are not automatically mutations. Zero density is not proof of purity.
+
+Facts export uses schema_version 2 with helper summaries; version 1 remains readable and keeps absent helper information unknown. Save versioned facts with ` + "`cyclo check --format facts .`" + `, then use ` + "`cyclo check --facts-in PATH --config POLICY --format json`" + ` to reevaluate without loading Go packages. Exit 0 means no findings or successful export, 1 means guardrail findings, and 2 means an operational failure. Type errors must not be interpreted as a clean check.
+
+Suppressions use ` + "`// cyclo-allow(rule_a, rule_b): reason`" + ` above a function, with intervening doc comments allowed. Reasons are required; unknown rules fail validation. Prefer documenting a deliberate exception over hiding evidence.
+
 ## Reduce a bug reproducer
 
-Use the CLI-only bug reducer once you have an input that reproduces a specific failure and a deterministic checker for that failure. It works with inputs for any codebase and removes whole lines; it does not find or fix bugs itself.
+Use the bug reducer once you have an input that reproduces a specific failure and a deterministic checker for that failure. Default mode works with inputs for any codebase and removes whole lines; it does not find or fix bugs itself. Go mode uses Tree-sitter to remove complete declarations, statements, and adjacent groups, largest first, reparsing each accepted reduction.
 
 ` + "```sh" + `
 cyclo bug-reducer command.sh -- ./checker.sh
 cyclo bug-reducer --timeout 30s --output reduced.sh command.sh -- ./checker.sh
+cyclo bug-reducer --language go --go-parser /path/to/go.so --tui=false input.go -- ./checker.sh
 ` + "```" + `
 
 Here, ` + "`command.sh`" + ` is the input file being minimized. ` + "`checker.sh`" + ` receives the absolute candidate file path as its last argument, after any checker arguments supplied on the command line. The reducer invokes the checker; the checker decides how to run or inspect the candidate. Input can also be Go source, JSON, or another file format.
 
+Prefer --language go for Go reproducers. Use the default line mode for other formats or when deliberately experimenting with text reduction. Go mode requires the tree-sitter CLI and a configured source.go grammar, or an explicit Go parser dynamic library supplied with --go-parser. Omit --go-parser when the grammar is configured. If the parser is unavailable, report the setup error rather than silently switching modes.
+
+Go syntax is validated before every candidate reaches the checker. The checker must still validate compilation and behavior; syntax alone does not establish the bug. Go mode has no line-deletion fallback. Adjacent groups allow related statements, such as a declaration and its only use, to disappear together. Structural reduction can use fewer checker runs while leaving a slightly larger reproducer than line reduction; compare both checker count and final size when evaluating it.
+
 Write the checker to exit **0 only when the same bug still occurs**. An ordinary nonzero exit rejects the candidate. Reject unrelated syntax errors, build failures, or different crashes. Confirm that the original reproduces the failure before reducing it. For project-dependent checks, arrange the required build workspace or overlay in the checker.
 
-The checker runs in the launch directory, inherits the environment, receives no stdin, and has its output suppressed. Candidates are temporary single files. Input must be a regular file. The original stays intact; output defaults to ` + "`command.sh.reduced`" + ` and must not already exist. Flags go before the input; the default timeout is 10 seconds per check.
+The checker runs in the launch directory, inherits the environment, and receives no stdin. Terminals automatically show a live dashboard with statistics, size over time, accepted deletions, and checker output. Use tab to change panes, j/k to scroll, enter to expand, and q to stop and save the best accepted input. Completed runs stay open for inspection; q closes the dashboard. Use ` + "`--tui=false`" + ` for unattended runs, or ` + "`--tui`" + ` to force the dashboard. Redirected output uses the plain final summary and suppresses checker output. The dashboard retains the last 16 KiB of output per check.
+
+Candidates are temporary single files. Input must be a regular file. The original stays intact; output defaults to ` + "`command.sh.reduced`" + ` and must not already exist. Flags go before the input; the default timeout is 10 seconds per check.
 
 Timeout, Ctrl-C, Unix SIGTERM, checker signals, and launch errors stop reduction. After the original is accepted, the best accepted candidate is saved even when the run stops with an error. Unix runs clean up the checker's process group; detached descendants and child-process cleanup on other platforms need checker-managed cleanup.
 
-Recheck the reduced file, use it as a regression test, and then fix the bug. Report the original and reduced sizes, the checker used, and validation results. The result is a local minimum for line deletion, not a guarantee of the smallest possible reproducer. Use ` + "`cyclo bug-reducer --help`" + ` for the current CLI contract.
+Recheck the reduced file, use it as a regression test, and then fix the bug. Report the original and reduced sizes, the checker used, and validation results. The result is a local minimum for the selected deletion units, not a guarantee of the smallest possible reproducer. Use ` + "`cyclo bug-reducer --help`" + ` for the current CLI contract.
 `

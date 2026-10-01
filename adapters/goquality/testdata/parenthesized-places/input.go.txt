@@ -1,0 +1,24 @@
+package repro
+
+const documentation = "parentheses should not change assignment ownership"
+
+type State struct {
+    Count int
+}
+
+func unusedHelper() int {
+    value := 4
+    return value + 1
+}
+
+func Mutate(shared *State) {
+    scratch := []int{1, 2, 3}
+    _ = scratch
+    local := new(State)
+    ((local)) = shared
+    local.Count++
+}
+
+func unusedTail() bool {
+    return true
+}

@@ -1,0 +1,25 @@
+package repro
+
+// Shared state arrives from the caller.
+type State struct { Count int }
+
+// Unrelated setup that the reducer should remove.
+type Metadata struct { Label string }
+
+func unrelated(value int) int {
+    if value > 0 {
+        return value + 1
+    }
+    return 0
+}
+
+// A value wrapper still reaches external state through its embedded pointer.
+func Mutate(shared *State) {
+    scratch := []int{1, 2, 3}; _ = scratch
+    local := struct { *State }{shared}
+    local.Count++
+}
+
+func anotherUnrelated() string {
+    return "noise"
+}

@@ -31,9 +31,11 @@ var (
 )
 
 func (m Model) View() tea.View {
-	content := m.wideView()
+	var content string
 	if m.width > 0 && m.width < wideMinimum {
 		content = m.narrowView()
+	} else {
+		content = m.wideView()
 	}
 
 	view := tea.NewView(content)
@@ -56,7 +58,7 @@ func (m Model) wideView() string {
 	panes := [][]string{
 		m.fileTable(widths[0], workspaceHeight),
 		m.functionTable(widths[1], workspaceHeight),
-		m.sourceLines(widths[2], workspaceHeight, "Source"),
+		m.detailsLines(widths[2], workspaceHeight, "Source"),
 	}
 	lines = append(lines, joinedRows(panes, widths)...)
 	lines = append(lines, m.footer(width))
@@ -71,18 +73,18 @@ func (m Model) narrowView() string {
 		height = max(m.height-2, 2)
 	}
 
-	lines := []string{m.header(width)}
+	lines := append([]string{m.header(width)}, m.activePaneLines(width, height)...)
+	return m.renderFrame(append(lines, m.footer(width)))
+}
+
+func (m Model) activePaneLines(width int, height int) []string {
 	switch m.focus {
 	case functionsPane:
-		lines = append(lines, m.functionTable(width, height)...)
+		return m.functionTable(width, height)
 	case detailsPane:
-		lines = append(lines, m.sourceLines(width, height, "Details")...)
-	default:
-		lines = append(lines, m.fileTable(width, height)...)
+		return m.detailsLines(width, height, "Details")
 	}
-	lines = append(lines, m.footer(width))
-
-	return m.renderFrame(lines)
+	return m.fileTable(width, height)
 }
 
 func (m Model) terminalWidth() int {
@@ -128,6 +130,7 @@ func (m Model) header(width int) string {
 	if m.controlPort > 0 {
 		summary += fmt.Sprintf(" · RPC :%d", m.controlPort)
 	}
+	summary += m.qualityHeader()
 	right := muted.Render(summary)
 
 	return joinSides(left, right, width)
@@ -304,8 +307,8 @@ func (m Model) sourceLines(width int, height int, title string) []string {
 		lines,
 		blue.Render(sourceLocation(m.report.Root, file.Path, function.Line, function.Column, contentWidth)),
 		text.Render(function.Package+" · "+function.Name),
+		rule(contentWidth),
 	)
-	lines = append(lines, rule(contentWidth))
 	return m.sourceBody(lines, function, width, height)
 }
 
@@ -319,7 +322,7 @@ func (m Model) sourceTitle(title string, function domain.Function) string {
 		}
 		line += muted.Render(" · ") + amber.Bold(true).Render(fmt.Sprintf("◆ %d %s", count, noun))
 	}
-	return line + diffTitle(m.report.DiffBase, function.DiffLines)
+	return line + qualityBadge(function) + diffTitle(m.report.DiffBase, function.DiffLines)
 }
 
 func (m Model) sourceBody(lines []string, function domain.Function, width int, height int) []string {
@@ -334,8 +337,9 @@ func (m Model) sourceBody(lines []string, function domain.Function, width int, h
 	if height == 0 {
 		return rendered
 	}
-	position := m.sourceDisplayRowCount(0, m.sourceOffset-1)
-	contentLength := m.sourceDisplayRowCount(0, len(code)-1)
+	counter := m.sourceRowCounter()
+	position := counter.count(0, m.sourceOffset-1)
+	contentLength := counter.count(0, len(code)-1)
 	return verticalScrollbar(rendered, contentStart, position, contentLength, available, width)
 }
 
@@ -348,8 +352,9 @@ func (m Model) selectedSourceCodeLines(function domain.Function) []string {
 	if function.Source == "" {
 		return lines
 	}
+	annotations := m.visibleAnnotations()
 	for index := range lines {
-		lines[index] = m.highlightSourceLine(function.Line+index, lines[index])
+		lines[index] = m.highlightSourceLine(function.Line+index, lines[index], annotations)
 	}
 	return lines
 }
@@ -407,11 +412,13 @@ func styledSourceLine(function domain.Function, lineNumber int, line string, suc
 }
 
 func normalizedSourceLines(source string) []string {
-	lines := strings.Split(source, "\n")
-	for index, line := range lines {
-		lines[index] = strings.ReplaceAll(strings.TrimSuffix(line, "\r"), "\t", "    ")
-	}
-	return lines
+	return strings.Split(normalizedSourceText(source), "\n")
+}
+
+func normalizedSourceText(source string) string {
+	source = strings.ReplaceAll(source, "\r\n", "\n")
+	source = strings.TrimSuffix(source, "\r")
+	return strings.ReplaceAll(source, "\t", "    ")
 }
 
 func (m Model) sourceGutter(line int, numberStyle lipgloss.Style) (string, lipgloss.Style) {
@@ -436,9 +443,10 @@ func (m Model) sourceDisplayWindow(lines []string, function domain.Function, wid
 	}
 
 	result := make([]string, 0, height)
+	annotations := m.visibleAnnotations()
 	for index := min(m.sourceOffset, len(lines)); index < len(lines) && len(result) < height; index++ {
 		lineNumber := function.Line + index
-		rows := m.sourceRowsAtLine(function, lineNumber, lines[index], width, index == len(lines)-1)
+		rows := sourceRowsAtLine(function, lineNumber, lines[index], width, index == len(lines)-1, annotations)
 		remaining := height - len(result)
 		if len(rows) > remaining {
 			return append(result, rows[:remaining]...)
@@ -448,16 +456,17 @@ func (m Model) sourceDisplayWindow(lines []string, function domain.Function, wid
 	return result
 }
 
-func (m Model) sourceRowsAtLine(
+func sourceRowsAtLine(
 	function domain.Function,
 	lineNumber int,
 	source string,
 	width int,
 	last bool,
+	annotations []Annotation,
 ) []string {
 	rows := sourceDeletedRows(function.DiffLines, lineNumber)
 	rows = append(rows, source)
-	rows = append(rows, m.sourceAnnotationRows(lineNumber, width)...)
+	rows = append(rows, sourceAnnotationRows(annotations, lineNumber, width)...)
 	if last {
 		rows = append(rows, sourceDeletedRows(function.DiffLines, function.EndLine+1)...)
 	}
@@ -509,26 +518,30 @@ func sourceDeletedRows(lines []domain.DiffLine, beforeLine int) []string {
 	return result
 }
 
-func (m Model) sourceAnnotationRows(line int, width int) []string {
-	annotations := m.visibleAnnotations()
+func sourceAnnotationRows(annotations []Annotation, line int, width int) []string {
 	rows := make([]string, 0)
 	for index, annotation := range annotations {
 		if annotation.EndLine != line {
 			continue
 		}
-		position := ""
-		if len(annotations) > 1 {
-			position = fmt.Sprintf("%d/%d ", index+1, len(annotations))
-		}
-		prefix := muted.Render("      ╰─") + amber.Bold(true).Render("◆ "+position)
+		prefix := sourceAnnotationPrefix(index, len(annotations))
 		rows = append(rows, annotationMessageRows(annotation.Message, prefix, width)...)
 	}
 	return rows
 }
 
+func sourceAnnotationPrefix(index int, count int) string {
+	position := ""
+	if count > 1 {
+		position = fmt.Sprintf("%d/%d ", index+1, count)
+	}
+	return muted.Render("      ╰─") + amber.Bold(true).Render("◆ "+position)
+}
+
 func annotationMessageRows(message string, prefix string, width int) []string {
-	indent := strings.Repeat(" ", ansi.StringWidth(prefix))
-	messageWidth := max(width-ansi.StringWidth(prefix), 1)
+	prefixWidth := ansi.StringWidth(prefix)
+	indent := strings.Repeat(" ", prefixWidth)
+	messageWidth := max(width-prefixWidth, 1)
 	rows := strings.Split(ansi.Wrap(message, messageWidth, ""), "\n")
 	for index, row := range rows {
 		rows[index] = prefix + amber.Render(row)
@@ -537,11 +550,11 @@ func annotationMessageRows(message string, prefix string, width int) []string {
 	return rows
 }
 
-func (m Model) highlightSourceLine(line int, rendered string) string {
+func (m Model) highlightSourceLine(line int, rendered string, annotations []Annotation) string {
 	if m.lineSelection.contains(line) {
 		return withBackground(rendered, "\x1b[48;2;45;52;54m")
 	}
-	for _, annotation := range m.visibleAnnotations() {
+	for _, annotation := range annotations {
 		if annotation.StartLine <= line && line <= annotation.EndLine {
 			return withBackground(rendered, "\x1b[48;2;44;34;14m")
 		}
@@ -556,7 +569,7 @@ func withBackground(rendered string, background string) string {
 
 func (m Model) sourceViewportHeight() int {
 	if m.height == 0 {
-		return len(m.selectedSourceLines())
+		return m.selectedSourceLineCount()
 	}
 	if m.width > 0 && m.width < wideMinimum {
 		return max(max(m.height-2, 2)-m.sourceHeaderHeight(), 0)
@@ -786,11 +799,13 @@ func verticalScrollbar(
 
 	gutterWidth := paneRightInset(width)
 	contentWidth := max(width-gutterWidth, 0)
+	trackGutter := strings.Repeat(" ", gutterWidth)
+	thumbGutter := strings.Repeat(" ", gutterWidth-1) + muted.Render("█")
 	for row := range trackHeight {
 		index := contentStart + row
-		gutter := strings.Repeat(" ", gutterWidth)
+		gutter := trackGutter
 		if thumbStart <= row && row < thumbStart+thumbHeight {
-			gutter = strings.Repeat(" ", gutterWidth-1) + muted.Render("█")
+			gutter = thumbGutter
 		}
 		lines[index] = styledCell(lines[index], contentWidth) + gutter
 	}
@@ -845,12 +860,13 @@ func fitLines(lines []string, width int, height int) []string {
 	if height > 0 && len(lines) > height {
 		lines = lines[:height]
 	}
-	result := make([]string, 0, max(len(lines), height))
-	for _, line := range lines {
-		result = append(result, styledCell(line, width))
-	}
-	for len(result) < height {
-		result = append(result, strings.Repeat(" ", width))
+	result := make([]string, max(len(lines), height))
+	for index := range result {
+		if index >= len(lines) {
+			result[index] = strings.Repeat(" ", width)
+			continue
+		}
+		result[index] = styledCell(lines[index], width)
 	}
 
 	return result
