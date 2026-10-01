@@ -1,4 +1,4 @@
-.PHONY: check complexity cognitive cyclo-check fmt lint test test-race
+.PHONY: check complexity cognitive cyclo-check fmt lint quality-baseline quality-gate test test-race
 
 check:
 	go test -buildvcs=false ./...
@@ -16,6 +16,23 @@ cognitive:
 cyclo-check:
 	go run -buildvcs=false github.com/fzipp/gocyclo/cmd/gocyclo -over 15 -ignore '_test.go' .
 	go run -buildvcs=false github.com/uudashr/gocognit/cmd/gocognit -over 15 -ignore '_test.go' .
+
+# Quality gate: cyclo's guardrails (fn_params, mutated targets, side-effect
+# density, ...) as excess rates per 1,000 functions, so the gate scales with
+# the codebase instead of pinning absolute finding counts. `check` exits 1
+# when it reports findings, which is expected; only exit 2 (analysis
+# failure) fails the run.
+quality-gate:
+	go build -buildvcs=false -o /tmp/cyclo-check-bin .
+	/tmp/cyclo-check-bin check --format json . > /tmp/cyclo-facts.json || test $$? -eq 1
+	go run ./internal/qualitygate --baseline quality-baseline.json --facts /tmp/cyclo-facts.json
+
+# Regenerate the checked-in baseline after a change legitimately moves the
+# numbers (usually down).
+quality-baseline:
+	go build -buildvcs=false -o /tmp/cyclo-check-bin .
+	/tmp/cyclo-check-bin check --format json . > /tmp/cyclo-facts.json || test $$? -eq 1
+	go run ./internal/qualitygate --write quality-baseline.json --facts /tmp/cyclo-facts.json
 
 fmt:
 	go fmt ./...

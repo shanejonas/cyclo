@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "generated_at": "2026-10-01T13:52:35Z",
+  "commit": "bd37ab5",
+  "functions": 588,
+  "tolerance": 0.05,
+  "rules": {
+    "fn_params": {
+      "limit": 4,
+      "excess": 4,
+      "per_1000_functions": 6.802721088435374
+    },
+    "mutated_targets": {
+      "limit": 3,
+      "excess": 12,
+      "per_1000_functions": 20.408163265306122
+    },
+    "mutation_per_target": {
+      "limit": 3,
+      "excess": 92,
+      "per_1000_functions": 156.4625850340136
+    },
+    "side_effect_density": {
+      "limit": 500,
+      "excess": 2815693,
+      "per_1000_functions": 4788593.537414966
+    }
+  }
+}
