@@ -23,22 +23,28 @@ func (m Model) relocateAnnotations() Model {
 	return m
 }
 
+// annotationFunction finds the function an annotation belongs to after the
+// code moved: first by unique name, then by unique annotated text. An
+// ambiguous or missing match relocates nothing.
 func annotationFunction(functions []domain.Function, annotation Annotation) (domain.Function, bool) {
+	if match, ok := uniqueFunction(functions, func(function domain.Function) bool {
+		return function.Name == annotation.Function
+	}); ok {
+		return match, true
+	}
+	return uniqueFunction(functions, func(function domain.Function) bool {
+		_, ok := annotationTextLine(function, annotation.Text)
+		return ok
+	})
+}
+
+// uniqueFunction returns the single function satisfying keep. Zero or several
+// matches mean the annotation cannot be placed unambiguously.
+func uniqueFunction(functions []domain.Function, keep func(domain.Function) bool) (domain.Function, bool) {
 	var match domain.Function
 	count := 0
 	for _, function := range functions {
-		if function.Name == annotation.Function {
-			match = function
-			count++
-		}
-	}
-	if count == 1 {
-		return match, true
-	}
-	count = 0
-	for _, function := range functions {
-		_, ok := annotationTextLine(function, annotation.Text)
-		if ok {
+		if keep(function) {
 			match = function
 			count++
 		}
