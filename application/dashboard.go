@@ -90,13 +90,17 @@ func (m Model) selectTreemap(message tea.MouseClickMsg) Model {
 	}
 	m.fileIndex = tile.file
 	m.functionIndex = max(tile.function, 0)
-	m.focus = functionsPane
-	if tile.function < 0 {
-		m.focus = filesPane
-	}
+	m.focus = tile.focusPane()
 	m = m.resetSourceWorkspace()
 	m.revision++
 	return m
+}
+
+func (t treemapTile) focusPane() pane {
+	if t.function < 0 {
+		return filesPane
+	}
+	return functionsPane
 }
 
 func (m Model) treemapTileAt(x int, y int) (treemapTile, bool) {

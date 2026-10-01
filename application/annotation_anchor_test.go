@@ -98,6 +98,18 @@ func TestRenamedFunctionRequiresUniqueAnnotationText(t *testing.T) {
 	}
 }
 
+func TestRelocationPreservesCRLFAndTrailingSnippetRows(t *testing.T) {
+	function := domain.Function{Line: 40, Source: "prefix\r\n\tfirst\r\n\tsecond\r\n"}
+	annotation := Annotation{
+		FunctionLine: 10, StartLine: 11, EndLine: 13,
+		Text: "\tfirst\r\n\tsecond\r\n",
+	}
+	relocated := relocateAnnotation(annotation, function)
+	if relocated.StartLine != 41 || relocated.EndLine != 43 {
+		t.Fatalf("relocated range = %d-%d, want 41-43", relocated.StartLine, relocated.EndLine)
+	}
+}
+
 func TestReloadRelocatesNotesWithoutOverwritingSavedAnchors(t *testing.T) {
 	store, err := sqlite.Open(filepath.Join(t.TempDir(), "annotations.db"))
 	if err != nil {

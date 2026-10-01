@@ -20,13 +20,20 @@ func (m Model) unmatchedAnnotation() (Annotation, bool) {
 }
 
 func savedAnnotationRows(annotation Annotation, width int) []string {
-	message := ansi.Wrap("◆ "+annotation.Message, max(width, 1), "")
-	rows := strings.Split(amber.Render(message), "\n")
-	rows = append(rows, "")
+	rows := savedAnnotationMessageRows(annotation.Message, width)
 	for index, line := range normalizedSourceLines(annotation.Text) {
 		rows = append(rows, muted.Render(fmt.Sprintf("%4d │ ", annotation.StartLine+index))+text.Render(line))
 	}
 	return rows
+}
+
+func savedAnnotationMessageRows(message string, width int) []string {
+	wrapped := ansi.Wrap("◆ "+message, max(width, 1), "")
+	return strings.Split(amber.Render(wrapped)+"\n", "\n")
+}
+
+func savedAnnotationRowCount(annotation Annotation, width int) int {
+	return len(savedAnnotationMessageRows(annotation.Message, width)) + strings.Count(annotation.Text, "\n") + 1
 }
 
 func (m Model) savedAnnotationLines(annotation Annotation, width int, height int, title string) []string {
@@ -53,11 +60,12 @@ func (m Model) savedAnnotationLines(annotation Annotation, width int, height int
 }
 
 func (m Model) scrollSavedAnnotation(annotation Annotation, delta int) Model {
-	rows := savedAnnotationRows(annotation, paneContentWidth(m.sourcePaneWidth()))
+	rowCount := savedAnnotationRowCount(annotation, paneContentWidth(m.sourcePaneWidth()))
 	visible := m.sourceViewportHeight()
 	if m.height == 0 {
-		visible = len(rows)
+		visible = rowCount
 	}
-	m.sourceOffset = min(max(m.sourceOffset+delta, 0), max(len(rows)-visible, 0))
+	maximum := max(rowCount-visible, 0)
+	m.sourceOffset = moveIndex(m.sourceOffset, delta, maximum+1)
 	return m
 }

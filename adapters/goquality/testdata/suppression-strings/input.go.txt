@@ -1,0 +1,17 @@
+package repro
+
+// Unrelated declarations are removable noise.
+type Metadata struct { Label string }
+
+func unrelated(value int) int {
+    if value > 0 { return value + 1 }
+    return 0
+}
+
+// This is Go string data, not a suppression comment.
+const example = "// cyclo-allow(fn_params): documentation example"
+func Plain() int { return 1 }
+
+func anotherUnrelated() string {
+    return "noise"
+}

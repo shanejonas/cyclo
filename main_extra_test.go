@@ -26,7 +26,7 @@ func TestSkillFlagPrintsAnAgentSkillWithoutStartingTheTUI(t *testing.T) {
 	}
 }
 
-func TestGoRunLaunchesCyclo(t *testing.T) {
+func TestBinaryLaunchesCyclo(t *testing.T) {
 	directory := t.TempDir()
 	t.Setenv("XDG_STATE_HOME", directory)
 	source := filepath.Join(directory, "sample.go")
@@ -35,18 +35,27 @@ func TestGoRunLaunchesCyclo(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Cold CI builds need their own deadline; compilation is not TUI startup.
+	buildContext, cancelBuild := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancelBuild()
+	binary := filepath.Join(t.TempDir(), "cyclo")
+	build := exec.CommandContext(buildContext, "go", "build", "-buildvcs=false", "-o", binary, ".")
+	if output, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("build cyclo: %v\n%s", err, output)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	command := exec.CommandContext(ctx, "go", "run", ".", "--control-port", "0", source)
+	command := exec.CommandContext(ctx, binary, "--control-port", "0", source)
 	command.Stdin = strings.NewReader("q")
 	command.Env = append(os.Environ(), "TERM=xterm-256color")
 	output, err := command.CombinedOutput()
 	if ctx.Err() != nil {
-		t.Fatalf("go run . did not exit after q: %v\n%s", ctx.Err(), output)
+		t.Fatalf("cyclo did not exit after q: %v\n%s", ctx.Err(), output)
 	}
 	if err != nil {
-		t.Fatalf("go run . failed: %v\n%s", err, output)
+		t.Fatalf("cyclo failed: %v\n%s", err, output)
 	}
 }
 
@@ -67,6 +76,16 @@ func TestDefaultControlPort(t *testing.T) {
 	}
 	if options.controlPort != 8197 {
 		t.Fatalf("control port = %d, want 8197", options.controlPort)
+	}
+}
+
+func TestQualityCheckHelpDoesNotStartTUI(t *testing.T) {
+	var output bytes.Buffer
+	if err := run([]string{"check", "--help"}, &output); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "Usage: cyclo check") {
+		t.Fatal(output.String())
 	}
 }
 

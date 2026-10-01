@@ -1,0 +1,19 @@
+package repro
+
+const documentation = "arrays copy their values, including in generic functions"
+
+func unrelated() int {
+    return 7
+}
+
+func Copy[T ~[1]int](shared T) int {
+    scratch := []int{1, 2}
+    _ = scratch
+    local := shared
+    local[0]++
+    return local[0]
+}
+
+func unrelatedTail() bool {
+    return true
+}

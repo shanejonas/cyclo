@@ -31,8 +31,7 @@ func Open(path string) (*Store, error) {
 	}
 	database.SetMaxOpenConns(1)
 	store := &Store{database: database}
-	err = store.migrate()
-	if err != nil {
+	if err := store.migrate(); err != nil {
 		_ = database.Close()
 		return nil, err
 	}
@@ -68,17 +67,15 @@ func (s *Store) ListAnnotations(repository string) ([]domain.Annotation, error) 
 	annotations := []domain.Annotation{}
 	for rows.Next() {
 		var annotation domain.Annotation
-		err = rows.Scan(
+		if err := rows.Scan(
 			&annotation.ID, &annotation.Path, &annotation.Function, &annotation.FunctionLine,
 			&annotation.StartLine, &annotation.EndLine, &annotation.Message, &annotation.Text,
-		)
-		if err != nil {
+		); err != nil {
 			return nil, fmt.Errorf("scan annotation: %w", err)
 		}
 		annotations = append(annotations, annotation)
 	}
-	err = rows.Err()
-	if err != nil {
+	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("read annotations: %w", err)
 	}
 	return annotations, nil

@@ -9,27 +9,37 @@ import (
 	"os"
 	"time"
 
+	"github.com/charmbracelet/x/term"
+	"github.com/shanejonas/cyclo/adapters/treesitter"
 	"github.com/shanejonas/cyclo/internal/reducer"
 )
 
-const usage = `Usage: cyclo bug-reducer [--output PATH] [--timeout 10s] INPUT -- CHECKER [ARGS...]
+const usage = `Usage: cyclo bug-reducer [--language lines|go] [--go-parser PATH] [--tui=false] [--output PATH] [--timeout 10s] INPUT -- CHECKER [ARGS...]
 
 Minimize an input while preserving a reproducible bug.
 The checker receives an absolute candidate file path as its last argument.
 Exit 0 accepts the candidate; any ordinary nonzero exit rejects it.
-The checker runs in your current directory, with output suppressed.
+The checker runs in your current directory.
+Terminals show a live dashboard with checker output; scripts get a final summary.
+Use --tui to force the dashboard, or --tui=false for plain output.
+In the dashboard: tab changes panes, j/k scrolls, enter expands, q stops and saves.
 Timeouts, signals, and launch errors stop reduction.
-Only the checker decides validity; no Go parsing or Cyclo-specific check is applied.
+Default mode removes whole lines. --language go removes Tree-sitter Go syntax units.
+Go mode requires the tree-sitter CLI and a configured Go grammar, or --go-parser PATH.
+Go syntax is checked before the checker; the checker still decides whether the bug remains.
 Input must be a regular file.
 The original is preserved. Output defaults to INPUT.reduced and must not exist.
-Reduction removes whole lines; it does not guarantee a globally smallest input.
+Reduction does not guarantee a globally smallest input.
 `
 
 type options struct {
-	input   string
-	output  string
-	command []string
-	timeout time.Duration
+	language string
+	goParser string
+	input    string
+	output   string
+	command  []string
+	timeout  time.Duration
+	tui      bool
 }
 
 func parseOptions(args []string, output io.Writer) (options, error) {
@@ -37,8 +47,11 @@ func parseOptions(args []string, output io.Writer) (options, error) {
 	flags.SetOutput(output)
 	flags.Usage = func() { fmt.Fprint(output, usage) }
 	result := options{}
+	flags.StringVar(&result.language, "language", "lines", "reduction mode: lines or go (Tree-sitter)")
+	flags.StringVar(&result.goParser, "go-parser", "", "Go parser dynamic library for Tree-sitter")
 	flags.StringVar(&result.output, "output", "", "new output file")
 	flags.DurationVar(&result.timeout, "timeout", 10*time.Second, "timeout per checker invocation")
+	flags.BoolVar(&result.tui, "tui", terminalOutput(output), "show the live terminal dashboard")
 	err := flags.Parse(args)
 	if err != nil {
 		return options{}, err
@@ -54,7 +67,7 @@ func parseOptions(args []string, output io.Writer) (options, error) {
 	if result.output == "" {
 		result.output = result.input + ".reduced"
 	}
-	return result, nil
+	return result, validateMode(result)
 }
 
 func Run(ctx context.Context, args []string, output io.Writer) error {
@@ -82,8 +95,16 @@ func runReduction(ctx context.Context, options options, output io.Writer) error 
 	if err != nil {
 		return fmt.Errorf("create output: %w", err)
 	}
-	reduced, reduceErr := reducer.Reduce(source, func(candidate []byte) (bool, error) { return check.check(ctx, candidate) })
+	if options.tui {
+		return runDashboard(ctx, options, source, check, destination, output)
+	}
+	reduced, reduceErr := reduceInput(ctx, options, source, check, nil)
 	return finish(destination, reduced, reduceErr, check.checks, len(source), output)
+}
+
+func terminalOutput(output io.Writer) bool {
+	file, ok := output.(*os.File)
+	return ok && term.IsTerminal(file.Fd()) && term.IsTerminal(os.Stdin.Fd())
 }
 
 func finish(destination *os.File, reduced []byte, reduceErr error, checks, original int, output io.Writer) error {
@@ -97,4 +118,23 @@ func finish(destination *os.File, reduced []byte, reduceErr error, checks, origi
 	}
 	_, reportErr := fmt.Fprintf(output, "%d -> %d bytes; %d checks; saved %s\n", original, len(reduced), checks, destination.Name())
 	return errors.Join(reduceErr, reportErr)
+}
+
+func validateMode(options options) error {
+	if options.language != "lines" && options.language != "go" {
+		return fmt.Errorf("unsupported reduction language: %s", options.language)
+	}
+	if options.goParser != "" && options.language != "go" {
+		return errors.New("--go-parser requires --language go")
+	}
+	return nil
+}
+
+func reduceInput(ctx context.Context, options options, source []byte, check *checker, observe func(reducer.Progress)) ([]byte, error) {
+	predicate := func(candidate []byte) (bool, error) { return check.check(ctx, candidate) }
+	if options.language == "go" {
+		parser := treesitter.GoParser{Context: ctx, Library: options.goParser}
+		return reducer.ReduceSyntaxWithProgress(source, predicate, observe, parser)
+	}
+	return reducer.ReduceWithProgress(source, predicate, observe)
 }

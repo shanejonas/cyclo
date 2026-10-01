@@ -39,6 +39,7 @@ func TestControlAPIAdvertisesItsRuntimeAddressAndMethods(t *testing.T) {
 		"cyclo.annotateLines",
 		"cyclo.removeAnnotation",
 		"cyclo.refresh",
+		"cyclo.setDetailsView",
 	}
 	if got := methodNames(document); !sameStrings(got, want) {
 		t.Fatalf("methods = %v, want %v", got, want)

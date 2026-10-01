@@ -1,0 +1,13 @@
+package repro
+
+
+type State struct { Count int }
+
+func Mutate(shared *State) {
+    closure := func(value *State) {
+        if false { value = new(State) }
+        value.Count++
+    }
+    closure(shared)
+}
+

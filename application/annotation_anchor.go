@@ -50,8 +50,8 @@ func annotationTextLine(function domain.Function, text string) (int, bool) {
 	if strings.TrimSpace(text) == "" {
 		return 0, false
 	}
-	source := "\n" + strings.Join(normalizedSourceLines(function.Source), "\n") + "\n"
-	needle := "\n" + strings.Join(normalizedSourceLines(text), "\n") + "\n"
+	source := "\n" + normalizedSourceText(function.Source) + "\n"
+	needle := "\n" + normalizedSourceText(text) + "\n"
 	index := strings.Index(source, needle)
 	if index < 0 || strings.Contains(source[index+1:], needle) {
 		return 0, false
@@ -65,14 +65,21 @@ func relocateAnnotation(annotation Annotation, function domain.Function) Annotat
 	line, ok := annotationTextLine(function, annotation.Text)
 	if ok {
 		start = line
-		end = start + len(normalizedSourceLines(annotation.Text)) - 1
+		end = start + strings.Count(annotation.Text, "\n")
 	}
-	last := function.Line + len(normalizedSourceLines(function.Source)) - 1
-	annotation.Function = function.Name
-	annotation.FunctionLine = function.Line
-	annotation.StartLine = min(max(start, function.Line), last)
-	annotation.EndLine = min(max(end, annotation.StartLine), last)
-	return annotation
+	last := function.Line + strings.Count(function.Source, "\n")
+	start = min(max(start, function.Line), last)
+	end = min(max(end, start), last)
+	return Annotation{
+		ID:           annotation.ID,
+		Path:         annotation.Path,
+		Function:     function.Name,
+		FunctionLine: function.Line,
+		StartLine:    start,
+		EndLine:      end,
+		Message:      annotation.Message,
+		Text:         annotation.Text,
+	}
 }
 
 func annotationMatchesFunction(annotation Annotation, function domain.Function) bool {

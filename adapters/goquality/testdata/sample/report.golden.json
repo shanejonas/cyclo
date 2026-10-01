@@ -1,0 +1,459 @@
+{
+  "schema_version": 1,
+  "summary": {
+    "functions": 14,
+    "mean_density_milli": 651,
+    "max_density_milli": 2666,
+    "incomplete_functions": 4,
+    "effects": [
+      {
+        "kind": "mutation",
+        "count": 11
+      },
+      {
+        "kind": "io",
+        "count": 2
+      },
+      {
+        "kind": "network",
+        "count": 0
+      },
+      {
+        "kind": "global",
+        "count": 1
+      },
+      {
+        "kind": "unsafe",
+        "count": 2
+      },
+      {
+        "kind": "time",
+        "count": 1
+      },
+      {
+        "kind": "random",
+        "count": 0
+      },
+      {
+        "kind": "panic",
+        "count": 0
+      },
+      {
+        "kind": "unknown",
+        "count": 5
+      }
+    ]
+  },
+  "functions": [
+    {
+      "path": "edge.go",
+      "line": 3,
+      "column": 1,
+      "name": "example.com/sample.pointerResult",
+      "density_milli": 0,
+      "mutations": 0,
+      "mutated_targets": 0,
+      "unclassified_calls": 0,
+      "complete": true,
+      "effects": []
+    },
+    {
+      "path": "edge.go",
+      "line": 5,
+      "column": 1,
+      "name": "example.com/sample.boxResult",
+      "density_milli": 0,
+      "mutations": 0,
+      "mutated_targets": 0,
+      "unclassified_calls": 0,
+      "complete": true,
+      "effects": []
+    },
+    {
+      "path": "edge.go",
+      "line": 7,
+      "column": 1,
+      "name": "example.com/sample.TupleAndTemporary",
+      "density_milli": 600,
+      "mutations": 3,
+      "mutated_targets": 3,
+      "unclassified_calls": 0,
+      "complete": false,
+      "effects": [
+        {
+          "kind": "unknown",
+          "detail": "alias",
+          "line": 10
+        },
+        {
+          "kind": "unknown",
+          "detail": "\u003ctemporary\u003e.Count",
+          "line": 11
+        },
+        {
+          "kind": "mutation",
+          "detail": "values",
+          "line": 12
+        }
+      ]
+    },
+    {
+      "path": "sample.go",
+      "line": 17,
+      "column": 1,
+      "name": "example.com/sample.Pure",
+      "density_milli": 0,
+      "mutations": 0,
+      "mutated_targets": 0,
+      "unclassified_calls": 0,
+      "complete": true,
+      "effects": []
+    },
+    {
+      "path": "sample.go",
+      "line": 19,
+      "column": 1,
+      "name": "example.com/sample.Box.Read",
+      "density_milli": 0,
+      "mutations": 0,
+      "mutated_targets": 0,
+      "unclassified_calls": 0,
+      "complete": true,
+      "effects": []
+    },
+    {
+      "path": "sample.go",
+      "line": 21,
+      "column": 1,
+      "name": "example.com/sample.Box.Bump",
+      "density_milli": 1000,
+      "mutations": 1,
+      "mutated_targets": 1,
+      "unclassified_calls": 0,
+      "complete": true,
+      "effects": [
+        {
+          "kind": "mutation",
+          "detail": "b.Count",
+          "line": 21
+        }
+      ]
+    },
+    {
+      "path": "sample.go",
+      "line": 23,
+      "column": 1,
+      "name": "example.com/sample.Writes",
+      "density_milli": 523,
+      "mutations": 11,
+      "mutated_targets": 8,
+      "unclassified_calls": 0,
+      "complete": true,
+      "effects": [
+        {
+          "kind": "mutation",
+          "detail": "b.Count",
+          "line": 27
+        },
+        {
+          "kind": "mutation",
+          "detail": "alias",
+          "line": 29
+        },
+        {
+          "kind": "mutation",
+          "detail": "data",
+          "line": 32
+        },
+        {
+          "kind": "mutation",
+          "detail": "m",
+          "line": 33
+        },
+        {
+          "kind": "mutation",
+          "detail": "m",
+          "line": 35
+        },
+        {
+          "kind": "io",
+          "detail": "fmt.Println",
+          "line": 36
+        },
+        {
+          "kind": "time",
+          "detail": "time.Now",
+          "line": 38
+        },
+        {
+          "kind": "global",
+          "detail": "example.com/sample.global",
+          "line": 39
+        }
+      ]
+    },
+    {
+      "path": "sample.go",
+      "line": 48,
+      "column": 1,
+      "name": "example.com/sample.Calls",
+      "density_milli": 500,
+      "mutations": 0,
+      "mutated_targets": 0,
+      "unclassified_calls": 0,
+      "complete": true,
+      "effects": [
+        {
+          "kind": "mutation",
+          "detail": "example.com/sample.Box.Bump → b.Count",
+          "line": 50
+        }
+      ]
+    },
+    {
+      "path": "sample.go",
+      "line": 53,
+      "column": 1,
+      "name": "example.com/sample.Dynamic",
+      "density_milli": 2000,
+      "mutations": 0,
+      "mutated_targets": 0,
+      "unclassified_calls": 1,
+      "complete": false,
+      "effects": [
+        {
+          "kind": "io",
+          "detail": "io.Reader.Read",
+          "line": 54
+        },
+        {
+          "kind": "unknown",
+          "detail": "callback",
+          "line": 55
+        }
+      ]
+    },
+    {
+      "path": "sample.go",
+      "line": 58,
+      "column": 1,
+      "name": "example.com/sample.Aliases",
+      "density_milli": 333,
+      "mutations": 6,
+      "mutated_targets": 3,
+      "unclassified_calls": 0,
+      "complete": false,
+      "effects": [
+        {
+          "kind": "unknown",
+          "detail": "alias",
+          "line": 64
+        },
+        {
+          "kind": "mutation",
+          "detail": "values",
+          "line": 67
+        },
+        {
+          "kind": "mutation",
+          "detail": "values",
+          "line": 68
+        }
+      ]
+    },
+    {
+      "path": "sample.go",
+      "line": 73,
+      "column": 1,
+      "name": "example.com/sample.Suppressed",
+      "density_milli": 0,
+      "mutations": 0,
+      "mutated_targets": 0,
+      "unclassified_calls": 0,
+      "complete": true,
+      "effects": []
+    },
+    {
+      "path": "sample.go",
+      "line": 75,
+      "column": 15,
+      "name": "example.com/sample.\u003cliteral@75:15\u003e",
+      "density_milli": 1000,
+      "mutations": 1,
+      "mutated_targets": 1,
+      "unclassified_calls": 0,
+      "complete": true,
+      "effects": [
+        {
+          "kind": "mutation",
+          "detail": "p",
+          "line": 75
+        }
+      ]
+    },
+    {
+      "path": "sample_test.go",
+      "line": 5,
+      "column": 1,
+      "name": "example.com/sample.TestPure",
+      "density_milli": 500,
+      "mutations": 0,
+      "mutated_targets": 0,
+      "unclassified_calls": 1,
+      "complete": false,
+      "effects": [
+        {
+          "kind": "unknown",
+          "detail": "testing.common.Fatal",
+          "line": 7
+        }
+      ]
+    },
+    {
+      "path": "unsafe.go",
+      "line": 7,
+      "column": 1,
+      "name": "example.com/sample.Unsafe",
+      "density_milli": 2666,
+      "mutations": 0,
+      "mutated_targets": 0,
+      "unclassified_calls": 0,
+      "complete": true,
+      "effects": [
+        {
+          "kind": "unsafe",
+          "detail": "unsafe pointer conversion",
+          "line": 8
+        },
+        {
+          "kind": "unsafe",
+          "detail": "unsafe.Add",
+          "line": 9
+        }
+      ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "path": "edge.go",
+      "line": 7,
+      "column": 1,
+      "name": "example.com/sample.TupleAndTemporary",
+      "rule_id": "side_effect_density",
+      "actual": 600,
+      "limit": 500,
+      "message": "side_effect_density: 600 exceeds 500",
+      "effects": [
+        {
+          "kind": "unknown",
+          "detail": "alias",
+          "line": 10
+        },
+        {
+          "kind": "unknown",
+          "detail": "\u003ctemporary\u003e.Count",
+          "line": 11
+        },
+        {
+          "kind": "mutation",
+          "detail": "values",
+          "line": 12
+        }
+      ]
+    },
+    {
+      "path": "sample.go",
+      "line": 23,
+      "column": 1,
+      "name": "example.com/sample.Writes",
+      "rule_id": "fn_params",
+      "actual": 5,
+      "limit": 4,
+      "message": "fn_params: 5 exceeds 4"
+    },
+    {
+      "path": "sample.go",
+      "line": 23,
+      "column": 1,
+      "name": "example.com/sample.Writes",
+      "rule_id": "mutated_targets",
+      "actual": 8,
+      "limit": 3,
+      "message": "mutated_targets: 8 exceeds 3"
+    },
+    {
+      "path": "sample.go",
+      "line": 23,
+      "column": 1,
+      "name": "example.com/sample.Writes",
+      "rule_id": "side_effect_density",
+      "actual": 523,
+      "limit": 500,
+      "message": "side_effect_density: 523 exceeds 500",
+      "effects": [
+        {
+          "kind": "mutation",
+          "detail": "b.Count",
+          "line": 27
+        },
+        {
+          "kind": "mutation",
+          "detail": "alias",
+          "line": 29
+        },
+        {
+          "kind": "mutation",
+          "detail": "data",
+          "line": 32
+        },
+        {
+          "kind": "mutation",
+          "detail": "m",
+          "line": 33
+        },
+        {
+          "kind": "mutation",
+          "detail": "m",
+          "line": 35
+        },
+        {
+          "kind": "io",
+          "detail": "fmt.Println",
+          "line": 36
+        },
+        {
+          "kind": "time",
+          "detail": "time.Now",
+          "line": 38
+        },
+        {
+          "kind": "global",
+          "detail": "example.com/sample.global",
+          "line": 39
+        }
+      ]
+    },
+    {
+      "path": "unsafe.go",
+      "line": 7,
+      "column": 1,
+      "name": "example.com/sample.Unsafe",
+      "rule_id": "side_effect_density",
+      "actual": 2666,
+      "limit": 500,
+      "message": "side_effect_density: 2666 exceeds 500",
+      "effects": [
+        {
+          "kind": "unsafe",
+          "detail": "unsafe pointer conversion",
+          "line": 8
+        },
+        {
+          "kind": "unsafe",
+          "detail": "unsafe.Add",
+          "line": 9
+        }
+      ]
+    }
+  ]
+}

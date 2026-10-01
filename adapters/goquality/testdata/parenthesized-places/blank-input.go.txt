@@ -1,0 +1,18 @@
+package repro
+
+const documentation = "discarding a value is not a mutation"
+
+func unusedHelper() int {
+    return 5
+}
+
+func Blank() int {
+    scratch := []int{1, 2}
+    _ = scratch
+    (( _ )) = 42
+    return 1
+}
+
+func unusedTail() bool {
+    return true
+}

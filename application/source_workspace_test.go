@@ -116,7 +116,7 @@ func TestAnnotationRowsWrapWithoutLosingText(t *testing.T) {
 	annotation, _ := model.newAnnotation(11, 16, message)
 	model.annotations = []Annotation{annotation}
 
-	rows := model.sourceAnnotationRows(16, 32)
+	rows := sourceAnnotationRows(model.visibleAnnotations(), 16, 32)
 	if len(rows) < 2 {
 		t.Fatalf("annotation stayed on one row: %q", ansi.Strip(strings.Join(rows, "\n")))
 	}
@@ -129,6 +129,77 @@ func TestAnnotationRowsWrapWithoutLosingText(t *testing.T) {
 	for _, row := range rows {
 		if width := ansi.StringWidth(row); width > 32 {
 			t.Fatalf("wrapped row width = %d, want <= 32: %q", width, ansi.Strip(row))
+		}
+	}
+}
+
+func TestSourceScrollExtentMatchesRenderedNotesAndDeletions(t *testing.T) {
+	for _, width := range []int{14, 30, 32, 50, 90, 140} {
+		model := sourceWorkspaceModel()
+		model.width = width
+		function := &model.report.Files[0].Functions[0]
+		function.EndLine = 22
+		function.DiffLines = []domain.DiffLine{
+			{Kind: domain.DiffDeleted, NewLine: 11, OldLine: 11, Text: "deleted"},
+			{Kind: domain.DiffAdded, NewLine: 12, Text: "added"},
+			{Kind: domain.DiffDeleted, NewLine: 23, OldLine: 24, Text: "trailing deletion"},
+		}
+		first, _ := model.newAnnotation(11, 11, strings.Repeat("語 ", 30))
+		second, _ := model.newAnnotation(11, 11, "second note\nwith another line")
+		last, _ := model.newAnnotation(22, 22, "last note")
+		other := first
+		other.Path = "other.go"
+		model.annotations = []Annotation{last, first, other, second}
+		code := model.selectedSourceCodeLines(*function)
+		for start := range code {
+			model.sourceOffset = start
+			rows := model.sourceDisplayWindow(code, *function, paneContentWidth(model.sourcePaneWidth()), 1000)
+			if count := model.sourceDisplayRowCount(start, len(code)-1); count != len(rows) {
+				t.Fatalf("width %d, start %d: scroll extent %d, rendered rows %d", width, start, count, len(rows))
+			}
+		}
+	}
+}
+
+func TestCursorScrollingFitsRenderedRows(t *testing.T) {
+	for _, width := range []int{32, 90} {
+		for _, height := range []int{2, 12, 24} {
+			model := sourceWorkspaceModel()
+			model.width, model.height = width, height
+			function := &model.report.Files[0].Functions[0]
+			function.EndLine = 22
+			function.DiffLines = []domain.DiffLine{
+				{Kind: domain.DiffDeleted, NewLine: 14, OldLine: 14, Text: "deleted"},
+				{Kind: domain.DiffDeleted, NewLine: 23, OldLine: 24, Text: "trailing deletion"},
+			}
+			note, _ := model.newAnnotation(11, 11, strings.Repeat("wrapped note ", 10))
+			last, _ := model.newAnnotation(22, 22, "last note\nsecond row")
+			model.annotations = []Annotation{last, note}
+			code := model.selectedSourceCodeLines(*function)
+			annotations := model.visibleAnnotations()
+			visible := model.sourceViewportHeight()
+			for cursor := range code {
+				for _, offset := range []int{0, 8} {
+					model.sourceCursor, model.sourceOffset = cursor, offset
+					want := offset
+					if visible <= 0 || cursor < offset {
+						want = cursor
+					}
+					for want < cursor {
+						rows := 0
+						for index := want; index <= cursor; index++ {
+							rows += len(sourceRowsAtLine(*function, function.Line+index, code[index], paneContentWidth(model.sourcePaneWidth()), index == len(code)-1, annotations))
+						}
+						if rows <= visible {
+							break
+						}
+						want++
+					}
+					if next := model.keepSourceCursorVisible(); next.sourceOffset != want || next.sourceCursor != cursor {
+						t.Fatalf("%dx%d cursor %d offset %d: got %d/%d, want %d/%d", width, height, cursor, offset, next.sourceOffset, next.sourceCursor, want, cursor)
+					}
+				}
+			}
 		}
 	}
 }

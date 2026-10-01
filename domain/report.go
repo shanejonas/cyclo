@@ -1,5 +1,7 @@
 package domain
 
+import "github.com/shanejonas/cyclo/domain/quality"
+
 type Report struct {
 	Root             string
 	DiffBase         string
@@ -9,6 +11,7 @@ type Report struct {
 	Average          float64
 	CognitiveTotal   int
 	CognitiveAverage float64
+	Quality          *QualityAnalysis
 }
 
 type File struct {
@@ -34,6 +37,27 @@ type Function struct {
 	Column                int
 	Source                string
 	DiffLines             []DiffLine
+	Quality               *FunctionQuality
+}
+
+// QualityAnalysis distinguishes a failed typed scan from a clean report.
+type QualityAnalysis struct {
+	Status string          `json:"status"`
+	Error  string          `json:"error,omitempty"`
+	Report *quality.Report `json:"report,omitempty"`
+}
+
+type QualitySummary struct {
+	Status   string           `json:"status"`
+	Error    string           `json:"error,omitempty"`
+	Summary  *quality.Summary `json:"summary,omitempty"`
+	Findings *int             `json:"findings,omitempty"`
+}
+
+type FunctionQuality struct {
+	quality.FunctionResult
+	Diagnostics    []quality.Diagnostic `json:"diagnostics"`
+	MutationEvents []quality.Mutation   `json:"mutation_events"`
 }
 
 type DiffLine struct {

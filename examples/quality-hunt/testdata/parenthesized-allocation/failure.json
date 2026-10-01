@@ -1,0 +1,32 @@
+{
+  "Failure": {
+    "Name": "Case4_parentheses",
+    "Base": "Case4_base",
+    "Rule": "owned-storage-effect"
+  },
+  "Cases": [
+    {
+      "Name": "Case4_base",
+      "Base": "Case4_base",
+      "Family": "owned-pointer",
+      "Variant": "base",
+      "Body": "local := new(State); local.Count++",
+      "Signature": "",
+      "Argument": "",
+      "Changed": false,
+      "Clean": true
+    },
+    {
+      "Name": "Case4_parentheses",
+      "Base": "Case4_base",
+      "Family": "owned-pointer",
+      "Variant": "parentheses",
+      "Body": "\n\tlocal := (new)(State)\n\t((local).Count)++\n",
+      "Signature": "",
+      "Argument": "",
+      "Changed": false,
+      "Clean": true
+    }
+  ],
+  "Checks": 0
+}

@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -65,6 +66,7 @@ const (
 	annotateLinesAction
 	removeAnnotationAction
 	refreshAction
+	setDetailsViewAction
 )
 
 type controlCommand struct {
@@ -79,6 +81,7 @@ type controlCommand struct {
 	afterRevision uint64
 	timeoutMs     int
 	reply         chan controlReply
+	view          string
 }
 
 type controlReply struct {
@@ -102,6 +105,7 @@ var methodParsers = map[string]methodParser{
 	"cyclo.annotateLines":      parseAnnotateLines,
 	"cyclo.removeAnnotation":   parseRemoveAnnotation,
 	"cyclo.refresh":            parseRefresh,
+	"cyclo.setDetailsView":     parseSetDetailsView,
 }
 
 func NewControlServer(port int) (*ControlServer, error) {
@@ -401,7 +405,7 @@ func parsedAnnotationMessage(value *string, required bool) (string, *controlErro
 		return "", nil
 	}
 	message := strings.TrimSpace(*value)
-	if message == "" || len([]rune(message)) > maximumAnnotationLength {
+	if message == "" || utf8.RuneCountInString(message) > maximumAnnotationLength {
 		return "", invalidParams("message must contain between 1 and 160 characters")
 	}
 	return message, nil

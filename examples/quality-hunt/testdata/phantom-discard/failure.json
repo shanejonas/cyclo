@@ -1,0 +1,32 @@
+{
+  "Failure": {
+    "Name": "Case0_discard",
+    "Base": "Case0_base",
+    "Rule": "equivalent-syntax-evidence"
+  },
+  "Cases": [
+    {
+      "Name": "Case0_base",
+      "Base": "Case0_base",
+      "Family": "pointer-alias",
+      "Variant": "base",
+      "Body": "local := shared; local.Count++",
+      "Signature": "",
+      "Argument": "",
+      "Changed": true,
+      "Clean": false
+    },
+    {
+      "Name": "Case0_discard",
+      "Base": "Case0_base",
+      "Family": "pointer-alias",
+      "Variant": "discard",
+      "Body": "local := shared; local.Count++; ((_)) = 0",
+      "Signature": "",
+      "Argument": "",
+      "Changed": true,
+      "Clean": false
+    }
+  ],
+  "Checks": 32
+}

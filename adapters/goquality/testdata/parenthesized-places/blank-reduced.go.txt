@@ -1,0 +1,8 @@
+package repro
+
+
+func Blank() int {
+    (( _ )) = 42
+    return 1
+}
+
