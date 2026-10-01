@@ -149,7 +149,13 @@ func TestFinishSavesBestCandidateOnInterruption(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = finish(destination, []byte("best"), context.Canceled, 4, 100, &bytes.Buffer{})
+	run := reduction{
+		check:       &checker{checks: 4},
+		source:      bytes.Repeat([]byte("x"), 100),
+		destination: destination,
+		output:      &bytes.Buffer{},
+	}
+	err = run.finish([]byte("best"), context.Canceled)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("lost cancellation: %v", err)
 	}

@@ -95,29 +95,57 @@ func runReduction(ctx context.Context, options options, output io.Writer) error 
 	if err != nil {
 		return fmt.Errorf("create output: %w", err)
 	}
-	if options.tui {
-		return runDashboard(ctx, options, source, check, destination, output)
+	return reduction{ctx: ctx, options: options, source: source, check: check, destination: destination, output: output}.run()
+}
+
+// reduction carries one reduction run: the input, its checker, and where the
+// result and the report go. The run's steps are methods on it so the values
+// they all share don't thread through every signature.
+type reduction struct {
+	ctx         context.Context
+	options     options
+	source      []byte
+	check       *checker
+	destination *os.File
+	output      io.Writer
+}
+
+// run reduces the input, showing the live dashboard on terminals.
+func (r reduction) run() error {
+	if r.options.tui {
+		return r.runDashboard()
 	}
-	reduced, reduceErr := reduceInput(ctx, options, source, check, nil)
-	return finish(destination, reduced, reduceErr, check.checks, len(source), output)
+	reduced, reduceErr := r.reduce(nil)
+	return r.finish(reduced, reduceErr)
+}
+
+func (r reduction) reduce(observe func(reducer.Progress)) ([]byte, error) {
+	predicate := func(candidate []byte) (bool, error) { return r.check.check(r.ctx, candidate) }
+	if r.options.language == "go" {
+		parser := treesitter.GoParser{Context: r.ctx, Library: r.options.goParser}
+		return reducer.ReduceSyntaxWithProgress(r.source, predicate, observe, parser)
+	}
+	return reducer.ReduceWithProgress(r.source, predicate, observe)
+}
+
+// finish saves the reduced input and reports the run. A nil result means the
+// seed was never accepted, so the destination is removed instead.
+func (r reduction) finish(reduced []byte, reduceErr error) error {
+	if reduced == nil {
+		return errors.Join(reduceErr, r.destination.Close(), os.Remove(r.destination.Name()))
+	}
+	_, writeErr := r.destination.Write(reduced)
+	closeErr := r.destination.Close()
+	if writeErr != nil || closeErr != nil {
+		return errors.Join(reduceErr, writeErr, closeErr)
+	}
+	_, reportErr := fmt.Fprintf(r.output, "%d -> %d bytes; %d checks; saved %s\n", len(r.source), len(reduced), r.check.checks, r.destination.Name())
+	return errors.Join(reduceErr, reportErr)
 }
 
 func terminalOutput(output io.Writer) bool {
 	file, ok := output.(*os.File)
 	return ok && term.IsTerminal(file.Fd()) && term.IsTerminal(os.Stdin.Fd())
-}
-
-func finish(destination *os.File, reduced []byte, reduceErr error, checks, original int, output io.Writer) error {
-	if reduced == nil {
-		return errors.Join(reduceErr, destination.Close(), os.Remove(destination.Name()))
-	}
-	_, writeErr := destination.Write(reduced)
-	closeErr := destination.Close()
-	if writeErr != nil || closeErr != nil {
-		return errors.Join(reduceErr, writeErr, closeErr)
-	}
-	_, reportErr := fmt.Fprintf(output, "%d -> %d bytes; %d checks; saved %s\n", original, len(reduced), checks, destination.Name())
-	return errors.Join(reduceErr, reportErr)
 }
 
 func validateMode(options options) error {
@@ -128,13 +156,4 @@ func validateMode(options options) error {
 		return errors.New("--go-parser requires --language go")
 	}
 	return nil
-}
-
-func reduceInput(ctx context.Context, options options, source []byte, check *checker, observe func(reducer.Progress)) ([]byte, error) {
-	predicate := func(candidate []byte) (bool, error) { return check.check(ctx, candidate) }
-	if options.language == "go" {
-		parser := treesitter.GoParser{Context: ctx, Library: options.goParser}
-		return reducer.ReduceSyntaxWithProgress(source, predicate, observe, parser)
-	}
-	return reducer.ReduceWithProgress(source, predicate, observe)
 }

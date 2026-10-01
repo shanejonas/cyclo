@@ -24,15 +24,15 @@ type reductionResult struct {
 	at      time.Time
 }
 
-func runDashboard(ctx context.Context, options options, source []byte, check *checker, destination *os.File, output io.Writer) error {
-	ctx, cancel := context.WithCancel(ctx)
+func (r reduction) runDashboard() error {
+	ctx, cancel := context.WithCancel(r.ctx)
 	defer cancel()
-	check.output = &checkerOutput{}
-	model := newDashboard(ctx, cancel, options, source, check.output)
-	program := tea.NewProgram(model, tea.WithInput(os.Stdin), tea.WithOutput(output), tea.WithoutSignalHandler())
+	r.check.output = &checkerOutput{}
+	model := r.newDashboard(ctx, cancel)
+	program := tea.NewProgram(model, tea.WithInput(os.Stdin), tea.WithOutput(r.output), tea.WithoutSignalHandler())
 	done := make(chan reductionResult, 1)
 	go func() {
-		result := reduceForDashboard(ctx, source, check, destination, program.Send, options)
+		result := r.reduceForDashboard(program.Send)
 		done <- result
 		program.Send(result)
 	}()
@@ -40,20 +40,23 @@ func runDashboard(ctx context.Context, options options, source []byte, check *ch
 	// A renderer/input failure must also stop the checker and save its best input.
 	cancel()
 	result := <-done
-	_, reportErr := io.WriteString(output, result.summary)
+	_, reportErr := io.WriteString(r.output, result.summary)
 	return errors.Join(programErr, result.err, reportErr)
 }
 
-func reduceForDashboard(ctx context.Context, source []byte, check *checker, destination *os.File, send func(tea.Msg), settings options) reductionResult {
+func (r reduction) reduceForDashboard(send func(tea.Msg)) reductionResult {
 	observe := func(progress reducer.Progress) {
 		if progress.Checking {
-			check.output.reset()
+			r.check.output.reset()
 		}
 		send(progressMsg{progress: progress, at: time.Now()})
 	}
-	reduced, err := reduceInput(ctx, settings, source, check, observe)
+	reduced, err := r.reduce(observe)
+	// The dashboard keeps the run's report in its summary instead of printing it.
 	var summary bytes.Buffer
-	err = finish(destination, reduced, err, check.checks, len(source), &summary)
+	summarized := r
+	summarized.output = &summary
+	err = summarized.finish(reduced, err)
 	return reductionResult{err: err, summary: summary.String(), at: time.Now()}
 }
 
@@ -90,12 +93,12 @@ type dashboard struct {
 	expanded bool
 }
 
-func newDashboard(ctx context.Context, cancel context.CancelFunc, options options, source []byte, output *checkerOutput) dashboard {
+func (r reduction) newDashboard(ctx context.Context, cancel context.CancelFunc) dashboard {
 	now := time.Now()
 	return dashboard{
-		ctx: ctx, cancel: cancel, options: options, output: output,
-		started: now, now: now, original: len(source), best: source,
-		width: 120, height: 36, history: []sizePoint{{bytes: len(source)}},
+		ctx: ctx, cancel: cancel, options: r.options, output: r.check.output,
+		started: now, now: now, original: len(r.source), best: r.source,
+		width: 120, height: 36, history: []sizePoint{{bytes: len(r.source)}},
 	}
 }
 

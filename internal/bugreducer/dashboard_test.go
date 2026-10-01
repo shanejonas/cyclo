@@ -15,6 +15,16 @@ import (
 	"github.com/shanejonas/cyclo/internal/reducer"
 )
 
+// testDashboard builds a dashboard model the way reduction.newDashboard does,
+// without needing a full reduction run.
+func testDashboard(ctx context.Context, cancel context.CancelFunc, opts options, source []byte, outputs ...*checkerOutput) dashboard {
+	output := &checkerOutput{}
+	if len(outputs) > 0 {
+		output = outputs[0]
+	}
+	return reduction{ctx: ctx, options: opts, source: source, check: &checker{output: output}}.newDashboard(ctx, cancel)
+}
+
 func TestDashboardReductionShowsChecksAndSaves(t *testing.T) {
 	command := checkerCommand(t, "marker")
 	t.Setenv("BUG_REDUCER_TEST_OUTPUT", "stdout marker")
@@ -32,10 +42,11 @@ func TestDashboardReductionShowsChecksAndSaves(t *testing.T) {
 	source := []byte("noise\nspecific failure\nmore noise\n")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	model := newDashboard(ctx, cancel, options, source, check.output)
-	result := reduceForDashboard(ctx, source, check, destination, func(msg tea.Msg) {
+	run := reduction{ctx: ctx, options: options, source: source, check: check, destination: destination, output: &bytes.Buffer{}}
+	model := run.newDashboard(ctx, cancel)
+	result := run.reduceForDashboard(func(msg tea.Msg) {
 		model = model.withProgress(msg.(progressMsg))
-	}, options)
+	})
 	if result.err != nil {
 		t.Fatal(result.err)
 	}
@@ -74,13 +85,21 @@ func TestDashboardCancellationSavesAcceptedCandidate(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	var best []byte
-	result := reduceForDashboard(ctx, []byte("noise\nspecific failure\nmore noise\n"), check, destination, func(msg tea.Msg) {
+	run := reduction{
+		ctx:         ctx,
+		options:     options{},
+		source:      []byte("noise\nspecific failure\nmore noise\n"),
+		check:       check,
+		destination: destination,
+		output:      &bytes.Buffer{},
+	}
+	result := run.reduceForDashboard(func(msg tea.Msg) {
 		p := msg.(progressMsg).progress
 		if p.Accepted && !p.Seed {
 			best = bytes.Clone(p.Candidate)
 			cancel()
 		}
-	}, options{})
+	})
 	if !errors.Is(result.err, context.Canceled) || len(best) == 0 {
 		t.Fatalf("result = %+v, best = %q", result, best)
 	}
@@ -93,7 +112,7 @@ func TestDashboardCancellationSavesAcceptedCandidate(t *testing.T) {
 func TestDashboardStopWaitsForSaveAndCompletedRunStaysOpen(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	model := newDashboard(ctx, cancel, options{}, []byte("input"), &checkerOutput{})
+	model := testDashboard(ctx, cancel, options{}, []byte("input"))
 	next, cmd := model.updateKey("q")
 	if cmd != nil || ctx.Err() == nil || !next.(dashboard).stopping {
 		t.Fatal("quit must cancel the checker and wait for the saved result")
@@ -104,7 +123,7 @@ func TestDashboardStopWaitsForSaveAndCompletedRunStaysOpen(t *testing.T) {
 	}
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
-	model = newDashboard(ctx, cancel, options{}, []byte("input"), &checkerOutput{})
+	model = testDashboard(ctx, cancel, options{}, []byte("input"))
 	next, cmd = model.Update(reductionResult{at: time.Now()})
 	if cmd != nil || next.(dashboard).result == nil {
 		t.Fatal("completed run must remain open for inspection")
@@ -119,7 +138,7 @@ func TestDashboardStopWaitsForSaveAndCompletedRunStaysOpen(t *testing.T) {
 func TestDashboardFitsTerminalAndShowsAllPanes(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	model := newDashboard(ctx, cancel, options{input: "demo.txt", output: "demo.reduced", command: []string{"checker"}}, []byte("input"), &checkerOutput{})
+	model := testDashboard(ctx, cancel, options{input: "demo.txt", output: "demo.reduced", command: []string{"checker"}}, []byte("input"))
 	view := ansi.Strip(model.View().Content)
 	for _, title := range paneTitles {
 		if !strings.Contains(view, title) {
@@ -148,7 +167,7 @@ func TestDashboardOutputScrollsBackFromLiveTail(t *testing.T) {
 	defer cancel()
 	output := &checkerOutput{}
 	_, _ = output.Write([]byte(strings.Repeat("old line\n", 30) + "newest line"))
-	model := newDashboard(ctx, cancel, options{}, nil, output)
+	model := testDashboard(ctx, cancel, options{}, nil, output)
 	model.focus = 3
 	if !strings.Contains(model.panel(3, 60, 10), "newest line") {
 		t.Fatal("output does not follow the tail")
@@ -243,7 +262,7 @@ func TestDeletedLinePreviewPreservesExactBytes(t *testing.T) {
 func TestDashboardTracksTimeAndBestSize(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	model := newDashboard(ctx, cancel, options{}, []byte("noise\nbug\n"), &checkerOutput{})
+	model := testDashboard(ctx, cancel, options{}, []byte("noise\nbug\n"))
 	model = model.withProgress(progressMsg{progress: reducer.Progress{Candidate: []byte("bug\n"), Accepted: true, RemovedLines: 1}, at: model.started.Add(time.Second)})
 	if model.history[1].elapsed != time.Second || model.history[1].bytes != 4 {
 		t.Fatalf("history = %+v", model.history)
