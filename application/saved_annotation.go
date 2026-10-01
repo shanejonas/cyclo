@@ -43,7 +43,7 @@ func (m Model) savedAnnotationLines(annotation Annotation, width int, height int
 		lines = append(lines, danger.Render(m.annotationError.Error()))
 	}
 	lines = append(lines,
-		blue.Render(sourceLocation(m.report.Root, annotation.Path, annotation.StartLine, 1, contentWidth)),
+		blue.Render(m.sourceLocation(annotation.Path, annotation.StartLine, 1, contentWidth)),
 		text.Render(annotation.Function+" · saved code"),
 		rule(contentWidth),
 	)

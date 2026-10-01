@@ -305,7 +305,7 @@ func (m Model) sourceLines(width int, height int, title string) []string {
 
 	lines = append(
 		lines,
-		blue.Render(sourceLocation(m.report.Root, file.Path, function.Line, function.Column, contentWidth)),
+		blue.Render(m.sourceLocation(file.Path, function.Line, function.Column, contentWidth)),
 		text.Render(function.Package+" · "+function.Name),
 		rule(contentWidth),
 	)
@@ -941,8 +941,10 @@ func displayPath(root string, path string) string {
 	return relative
 }
 
-func sourceLocation(root string, path string, line int, column int, width int) string {
-	path = displayPath(root, path)
+// sourceLocation renders the display path with line:column coordinates,
+// shortened to fit width. The root comes from the model that owns the report.
+func (m Model) sourceLocation(path string, line int, column int, width int) string {
+	path = displayPath(m.report.Root, path)
 	coordinates := fmt.Sprintf(":%d:%d", line, column)
 	if ansi.StringWidth(path+coordinates) <= width {
 		return path + coordinates
