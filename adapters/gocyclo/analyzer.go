@@ -30,31 +30,58 @@ func (Analyzer) Analyze(paths []string) (domain.Report, error) {
 
 	root := commonRoot(roots)
 	diff, _ := newGitDiff(root)
+	analyzed, err := analyzeFiles(files, diff)
+	if err != nil {
+		return domain.Report{}, err
+	}
+	return summarizeReport(root, diff.base, analyzed), nil
+}
+
+// fileTotals accumulates per-file complexity counters that only ever move
+// together, so the analysis loop does not juggle several counters by hand.
+type fileTotals struct {
+	functions      int
+	total          int
+	cognitiveTotal int
+}
+
+func (t *fileTotals) add(file domain.File) {
+	t.functions += len(file.Functions)
+	t.total += file.Total
+	t.cognitiveTotal += file.CognitiveTotal
+}
+
+func (t fileTotals) averages() (average, cognitiveAverage float64) {
+	if t.functions == 0 {
+		return 0, 0
+	}
+	return float64(t.total) / float64(t.functions),
+		float64(t.cognitiveTotal) / float64(t.functions)
+}
+
+func analyzeFiles(files []string, diff gitDiff) ([]domain.File, error) {
 	var analyzed []domain.File
-	var functions, total, cognitiveTotal int
 	for _, path := range files {
 		file, err := analyzeFile(path)
 		if err != nil {
-			return domain.Report{}, err
+			return nil, err
 		}
-
-		file = diff.apply(file)
-		analyzed = append(analyzed, file)
-		functions += len(file.Functions)
-		total += file.Total
-		cognitiveTotal += file.CognitiveTotal
+		analyzed = append(analyzed, diff.apply(file))
 	}
-	var average, cognitiveAverage float64
-	if functions > 0 {
-		average = float64(total) / float64(functions)
-		cognitiveAverage = float64(cognitiveTotal) / float64(functions)
-	}
+	return analyzed, nil
+}
 
+func summarizeReport(root, diffBase string, analyzed []domain.File) domain.Report {
+	var totals fileTotals
+	for _, file := range analyzed {
+		totals.add(file)
+	}
+	average, cognitiveAverage := totals.averages()
 	return domain.Report{
-		Root: root, DiffBase: diff.base, Files: analyzed,
-		Functions: functions, Total: total, CognitiveTotal: cognitiveTotal,
+		Root: root, DiffBase: diffBase, Files: analyzed,
+		Functions: totals.functions, Total: totals.total, CognitiveTotal: totals.cognitiveTotal,
 		Average: average, CognitiveAverage: cognitiveAverage,
-	}, nil
+	}
 }
 
 func sourceFiles(paths []string) ([]string, []string, error) {
