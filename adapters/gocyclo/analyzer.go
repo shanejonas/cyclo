@@ -37,26 +37,42 @@ func (Analyzer) Analyze(paths []string) (domain.Report, error) {
 	return summarizeReport(root, diff.base, analyzed), nil
 }
 
-// fileTotals accumulates per-file complexity counters that only ever move
-// together, so the analysis loop does not juggle several counters by hand.
-type fileTotals struct {
+// complexitySummary folds per-function complexity statistics into running
+// totals. It is immutable: with returns the summary including one more
+// function, so callers never mutate a half-built aggregate.
+type complexitySummary struct {
 	functions      int
 	total          int
+	peak           int
 	cognitiveTotal int
+	cognitivePeak  int
 }
 
-func (t *fileTotals) add(file domain.File) {
-	t.functions += len(file.Functions)
-	t.total += file.Total
-	t.cognitiveTotal += file.CognitiveTotal
+// with returns the summary including the given function.
+func (s complexitySummary) with(function domain.Function) complexitySummary {
+	return complexitySummary{
+		functions:      s.functions + 1,
+		total:          s.total + function.Complexity,
+		peak:           max(s.peak, function.Complexity),
+		cognitiveTotal: s.cognitiveTotal + function.CognitiveComplexity,
+		cognitivePeak:  max(s.cognitivePeak, function.CognitiveComplexity),
+	}
 }
 
-func (t fileTotals) averages() (average, cognitiveAverage float64) {
-	if t.functions == 0 {
+func (s complexitySummary) averages() (average, cognitiveAverage float64) {
+	if s.functions == 0 {
 		return 0, 0
 	}
-	return float64(t.total) / float64(t.functions),
-		float64(t.cognitiveTotal) / float64(t.functions)
+	return float64(s.total) / float64(s.functions),
+		float64(s.cognitiveTotal) / float64(s.functions)
+}
+
+func summarizeFunctions(functions []domain.Function) complexitySummary {
+	summary := complexitySummary{}
+	for _, function := range functions {
+		summary = summary.with(function)
+	}
+	return summary
 }
 
 func analyzeFiles(files []string, diff gitDiff) ([]domain.File, error) {
@@ -72,14 +88,16 @@ func analyzeFiles(files []string, diff gitDiff) ([]domain.File, error) {
 }
 
 func summarizeReport(root, diffBase string, analyzed []domain.File) domain.Report {
-	var totals fileTotals
+	summary := complexitySummary{}
 	for _, file := range analyzed {
-		totals.add(file)
+		for _, function := range file.Functions {
+			summary = summary.with(function)
+		}
 	}
-	average, cognitiveAverage := totals.averages()
+	average, cognitiveAverage := summary.averages()
 	return domain.Report{
 		Root: root, DiffBase: diffBase, Files: analyzed,
-		Functions: totals.functions, Total: totals.total, CognitiveTotal: totals.cognitiveTotal,
+		Functions: summary.functions, Total: summary.total, CognitiveTotal: summary.cognitiveTotal,
 		Average: average, CognitiveAverage: cognitiveAverage,
 	}
 }
@@ -209,19 +227,18 @@ func functionComplexityBefore(left domain.Function, right domain.Function) bool 
 }
 
 func summarizeFile(path string, functions []domain.Function) domain.File {
-	file := domain.File{Path: path, Functions: functions}
-	for _, function := range functions {
-		file.Total += function.Complexity
-		file.Peak = max(file.Peak, function.Complexity)
-		file.CognitiveTotal += function.CognitiveComplexity
-		file.CognitivePeak = max(file.CognitivePeak, function.CognitiveComplexity)
+	summary := summarizeFunctions(functions)
+	average, cognitiveAverage := summary.averages()
+	return domain.File{
+		Path:             path,
+		Functions:        functions,
+		Total:            summary.total,
+		Peak:             summary.peak,
+		CognitiveTotal:   summary.cognitiveTotal,
+		CognitivePeak:    summary.cognitivePeak,
+		Average:          average,
+		CognitiveAverage: cognitiveAverage,
 	}
-	if len(functions) > 0 {
-		file.Average = float64(file.Total) / float64(len(functions))
-		file.CognitiveAverage = float64(file.CognitiveTotal) / float64(len(functions))
-	}
-
-	return file
 }
 
 func cognitiveStatsByOffset(file *ast.File, fileSet *token.FileSet) map[int]cognit.Stat {
