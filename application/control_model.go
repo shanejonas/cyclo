@@ -196,18 +196,8 @@ func (m Model) revealLines(command controlCommand) (Model, tea.Cmd) {
 		return m, nil
 	}
 	function, _ := m.selectedFunction()
-	m.focus = detailsPane
-	m.qualityView = false
-	m.sourceOffset = startLine - function.Line
-	m.sourceCursor = endLine - function.Line
-	m.lineSelection = &LineSelection{
-		AnchorLine: startLine,
-		StartLine:  startLine,
-		EndLine:    endLine,
-		Text:       m.sourceRangeText(startLine, endLine),
-	}
-	m.visualSelectionActive = false
-	m.activeAnnotationID = ""
+	m = m.showDetails()
+	m.sourceWorkspace = m.sourceWorkspace.selectLines(startLine, endLine, function.Line, m.sourceRangeText(startLine, endLine))
 	m = m.keepSourceCursorVisible()
 	m.revision++
 	command.answer(m.controlState(), nil)

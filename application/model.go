@@ -34,33 +34,26 @@ type changeWaiterTimeoutMsg struct {
 }
 
 type Model struct {
-	analyzer              Analyzer
-	paths                 []string
-	report                domain.Report
-	err                   error
-	controlPort           int
-	revision              uint64
-	refreshing            bool
-	refreshReply          chan controlReply
-	changeWaiters         []changeWaiter
-	width                 int
-	height                int
-	focus                 pane
-	fileIndex             int
-	functionIndex         int
-	sourceOffset          int
-	sourceCursor          int
-	qualityView           bool
-	qualityOffset         int
-	lineSelection         *LineSelection
-	visualSelectionActive bool
-	annotations           []Annotation
-	activeAnnotationID    string
-	nextAnnotationID      int
-	annotating            bool
-	annotationDraft       string
-	annotationStore       AnnotationStore
-	annotationError       error
+	analyzer      Analyzer
+	paths         []string
+	report        domain.Report
+	err           error
+	controlPort   int
+	revision      uint64
+	refreshing    bool
+	refreshReply  chan controlReply
+	changeWaiters []changeWaiter
+	width         int
+	height        int
+	focus         pane
+	sourceWorkspace
+	fileIndex        int
+	functionIndex    int
+	qualityView      bool
+	annotations      []Annotation
+	nextAnnotationID int
+	annotationStore  AnnotationStore
+	annotationError  error
 }
 
 func NewModel(analyzer Analyzer, paths []string) Model {
@@ -125,19 +118,34 @@ func (m Model) withReport(message reportMsg) Model {
 	m.err = message.err
 	m.refreshing = false
 	m.revision++
-	if message.err == nil {
-		m.report = rankReport(message.report)
-		m.fileIndex = 0
-		m.functionIndex = 0
-		m = m.resetSourceWorkspace()
-		m = m.loadAnnotations()
-		m = m.relocateAnnotations()
+	if message.err != nil {
+		return m.drainRefreshReply()
 	}
+	return m.applyReport(message.report).drainRefreshReply()
+}
 
-	if m.refreshReply != nil {
-		m.refreshReply <- controlReply{result: m.controlState()}
-		m.refreshReply = nil
+// applyReport swaps in a fresh analysis report and reloads annotations.
+func (m Model) applyReport(report domain.Report) Model {
+	m.report = rankReport(report)
+	m.fileIndex, m.functionIndex = 0, 0
+	return m.reloadWorkspace()
+}
+
+// reloadWorkspace resets the source workspace and reloads annotations
+// for the current report.
+func (m Model) reloadWorkspace() Model {
+	m = m.resetSourceWorkspace()
+	m = m.loadAnnotations()
+	return m.relocateAnnotations()
+}
+
+// drainRefreshReply answers a pending control-plane refresh, if any.
+func (m Model) drainRefreshReply() Model {
+	if m.refreshReply == nil {
+		return m
 	}
+	m.refreshReply <- controlReply{result: m.controlState()}
+	m.refreshReply = nil
 	return m
 }
 

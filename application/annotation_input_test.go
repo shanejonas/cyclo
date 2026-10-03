@@ -17,7 +17,7 @@ func TestAnnotationInputKeepsTheRuneLimitAndRejectedDraft(t *testing.T) {
 		{"keep this draft", "", "keep this draft"},
 	}
 	for _, tc := range cases {
-		model := Model{annotating: true, annotationDraft: tc.draft, revision: 7}
+		model := Model{sourceWorkspace: sourceWorkspace{annotating: true, annotationDraft: tc.draft}, revision: 7}
 		next := model.updateAnnotationInput(tea.KeyPressMsg{Text: tc.incoming})
 		if next.annotationDraft != tc.want || next.revision != 8 || !next.annotating {
 			t.Fatalf("draft=%q input=%q: result draft=%q revision=%d annotating=%v", tc.draft, tc.incoming, next.annotationDraft, next.revision, next.annotating)
