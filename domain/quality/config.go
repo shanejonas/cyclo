@@ -138,23 +138,24 @@ func (w Weights) environmentWeight(kind Kind) int64 {
 }
 
 func defaultPrefixes() []Prefix {
-	result := []Prefix{
-		{"net.Dial", Network}, {"net.Listen", Network}, {"net.Lookup", Network},
-		{"net.Conn.", Network}, {"net.TCPConn.", Network}, {"net.UDPConn.", Network},
-		{"net.UnixConn.", Network}, {"net.Listener.Accept", Network}, {"net.Listener.Close", Network},
-		{"net/http.Get", Network}, {"net/http.Head", Network}, {"net/http.Post", Network},
-		{"net/http.ListenAndServe", Network}, {"net/http.Serve", Network},
-		{"net/http.Client.Do", Network}, {"net/http.Client.Get", Network}, {"net/http.Client.Head", Network}, {"net/http.Client.Post", Network},
-		{"net/http.Server.Serve", Network}, {"net/http.Server.ListenAndServe", Network}, {"net/http.Transport.RoundTrip", Network},
-		{"net/http.NewRequest", None}, {"net/url.Parse", None},
-		{"io.Copy", IO}, {"io.ReadAll", IO}, {"io.ReadFull", IO}, {"io.ReadAtLeast", IO}, {"io.WriteString", IO},
-		{"io.Reader.Read", IO}, {"io.Writer.Write", IO}, {"io.Closer.Close", IO},
-		{"io/fs.ReadFile", IO}, {"io/fs.ReadDir", IO}, {"io/fs.Stat", IO}, {"io/fs.Glob", IO}, {"io/fs.WalkDir", IO},
-		{"time.Now", Time}, {"time.Since", Time}, {"time.Until", Time}, {"time.Sleep", Time},
-		{"time.NewTimer", Time}, {"time.NewTicker", Time}, {"time.After", Time},
-		{"math/rand.", Random}, {"math/rand/", Random}, {"crypto/rand.", Random},
-		{"unsafe.", Unsafe},
-	}
+	result := purePrefixes()
+	result = append(result,
+		Prefix{"net.Dial", Network}, Prefix{"net.Listen", Network}, Prefix{"net.Lookup", Network},
+		Prefix{"net.Conn.", Network}, Prefix{"net.TCPConn.", Network}, Prefix{"net.UDPConn.", Network},
+		Prefix{"net.UnixConn.", Network}, Prefix{"net.Listener.Accept", Network}, Prefix{"net.Listener.Close", Network},
+		Prefix{"net/http.Get", Network}, Prefix{"net/http.Head", Network}, Prefix{"net/http.Post", Network},
+		Prefix{"net/http.ListenAndServe", Network}, Prefix{"net/http.Serve", Network},
+		Prefix{"net/http.Client.Do", Network}, Prefix{"net/http.Client.Get", Network}, Prefix{"net/http.Client.Head", Network}, Prefix{"net/http.Client.Post", Network},
+		Prefix{"net/http.Server.Serve", Network}, Prefix{"net/http.Server.ListenAndServe", Network}, Prefix{"net/http.Transport.RoundTrip", Network},
+		Prefix{"net/http.NewRequest", None}, Prefix{"net/url.Parse", None},
+		Prefix{"io.Copy", IO}, Prefix{"io.ReadAll", IO}, Prefix{"io.ReadFull", IO}, Prefix{"io.ReadAtLeast", IO}, Prefix{"io.WriteString", IO},
+		Prefix{"io.Reader.Read", IO}, Prefix{"io.Writer.Write", IO}, Prefix{"io.Closer.Close", IO},
+		Prefix{"io/fs.ReadFile", IO}, Prefix{"io/fs.ReadDir", IO}, Prefix{"io/fs.Stat", IO}, Prefix{"io/fs.Glob", IO}, Prefix{"io/fs.WalkDir", IO},
+		Prefix{"time.Now", Time}, Prefix{"time.Since", Time}, Prefix{"time.Until", Time}, Prefix{"time.Sleep", Time},
+		Prefix{"time.NewTimer", Time}, Prefix{"time.NewTicker", Time}, Prefix{"time.After", Time},
+		Prefix{"math/rand.", Random}, Prefix{"math/rand/", Random}, Prefix{"crypto/rand.", Random},
+		Prefix{"unsafe.", Unsafe},
+	)
 	// os contains pure helpers and builders. Classify operations narrowly.
 	groups := []struct {
 		path  string
@@ -166,12 +167,44 @@ func defaultPrefixes() []Prefix {
 		{"os/exec.Cmd.", IO, []string{"Run", "Start", "Wait", "Output", "CombinedOutput"}},
 		{"fmt.", IO, []string{"Print", "Printf", "Println", "Fprint", "Fprintf", "Fprintln", "Scan", "Scanf", "Scanln", "Fscan", "Fscanf", "Fscanln"}},
 		{"fmt.", None, []string{"Sprintf", "Sprint", "Sprintln", "Errorf"}},
+		// Pure path manipulation. Abs, EvalSymlinks and Glob stay
+		// unclassified: they consult the working directory or the disk.
+		{"path/filepath.", None, []string{"Base", "Dir", "Ext", "Join", "Split", "Clean", "IsAbs", "Rel", "Match", "SplitList", "ToSlash", "FromSlash", "VolumeName"}},
 	}
 	for _, group := range groups {
 		for _, name := range group.names {
 			result = append(result, Prefix{group.path + name, group.kind})
 		}
 	}
-	result = append(result, Prefix{"errors.New", None}, Prefix{"os/exec.Command", None})
+	result = append(result, Prefix{"os/exec.Command", None}, Prefix{"error.Error", None})
+	return result
+}
+
+// purePrefixes lists calls that are pure by construction: immutable data
+// readers and string builders whose calls used to fall through to Unknown
+// and inflate side-effect density. Kept narrow where a package mixes pure
+// and effectful calls (os, fmt, path/filepath stay surgical in
+// defaultPrefixes, as do the go/types entry points); more specific prefixes
+// still win by longest match, so math/rand stays Random and fmt.Print*
+// stays IO.
+func purePrefixes() []Prefix {
+	paths := []string{
+		"strings.", "strconv.", "unicode.", "unicode/utf8.",
+		"cmp.", "slices.", "maps.", "math.", "sort.", "errors.", "path.",
+		"charm.land/lipgloss", "github.com/charmbracelet/lipgloss",
+		"github.com/charmbracelet/x/ansi.",
+		// go/types values are immutable once checking completes; these are
+		// pure readers over checked type information. Config.Check and the
+		// importer stay unclassified on purpose.
+		"go/types.Object.", "go/types.Type.", "go/types.Info.",
+		"go/types.Selection.", "go/types.Union.", "go/types.Tuple.",
+		"go/types.Signature.", "go/types.Array.", "go/types.Slice.",
+		"go/types.Map.", "go/types.Chan.", "go/types.Pointer.",
+		"go/types.Basic.", "go/types.Struct.", "go/types.Interface.",
+	}
+	result := make([]Prefix, len(paths))
+	for index, path := range paths {
+		result[index] = Prefix{path, None}
+	}
 	return result
 }
