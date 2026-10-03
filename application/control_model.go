@@ -166,13 +166,7 @@ func (m Model) selectFile(command controlCommand) (Model, tea.Cmd) {
 		command.answer(nil, invalidParams("file index is out of range"))
 		return m, nil
 	}
-
-	m.fileIndex = command.index
-	m.functionIndex = 0
-	m = m.resetSourceWorkspace()
-	m.revision++
-	command.answer(m.controlState(), nil)
-	return m, nil
+	return m.selectPosition(command.index, 0, command)
 }
 
 func (m Model) selectFunction(command controlCommand) (Model, tea.Cmd) {
@@ -181,8 +175,12 @@ func (m Model) selectFunction(command controlCommand) (Model, tea.Cmd) {
 		command.answer(nil, invalidParams("function index is out of range"))
 		return m, nil
 	}
+	return m.selectPosition(m.fileIndex, command.index, command)
+}
 
-	m.functionIndex = command.index
+// selectPosition moves to the given file/function and answers the command.
+func (m Model) selectPosition(fileIndex, functionIndex int, command controlCommand) (Model, tea.Cmd) {
+	m.fileIndex, m.functionIndex = fileIndex, functionIndex
 	m = m.resetSourceWorkspace()
 	m.revision++
 	command.answer(m.controlState(), nil)
