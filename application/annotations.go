@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -35,14 +34,14 @@ type AnnotationStore interface {
 }
 
 func (m Model) resetSourceWorkspace() Model {
-	m.qualityOffset = 0
-	m.sourceOffset = 0
-	m.sourceCursor = 0
-	m.lineSelection = nil
-	m.visualSelectionActive = false
-	m.activeAnnotationID = ""
-	m.annotating = false
-	m.annotationDraft = ""
+	m.sourceWorkspace = sourceWorkspace{}
+	return m
+}
+
+// showDetails focuses the details pane.
+func (m Model) showDetails() Model {
+	m.focus = detailsPane
+	m.qualityView = false
 	return m
 }
 
@@ -170,9 +169,7 @@ func (m Model) clearLineSelection() Model {
 	if m.lineSelection == nil && !m.visualSelectionActive && m.activeAnnotationID == "" {
 		return m
 	}
-	m.lineSelection = nil
-	m.visualSelectionActive = false
-	m.activeAnnotationID = ""
+	m.sourceWorkspace = m.sourceWorkspace.clearSelection()
 	m.revision++
 	return m
 }
@@ -190,17 +187,13 @@ func (m Model) startAnnotating() Model {
 func (m Model) updateAnnotationInput(message tea.KeyPressMsg) Model {
 	switch message.Keystroke() {
 	case "esc":
-		m.annotating = false
-		m.annotationDraft = ""
+		m.sourceWorkspace = m.sourceWorkspace.cancelDraft()
 	case "enter":
 		m = m.saveDraftAnnotation()
 	case "backspace":
-		m.annotationDraft = trimLastRune(m.annotationDraft)
+		m.sourceWorkspace = m.sourceWorkspace.trimDraft()
 	default:
-		draft := m.annotationDraft + message.Text
-		if message.Text != "" && utf8.RuneCountInString(draft) <= maximumAnnotationLength {
-			m.annotationDraft = draft
-		}
+		m.sourceWorkspace = m.sourceWorkspace.typeDraft(message.Text)
 	}
 	m.revision++
 	return m
@@ -224,15 +217,12 @@ func (m Model) saveDraftAnnotation() Model {
 		return m
 	}
 	next, err := m.saveAnnotation(annotation)
-	next.annotating = false
+	next.sourceWorkspace = next.sourceWorkspace.stopAnnotating()
 	if err != nil {
 		next.annotationError = err
 		return next
 	}
-	next.activeAnnotationID = annotation.ID
-	next.visualSelectionActive = false
-	next.lineSelection = nil
-	next.annotationDraft = ""
+	next.sourceWorkspace = next.sourceWorkspace.finishDraft(annotation.ID)
 	return next.keepSourceCursorVisible()
 }
 
@@ -449,15 +439,12 @@ func (m Model) focusAdjacentAnnotation(delta int) Model {
 	annotation := target.Annotation
 	m.fileIndex = target.fileIndex
 	m.functionIndex = target.functionIndex
-	m = m.resetSourceWorkspace()
-	m.focus = detailsPane
-	m.qualityView = false
-	m.activeAnnotationID = annotation.ID
+	m = m.resetSourceWorkspace().showDetails()
+	m.sourceWorkspace = m.sourceWorkspace.focusAnnotation(annotation, target.functionIndex >= 0)
 	m.revision++
 	if target.functionIndex < 0 {
 		return m
 	}
-	m.sourceCursor = annotation.EndLine - annotation.FunctionLine
 	return m.keepSourceCursorVisible()
 }
 
