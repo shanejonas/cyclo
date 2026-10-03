@@ -3,6 +3,7 @@ package application
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -464,13 +465,16 @@ func sourceRowsAtLine(
 	last bool,
 	annotations []Annotation,
 ) []string {
-	rows := sourceDeletedRows(function.DiffLines, lineNumber)
-	rows = append(rows, source)
-	rows = append(rows, sourceAnnotationRows(annotations, lineNumber, width)...)
+	trailing := []string{}
 	if last {
-		rows = append(rows, sourceDeletedRows(function.DiffLines, function.EndLine+1)...)
+		trailing = sourceDeletedRows(function.DiffLines, function.EndLine+1)
 	}
-	return rows
+	return slices.Concat(
+		sourceDeletedRows(function.DiffLines, lineNumber),
+		[]string{source},
+		sourceAnnotationRows(annotations, lineNumber, width),
+		trailing,
+	)
 }
 
 func diffTitle(base string, lines []domain.DiffLine) string {

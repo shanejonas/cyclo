@@ -2,6 +2,7 @@ package application
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -79,20 +80,36 @@ func functionQualityLines(q *domain.FunctionQuality) []string {
 	if !q.Complete {
 		coverage = "Incomplete: unknown effects remain"
 	}
-	lines := []string{
-		fmt.Sprintf("Density %d milli · %d mutations", q.DensityMilli, q.Mutations),
-		fmt.Sprintf("%d targets · %d unclassified calls", q.MutatedTargets, q.UnclassifiedCalls),
-		muted.Render(coverage), muted.Render("Modeled effects; zero is not proof of purity"), "",
-		amber.Render(fmt.Sprintf("Findings · %d", len(q.Diagnostics))),
+	return slices.Concat(
+		[]string{
+			fmt.Sprintf("Density %d milli · %d mutations", q.DensityMilli, q.Mutations),
+			fmt.Sprintf("%d targets · %d unclassified calls", q.MutatedTargets, q.UnclassifiedCalls),
+			muted.Render(coverage),
+			muted.Render("Modeled effects; zero is not proof of purity"),
+			"",
+			amber.Render(fmt.Sprintf("Findings · %d", len(q.Diagnostics))),
+		},
+		diagnosticMessages(q.Diagnostics),
+		[]string{"", blue.Render(fmt.Sprintf("Effects · %d", len(q.Effects)))},
+		effectLines(q.Effects),
+		mutationQualityLines(q.MutationEvents),
+	)
+}
+
+func diagnosticMessages(diagnostics []quality.Diagnostic) []string {
+	messages := make([]string, 0, len(diagnostics))
+	for _, diagnostic := range diagnostics {
+		messages = append(messages, diagnostic.Message)
 	}
-	for _, diagnostic := range q.Diagnostics {
-		lines = append(lines, diagnostic.Message)
-	}
-	lines = append(lines, "", blue.Render(fmt.Sprintf("Effects · %d", len(q.Effects))))
-	for _, effect := range q.Effects {
+	return messages
+}
+
+func effectLines(effects []quality.Effect) []string {
+	lines := make([]string, 0, len(effects))
+	for _, effect := range effects {
 		lines = append(lines, fmt.Sprintf("L%d %s: %s", effect.Line, effect.Kind, effect.Detail))
 	}
-	return append(lines, mutationQualityLines(q.MutationEvents)...)
+	return lines
 }
 
 func mutationQualityLines(mutations []quality.Mutation) []string {
