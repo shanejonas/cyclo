@@ -47,6 +47,48 @@ func TestMutationBudgetsAndProvenance(t *testing.T) {
 	}
 }
 
+func TestPurePrefixesClassifyAsNone(t *testing.T) {
+	pure := []string{
+		"strings.Repeat", "strconv.Itoa", "unicode.IsSpace", "unicode/utf8.RuneLen",
+		"cmp.Compare", "slices.Concat", "maps.Keys", "math.Max", "sort.Strings",
+		"errors.Is", "path.Join", "path/filepath.Base", "path/filepath.Join",
+		"charm.land/lipgloss/v2.Style.Render", "github.com/charmbracelet/lipgloss.NewStyle",
+		"github.com/charmbracelet/x/ansi.StringWidth", "error.Error",
+		"go/types.Object.Pkg", "go/types.Type.Underlying", "go/types.Info.ObjectOf",
+		"go/types.Selection.Index",
+	}
+	f := fact("calls", 1)
+	for index, callee := range pure {
+		f.Calls = append(f.Calls, Call{Callee: callee, Line: index + 2})
+	}
+	report := evaluate(t, f, DefaultConfig())
+	result := report.Functions[0]
+	if len(result.Effects) != 0 || result.DensityMilli != 0 || !result.Complete {
+		t.Fatalf("pure calls should vanish: %+v", result)
+	}
+	// Narrow classifications still win where packages mix pure and effectful
+	// calls, and unknown callees still count.
+	f = fact("calls", 1)
+	f.Calls = []Call{
+		{Callee: "math/rand.Int", Line: 2},
+		{Callee: "fmt.Println", Line: 3},
+		{Callee: "path/filepath.Abs", Line: 4},
+		{Callee: "mystery", Line: 5},
+	}
+	report = evaluate(t, f, DefaultConfig())
+	result = report.Functions[0]
+	if len(result.Effects) != 4 || result.UnclassifiedCalls != 2 {
+		t.Fatalf("mixed classification: %+v", result)
+	}
+	kinds := map[Kind]int{}
+	for _, effect := range result.Effects {
+		kinds[effect.Kind]++
+	}
+	if kinds[Random] != 1 || kinds[IO] != 1 || kinds[UnknownEffect] != 2 {
+		t.Fatalf("effect kinds: %+v", result.Effects)
+	}
+}
+
 func TestClassificationLongestPrefixAndUnknownCoverage(t *testing.T) {
 	f := fact("calls", 1)
 	f.Calls = []Call{{Callee: "net/http.Get", Line: 2}, {Callee: "fmt.Sprintf", Line: 3}, {Callee: "os/exec.Command", Line: 4}, {Callee: "os/exec.Cmd.Output", Line: 5}, {Callee: "project.save", Local: true, Line: 6}, {Callee: "callback", Dynamic: true, Line: 7}}
