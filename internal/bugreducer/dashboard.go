@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -197,32 +198,60 @@ func (m dashboard) scrollEdge(end bool) int {
 func (m dashboard) withProgress(msg progressMsg) dashboard {
 	p := msg.progress
 	m.current, m.now = p, msg.at
-	if p.Checking {
-		m.checks++
+	switch {
+	case p.Checking:
+		return m.withCheck()
+	case p.Err != nil:
+		return m.withFailure()
+	case !p.Accepted:
+		return m.withRejection()
+	case p.Seed:
+		return m.withSeed()
+	case len(p.Candidate) >= len(m.best):
 		return m
+	default:
+		return m.withCandidate(p)
 	}
-	if p.Err != nil {
-		m.failed++
-		return m
-	}
-	if !p.Accepted {
-		m.rejected++
-		return m
-	}
-	if p.Seed {
-		m.seedOK = true
-		return m
-	}
-	if len(p.Candidate) >= len(m.best) {
-		return m
-	}
-	recent := append(m.deletion(p), m.recent...)
-	history := append(m.history, sizePoint{elapsed: m.now.Sub(m.started), bytes: len(p.Candidate)})
-	m.accepted++
-	m.recent = recent[:min(len(recent), 300)]
-	m.best = p.Candidate
-	m.history = compactHistory(history)
+}
+
+func (m dashboard) withCheck() dashboard {
+	m.checks++
 	return m
+}
+
+func (m dashboard) withFailure() dashboard {
+	m.failed++
+	return m
+}
+
+func (m dashboard) withRejection() dashboard {
+	m.rejected++
+	return m
+}
+
+func (m dashboard) withSeed() dashboard {
+	m.seedOK = true
+	return m
+}
+
+func (m dashboard) withCandidate(p reducer.Progress) dashboard {
+	m.accepted++
+	return m.recordCandidate(p)
+}
+
+// recordCandidate folds an accepted candidate into the tracked best,
+// keeping the recent-deletion preview and size history bounded.
+func (m dashboard) recordCandidate(p reducer.Progress) dashboard {
+	m.recent = boundRecent(append(m.deletion(p), m.recent...))
+	m.best = p.Candidate
+	m.history = compactHistory(append(slices.Clone(m.history),
+		sizePoint{elapsed: m.now.Sub(m.started), bytes: len(p.Candidate)}))
+	return m
+}
+
+// boundRecent keeps the newest deletion-preview entries.
+func boundRecent(recent []string) []string {
+	return recent[:min(len(recent), 300)]
 }
 
 func (m dashboard) deletion(p reducer.Progress) []string {
