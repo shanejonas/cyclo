@@ -169,6 +169,13 @@ func (m dashboard) updateKey(key string) (tea.Model, tea.Cmd) {
 }
 
 func (m dashboard) scroll(key string) dashboard {
+	offset := m.scrollOffset(key)
+	m.offsets[m.focus] = max(0, min(offset, len(m.paneLines(m.focus, m.width, m.height))-1))
+	return m
+}
+
+// scrollOffset computes the new offset for the focused pane.
+func (m dashboard) scrollOffset(key string) int {
 	direction := 1
 	if m.focus == 3 {
 		direction = -1 // Output scrolls relative to its live tail.
@@ -176,16 +183,16 @@ func (m dashboard) scroll(key string) dashboard {
 	offset := m.offsets[m.focus]
 	switch key {
 	case "j", "down":
-		offset += direction
+		return offset + direction
 	case "k", "up":
-		offset -= direction
+		return offset - direction
 	case "home", "g":
-		offset = m.scrollEdge(false)
+		return m.scrollEdge(false)
 	case "end", "G":
-		offset = m.scrollEdge(true)
+		return m.scrollEdge(true)
+	default:
+		return offset
 	}
-	m.offsets[m.focus] = max(0, min(offset, len(m.paneLines(m.focus, m.width, m.height))-1))
-	return m
 }
 
 func (m dashboard) scrollEdge(end bool) int {
