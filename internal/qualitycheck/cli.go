@@ -26,6 +26,8 @@ Extract typed Go facts and evaluate code quality guardrails. Defaults to .
   --facts-in PATH   evaluate saved facts without loading Go packages
   --tests           include tests (default false)
   --tags TAGS       Go build tags
+  --changed         only report findings in functions touched by the git diff
+  --base REF        git base for --changed (default: merge-base with main/master, else HEAD)
 
 Exit 0: no findings (or facts exported); 1: findings; 2: analysis/config/IO failure.
 Effects include syntactic operations and conservative same-package helper summaries.
@@ -33,9 +35,9 @@ Unclassified calls are unknown, not pure. Facts export version 2; version 1 rema
 `
 
 type options struct {
-	config, format, factsIn, tags string
-	tests                         bool
-	paths                         []string
+	config, format, factsIn, tags, base string
+	tests, changed                      bool
+	paths                               []string
 }
 
 type FactsFile struct {
@@ -67,26 +69,72 @@ func execute(ctx context.Context, opts options, output io.Writer) error {
 	if opts.format == "facts" {
 		return writeJSON(output, FactsFile{2, facts})
 	}
-	return evaluateFacts(output, facts, config, opts.format)
+	return checkFacts(output, opts, facts, config)
 }
 
-func evaluateFacts(output io.Writer, facts []quality.Function, config quality.Config, format string) error {
+// checkFacts evaluates facts, optionally narrows the report to diff-touched
+// functions, writes it, and maps remaining findings to ErrFindings.
+func checkFacts(output io.Writer, opts options, facts []quality.Function, config quality.Config) error {
 	report, err := quality.Evaluate(facts, config)
 	if err != nil {
 		return err
 	}
-	if format == "json" {
-		err = writeJSON(output, report)
-	} else {
-		err = writeText(output, report)
+	if opts.changed {
+		report, err = onlyChanged(opts, facts, report)
+		if err != nil {
+			return err
+		}
 	}
-	if err != nil {
+	if err := writeReport(output, report, opts.format); err != nil {
 		return err
 	}
 	if len(report.Diagnostics) > 0 {
 		return ErrFindings
 	}
 	return nil
+}
+
+// onlyChanged filters the report to diagnostics in functions the git diff
+// touches. Facts are evaluated whole so helper summaries stay complete;
+// only the reported findings are narrowed.
+func onlyChanged(opts options, facts []quality.Function, report quality.Report) (quality.Report, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return report, err
+	}
+	root, err := gitRoot(cwd)
+	if err != nil {
+		return report, err
+	}
+	base, err := resolveBase(root, opts.base)
+	if err != nil {
+		return report, err
+	}
+	ranges, err := changedRanges(root, base, rootSpecs(opts.paths, root, cwd))
+	if err != nil {
+		return report, err
+	}
+	return filterChanged(report, touchedFunctions(facts, ranges, root, cwd)), nil
+}
+
+// rootSpecs converts CLI paths (relative to cwd) to repo-root-relative git
+// pathspecs, defaulting to the whole tree.
+func rootSpecs(paths []string, root, cwd string) []string {
+	if len(paths) == 0 {
+		paths = []string{"."}
+	}
+	specs := make([]string, len(paths))
+	for index, path := range paths {
+		specs[index] = rootRelative(path, root, cwd)
+	}
+	return specs
+}
+
+func writeReport(output io.Writer, report quality.Report, format string) error {
+	if format == "json" {
+		return writeJSON(output, report)
+	}
+	return writeText(output, report)
 }
 
 func parseOptions(args []string) (options, error) {
@@ -98,6 +146,8 @@ func parseOptions(args []string) (options, error) {
 	flags.StringVar(&result.factsIn, "facts-in", "", "saved facts")
 	flags.StringVar(&result.tags, "tags", "", "Go build tags")
 	flags.BoolVar(&result.tests, "tests", false, "include tests")
+	flags.BoolVar(&result.changed, "changed", false, "only findings in diff-touched functions")
+	flags.StringVar(&result.base, "base", "", "git base for --changed")
 	if err := flags.Parse(args); err != nil {
 		return result, err
 	}

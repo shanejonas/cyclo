@@ -104,7 +104,7 @@ Use ` + "`cyclo.setDetailsView`" + ` with ` + "`{\"view\":\"quality\"}`" + ` or 
 
 ## Check quality guardrails
 
-Run ` + "`cyclo check --format json [paths...]`" + ` for typed Go mutation and side-effect diagnostics without a TUI. Directories scan packages recursively; Go file arguments report only those files after loading their enclosing packages. Run from the repository root. Use ` + "`--config PATH`" + ` for TOML policy, ` + "`--tests`" + ` to include tests, and ` + "`--tags TAGS`" + ` for build tags.
+Run ` + "`cyclo check --format json [paths...]`" + ` for typed Go mutation and side-effect diagnostics without a TUI. Directories scan packages recursively; Go file arguments report only those files after loading their enclosing packages. Run from the repository root. Use ` + "`--config PATH`" + ` for TOML policy, ` + "`--tests`" + ` to include tests, and ` + "`--tags TAGS`" + ` for build tags. Use ` + "`--changed`" + ` to report only findings in functions the git diff touches (against ` + "`--base REF`" + `, defaulting to the merge-base with main/master), so an agent loop can gate on what its own edits introduced; untracked files count as fully changed.
 
 The rules are fn_length, fn_params, mutation_per_target, mutated_targets, side_effect_density, and invalid_suppression. Findings carry actual, limit, rule_id, and source location. Density findings include effect kinds, labels, and lines; per-target findings include mutation evidence. Review that evidence before changing code. Preserve legitimate IO boundaries and do not extract helpers solely to lower a score.
 
