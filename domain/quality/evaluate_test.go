@@ -89,6 +89,85 @@ func TestPurePrefixesClassifyAsNone(t *testing.T) {
 	}
 }
 
+func TestPureStdlibCallsScoreZero(t *testing.T) {
+	f := fact("pure", 1)
+	f.Statements = 10
+	for index, callee := range []string{
+		"strings.Repeat", "bytes.Compare", "slices.Contains", "maps.Keys",
+		"strconv.Itoa", "sort.Strings", "errors.Is", "math/big.NewInt",
+		"encoding/json.Marshal", "context.Background", "sync.Mutex.Lock",
+		"path/filepath.Join", "net/url.Parse",
+	} {
+		f.Calls = append(f.Calls, Call{Callee: callee, Line: index + 2})
+	}
+	report := evaluate(t, f, DefaultConfig())
+	for _, diagnostic := range report.Diagnostics {
+		t.Fatalf("pure stdlib finding: %+v", diagnostic)
+	}
+	if report.Functions[0].DensityMilli != 0 {
+		t.Fatalf("density: %+v", report.Functions[0])
+	}
+}
+
+func TestRealEffectsStillFail(t *testing.T) {
+	f := fact("effectful", 1)
+	f.Statements = 10
+	for index, callee := range []string{
+		"os.Open", "net/http.Get", "log/slog.Info",
+	} {
+		f.Calls = append(f.Calls, Call{Callee: callee, Line: index + 2})
+	}
+	report := evaluate(t, f, DefaultConfig())
+	var density *Diagnostic
+	for i, diagnostic := range report.Diagnostics {
+		if diagnostic.RuleID == "side_effect_density" {
+			density = &report.Diagnostics[i]
+		}
+	}
+	if density == nil {
+		t.Fatal("expected a side_effect_density finding")
+	}
+	// weight 3+3+3=9 over 10 statements = 900 milli > 500.
+	if density.Actual != 900 {
+		t.Fatalf("actual = %d", density.Actual)
+	}
+}
+
+func TestDensityFindingExplainsItself(t *testing.T) {
+	f := fact("mixed", 1)
+	f.Statements = 10
+	f.Calls = []Call{
+		{Callee: "os.Open", Line: 2},
+		{Callee: "mystery", Line: 3},
+		{Callee: "mystery", Line: 4},
+	}
+	f.Mutations = []Mutation{
+		{Root: "x", RootID: "1:1", Line: 5, Provenance: External},
+	}
+	report := evaluate(t, f, DefaultConfig())
+	var density *Diagnostic
+	for i, diagnostic := range report.Diagnostics {
+		if diagnostic.RuleID == "side_effect_density" {
+			density = &report.Diagnostics[i]
+		}
+	}
+	if density == nil {
+		t.Fatal("expected a side_effect_density finding")
+	}
+	// weight 3 (io) + 1 + 1 (unknown) + 1 (mutation) = 6 over 10 statements.
+	if density.Weight != 6 || density.Statements != 10 {
+		t.Fatalf("weight/statements = %d/%d", density.Weight, density.Statements)
+	}
+	wantCounts := map[string]int64{"io": 3, "unknown": 2, "mutation": 1}
+	if !reflect.DeepEqual(density.KindWeights, wantCounts) {
+		t.Fatalf("kind weights = %v", density.KindWeights)
+	}
+	want := "side_effect_density 600 > 500: weight 6 over 10 statements (io 3, unknown 2, mutation 1)"
+	if density.Message != want {
+		t.Fatalf("message = %q, want %q", density.Message, want)
+	}
+}
+
 func TestClassificationLongestPrefixAndUnknownCoverage(t *testing.T) {
 	f := fact("calls", 1)
 	f.Calls = []Call{{Callee: "net/http.Get", Line: 2}, {Callee: "fmt.Sprintf", Line: 3}, {Callee: "os/exec.Command", Line: 4}, {Callee: "os/exec.Cmd.Output", Line: 5}, {Callee: "project.save", Local: true, Line: 6}, {Callee: "callback", Dynamic: true, Line: 7}}

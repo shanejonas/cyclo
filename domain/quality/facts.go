@@ -86,6 +86,13 @@ type Diagnostic struct {
 	Message   string     `json:"message"`
 	Effects   []Effect   `json:"effects,omitempty"`
 	Mutations []Mutation `json:"mutations,omitempty"`
+	// Weight, Statements and KindWeights explain side_effect_density
+	// findings: weight over statements is the density arithmetic, and
+	// kind weights show where the weight comes from. Other rules leave
+	// them empty.
+	Weight      int64            `json:"weight,omitempty"`
+	Statements  int64            `json:"statements,omitempty"`
+	KindWeights map[string]int64 `json:"kind_weights,omitempty"`
 }
 
 type FunctionResult struct {
