@@ -95,6 +95,34 @@ func TestCheckBaselineTripsOnWorsenedFinding(t *testing.T) {
 	}
 }
 
+func TestCheckBaselineTripsOnImprovement(t *testing.T) {
+	// A past improvement (side_effect_density accuracy work) landed without
+	// refreshing the baseline, leaving the ratchet loose. The gate must force
+	// the refresh into the same PR.
+	base := baselineFor(t, testReport(100, finding("side_effect_density", "a", 2500, 500)))
+	better := testReport(100, finding("side_effect_density", "a", 1500, 500)) // excess 2000 -> 1000
+	violations, err := checkBaseline(base, better)
+	if err != nil {
+		t.Fatalf("checkBaseline: %v", err)
+	}
+	if len(violations) != 1 || !violations[0].improved || violations[0].rule != "side_effect_density" {
+		t.Fatalf("expected an improvement violation, got %v", violations)
+	}
+}
+
+func TestCheckBaselineIgnoresNoise(t *testing.T) {
+	// Small movements inside the tolerance band pass either way.
+	base := baselineFor(t, testReport(1000, finding("fn_params", "a", 24, 4)))
+	quieter := testReport(1000, finding("fn_params", "a", 23, 4)) // rate 20 -> 19
+	violations, err := checkBaseline(base, quieter)
+	if err != nil {
+		t.Fatalf("checkBaseline: %v", err)
+	}
+	if len(violations) != 0 {
+		t.Fatalf("expected no violations inside tolerance, got %v", violations)
+	}
+}
+
 func TestCheckBaselineScalesWithGrowth(t *testing.T) {
 	// Doubling the codebase with proportional findings keeps the rate flat.
 	base := baselineFor(t, testReport(100,
