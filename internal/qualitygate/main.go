@@ -102,6 +102,9 @@ type ruleViolation struct {
 	baseline float64
 	limit    int64
 	worst    []diagnostic
+	// improved marks a rate that dropped far enough below the baseline that
+	// the ratchet itself is stale: the baseline must be regenerated.
+	improved bool
 }
 
 // worstOffenders returns the n findings with the largest excess for a rule,
@@ -130,7 +133,9 @@ func worstOffenders(diagnostics []diagnostic, rule string, n int) []diagnostic {
 // excess rate exceeds the baseline rate plus tolerance. A rule missing from
 // the baseline is treated as a zero baseline, so any excess trips it. A
 // changed limit means the policy moved out from under the baseline, which is
-// a hard error rather than a violation.
+// a hard error rather than a violation. A rule whose rate improves past the
+// tolerance also trips: the baseline is now loose, so the same PR must
+// regenerate it (make quality-baseline) to tighten the ratchet.
 func checkBaseline(base qualityBaseline, report checkReport) ([]ruleViolation, error) {
 	current, err := aggregate(report)
 	if err != nil {
@@ -138,26 +143,52 @@ func checkBaseline(base qualityBaseline, report checkReport) ([]ruleViolation, e
 	}
 	var violations []ruleViolation
 	for rule, cur := range current {
-		baserule, ok := base.Rules[rule]
-		if !ok {
-			baserule = ruleBaseline{Limit: cur.Limit}
-		} else if baserule.Limit != cur.Limit {
-			return nil, fmt.Errorf("rule %s limit changed from %d to %d; regenerate the baseline", rule, baserule.Limit, cur.Limit)
+		violation, err := checkRule(rule, cur, base, report)
+		if err != nil {
+			return nil, err
 		}
-		rate := excessRate(cur.Excess, report.Summary.Functions)
-		allowed := baserule.Rate * (1 + base.Tolerance)
-		if rate > allowed+epsilon {
-			violations = append(violations, ruleViolation{
-				rule:     rule,
-				rate:     rate,
-				baseline: baserule.Rate,
-				limit:    cur.Limit,
-				worst:    worstOffenders(report.Diagnostics, rule, 5),
-			})
+		if violation != nil {
+			violations = append(violations, *violation)
 		}
 	}
 	sort.Slice(violations, func(i, j int) bool { return violations[i].rule < violations[j].rule })
 	return violations, nil
+}
+
+// checkRule compares one rule's excess rate against its baseline. It returns
+// a violation when the rate regresses past the tolerance band, or when it
+// improves past it — a loose ratchet must be regenerated in the same change.
+func checkRule(rule string, cur ruleBaseline, base qualityBaseline, report checkReport) (*ruleViolation, error) {
+	baserule, ok := base.Rules[rule]
+	if !ok {
+		baserule = ruleBaseline{Limit: cur.Limit}
+	} else if baserule.Limit != cur.Limit {
+		return nil, fmt.Errorf("rule %s limit changed from %d to %d; regenerate the baseline", rule, baserule.Limit, cur.Limit)
+	}
+	rate := excessRate(cur.Excess, report.Summary.Functions)
+	drifted, improved := baselineDrift(rate, baserule.Rate, base.Tolerance)
+	if !drifted {
+		return nil, nil
+	}
+	violation := &ruleViolation{rule: rule, rate: rate, baseline: baserule.Rate, limit: cur.Limit, improved: improved}
+	if !improved {
+		violation.worst = worstOffenders(report.Diagnostics, rule, 5)
+	}
+	return violation, nil
+}
+
+// baselineDrift reports whether a rule's excess rate moved past the tolerance
+// band around its baseline, and whether the move was an improvement. A loose
+// ratchet trips just like a regression: the same change must regenerate the
+// baseline.
+func baselineDrift(rate, baselineRate, tolerance float64) (drifted, improved bool) {
+	if rate > baselineRate*(1+tolerance)+epsilon {
+		return true, false
+	}
+	if rate < baselineRate*(1-tolerance)-epsilon {
+		return true, true
+	}
+	return false, false
 }
 
 func gitCommit() string {
@@ -265,14 +296,18 @@ func loadBaseline(path string) (qualityBaseline, error) {
 }
 
 func printViolations(base qualityBaseline, violations []ruleViolation) {
-	fmt.Printf("quality gate failed: %d rule(s) exceed baseline (tolerance %.0f%%):\n", len(violations), base.Tolerance*100)
+	fmt.Printf("quality gate failed: %d rule(s) outside baseline (tolerance %.0f%%):\n", len(violations), base.Tolerance*100)
 	for _, v := range violations {
+		if v.improved {
+			fmt.Printf("  %s: %.2f excess per 1000 functions, baseline %.2f (limit %d) — improved, tighten the ratchet\n", v.rule, v.rate, v.baseline, v.limit)
+			continue
+		}
 		fmt.Printf("  %s: %.2f excess per 1000 functions, baseline %.2f (limit %d)\n", v.rule, v.rate, v.baseline, v.limit)
 		for _, w := range v.worst {
 			fmt.Printf("    %s: %s\n", w.Name, w.Message)
 		}
 	}
-	fmt.Println("fix the findings above, or run make quality-baseline if the increase is intentional")
+	fmt.Println("run make quality-baseline to regenerate the baseline")
 }
 
 func main() {
