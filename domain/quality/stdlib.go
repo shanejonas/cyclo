@@ -214,6 +214,10 @@ var stdlibRules = []stdlibRule{
 		"Base", "Dir", "Ext", "Join", "Split", "Clean", "IsAbs", "Rel",
 		"Match", "SplitList", "ToSlash", "FromSlash", "VolumeName",
 	}},
+	// Abs, EvalSymlinks, Glob, Walk and WalkDir consult the working directory or the disk.
+	{pkg: "path/filepath", kind: IO, names: []string{
+		"Abs", "EvalSymlinks", "Glob", "Walk", "WalkDir",
+	}},
 
 	// Formatting: builders pure, writers IO.
 	{pkg: "fmt", kind: IO, names: []string{
@@ -312,10 +316,12 @@ var stdlibRules = []stdlibRule{
 	{pkg: "net/http", kind: IO, names: []string{
 		"ServeFile", "ServeContent", "ServeCookie", "Error", "Redirect",
 		"Request.ParseForm", "Request.ParseMultipartForm",
+		"ResponseWriter.Write", "ResponseWriter.WriteHeader",
 	}},
 	{pkg: "net/http", kind: None, names: []string{
 		"NewRequest", "NewRequestWithContext", "NewServeMux", "NewResponseController",
 		"Request.WithContext", "Request.Context", "Request.FormValue", "Request.URL",
+		"ResponseWriter.Header",
 		"CanonicalHeaderKey", "DetectContentType", "ParseTime", "StatusText",
 	}},
 	{pkg: "net/http/cgi", kind: Network, names: []string{"Serve"}},
@@ -452,6 +458,21 @@ var stdlibRules = []stdlibRule{
 	{pkg: "flag", kind: Global, names: []string{
 		"Parse", "NFlag", "NArg", "Arg", "Args", "Lookup", "Set",
 		"Visit", "VisitAll", "Var",
+	}},
+	// FlagSet methods: Parse reads os.Args and may print usage; the Var family,
+	// Set, SetOutput, Visit and Init mutate the set; the rest are pure accessors.
+	{pkg: "flag", kind: IO, names: []string{"FlagSet.Parse", "FlagSet.PrintDefaults"}},
+	{pkg: "flag", kind: None, names: []string{
+		"FlagSet.Arg", "FlagSet.Args", "FlagSet.Lookup", "FlagSet.NArg", "FlagSet.NFlag",
+		"FlagSet.Name", "FlagSet.Output", "FlagSet.ErrorHandling", "FlagSet.Parsed",
+	}},
+	{pkg: "flag", kind: Global, names: []string{
+		"FlagSet.Var", "FlagSet.BoolVar", "FlagSet.Bool", "FlagSet.IntVar", "FlagSet.Int",
+		"FlagSet.Int64Var", "FlagSet.Int64", "FlagSet.UintVar", "FlagSet.Uint",
+		"FlagSet.Uint64Var", "FlagSet.Uint64", "FlagSet.StringVar", "FlagSet.String",
+		"FlagSet.Float64Var", "FlagSet.Float64", "FlagSet.DurationVar", "FlagSet.Duration",
+		"FlagSet.Func", "FlagSet.BoolFunc", "FlagSet.TextVar",
+		"FlagSet.Set", "FlagSet.SetOutput", "FlagSet.Visit", "FlagSet.VisitAll", "FlagSet.Init",
 	}},
 	{pkg: "flag", kind: None, names: []string{"NewFlagSet"}},
 	{pkg: "unsafe", kind: Unsafe},

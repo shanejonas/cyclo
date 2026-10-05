@@ -77,14 +77,14 @@ func TestPurePrefixesClassifyAsNone(t *testing.T) {
 	}
 	report = evaluate(t, f, DefaultConfig())
 	result = report.Functions[0]
-	if len(result.Effects) != 4 || result.UnclassifiedCalls != 2 {
+	if len(result.Effects) != 4 || result.UnclassifiedCalls != 1 {
 		t.Fatalf("mixed classification: %+v", result)
 	}
 	kinds := map[Kind]int{}
 	for _, effect := range result.Effects {
 		kinds[effect.Kind]++
 	}
-	if kinds[Random] != 1 || kinds[IO] != 1 || kinds[UnknownEffect] != 2 {
+	if kinds[Random] != 1 || kinds[IO] != 2 || kinds[UnknownEffect] != 1 {
 		t.Fatalf("effect kinds: %+v", result.Effects)
 	}
 }
@@ -97,6 +97,7 @@ func TestPureStdlibCallsScoreZero(t *testing.T) {
 		"strconv.Itoa", "sort.Strings", "errors.Is", "math/big.NewInt",
 		"encoding/json.Marshal", "context.Background", "sync.Mutex.Lock",
 		"path/filepath.Join", "net/url.Parse",
+		"net/http.ResponseWriter.Header", "flag.FlagSet.Args", "flag.FlagSet.Lookup",
 	} {
 		f.Calls = append(f.Calls, Call{Callee: callee, Line: index + 2})
 	}
@@ -114,6 +115,9 @@ func TestRealEffectsStillFail(t *testing.T) {
 	f.Statements = 10
 	for index, callee := range []string{
 		"os.Open", "net/http.Get", "log/slog.Info",
+		"path/filepath.Abs", "path/filepath.WalkDir",
+		"flag.FlagSet.Parse", "flag.FlagSet.StringVar",
+		"net/http.ResponseWriter.WriteHeader",
 	} {
 		f.Calls = append(f.Calls, Call{Callee: callee, Line: index + 2})
 	}
@@ -127,9 +131,13 @@ func TestRealEffectsStillFail(t *testing.T) {
 	if density == nil {
 		t.Fatal("expected a side_effect_density finding")
 	}
-	// weight 3+3+3=9 over 10 statements = 900 milli > 500.
-	if density.Actual != 900 {
+	// weight 3*7+2=23 over 10 statements = 2300 milli > 500.
+	if density.Actual != 2300 {
 		t.Fatalf("actual = %d", density.Actual)
+	}
+	// Every call classified: no unknown weight remains.
+	if density.KindWeights["unknown"] != 0 {
+		t.Fatalf("kind weights = %+v", density.KindWeights)
 	}
 }
 
