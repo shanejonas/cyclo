@@ -139,80 +139,18 @@ func (w Weights) environmentWeight(kind Kind) int64 {
 
 func defaultPrefixes() []Prefix {
 	return slices.Concat(
-		purePrefixes(),
-		[]Prefix{
-			{"net.Dial", Network}, {"net.Listen", Network}, {"net.Lookup", Network},
-			{"net.Conn.", Network}, {"net.TCPConn.", Network}, {"net.UDPConn.", Network},
-			{"net.UnixConn.", Network}, {"net.Listener.Accept", Network}, {"net.Listener.Close", Network},
-			{"net/http.Get", Network}, {"net/http.Head", Network}, {"net/http.Post", Network},
-			{"net/http.ListenAndServe", Network}, {"net/http.Serve", Network},
-			{"net/http.Client.Do", Network}, {"net/http.Client.Get", Network}, {"net/http.Client.Head", Network}, {"net/http.Client.Post", Network},
-			{"net/http.Server.Serve", Network}, {"net/http.Server.ListenAndServe", Network}, {"net/http.Transport.RoundTrip", Network},
-			{"net/http.NewRequest", None}, {"net/url.Parse", None},
-			{"io.Copy", IO}, {"io.ReadAll", IO}, {"io.ReadFull", IO}, {"io.ReadAtLeast", IO}, {"io.WriteString", IO},
-			{"io.Reader.Read", IO}, {"io.Writer.Write", IO}, {"io.Closer.Close", IO},
-			{"io/fs.ReadFile", IO}, {"io/fs.ReadDir", IO}, {"io/fs.Stat", IO}, {"io/fs.Glob", IO}, {"io/fs.WalkDir", IO},
-			{"time.Now", Time}, {"time.Since", Time}, {"time.Until", Time}, {"time.Sleep", Time},
-			{"time.NewTimer", Time}, {"time.NewTicker", Time}, {"time.After", Time},
-			{"math/rand.", Random}, {"math/rand/", Random}, {"crypto/rand.", Random},
-			{"unsafe.", Unsafe},
-		},
-		surgicalPrefixes(),
-		[]Prefix{
-			{"os/exec.Command", None},
-			{"error.Error", None},
-		},
+		stdlibPrefixes(),
+		thirdPartyPrefixes(),
 	)
 }
 
-// surgicalPrefixes classifies packages that mix pure and effectful calls
-// one name at a time.
-func surgicalPrefixes() []Prefix {
-	return slices.Concat(
-		withPathKind("os.", IO, []string{"Open", "Create", "ReadFile", "WriteFile", "ReadDir", "Mkdir", "Remove", "Rename", "Stat", "Lstat", "Chmod", "Chown", "Chtimes", "Truncate", "Link", "Symlink", "Readlink", "Getenv", "LookupEnv", "Environ", "Setenv", "Unsetenv", "Clearenv", "Getwd", "Chdir", "Exit", "StartProcess", "FindProcess"}),
-		withPathKind("os.File.", IO, []string{"Read", "Write", "Close", "Seek", "Sync", "Stat", "Truncate", "Chmod", "Chown", "Readdir", "ReadDir"}),
-		withPathKind("os/exec.Cmd.", IO, []string{"Run", "Start", "Wait", "Output", "CombinedOutput"}),
-		withPathKind("fmt.", IO, []string{"Print", "Printf", "Println", "Fprint", "Fprintf", "Fprintln", "Scan", "Scanf", "Scanln", "Fscan", "Fscanf", "Fscanln"}),
-		withPathKind("fmt.", None, []string{"Sprintf", "Sprint", "Sprintln", "Errorf"}),
-		// Pure path manipulation. Abs, EvalSymlinks and Glob stay
-		// unclassified: they consult the working directory or the disk.
-		withPathKind("path/filepath.", None, []string{"Base", "Dir", "Ext", "Join", "Split", "Clean", "IsAbs", "Rel", "Match", "SplitList", "ToSlash", "FromSlash", "VolumeName"}),
-	)
-}
-
-func withPathKind(path string, kind Kind, names []string) []Prefix {
-	result := make([]Prefix, len(names))
-	for index, name := range names {
-		result[index] = Prefix{path + name, kind}
+// thirdPartyPrefixes classifies non-stdlib packages the tool knows are
+// pure. Unknown third-party calls stay Unknown on purpose: after the
+// stdlib table, unknown means "a call cyclo cannot see into".
+func thirdPartyPrefixes() []Prefix {
+	return []Prefix{
+		{Path: "charm.land/lipgloss", Kind: None},
+		{Path: "github.com/charmbracelet/lipgloss", Kind: None},
+		{Path: "github.com/charmbracelet/x/ansi.", Kind: None},
 	}
-	return result
-}
-
-// purePrefixes lists calls that are pure by construction: immutable data
-// readers and string builders whose calls used to fall through to Unknown
-// and inflate side-effect density. Kept narrow where a package mixes pure
-// and effectful calls (os, fmt, path/filepath stay surgical in
-// defaultPrefixes, as do the go/types entry points); more specific prefixes
-// still win by longest match, so math/rand stays Random and fmt.Print*
-// stays IO.
-func purePrefixes() []Prefix {
-	paths := []string{
-		"strings.", "strconv.", "unicode.", "unicode/utf8.",
-		"cmp.", "slices.", "maps.", "math.", "sort.", "errors.", "path.",
-		"charm.land/lipgloss", "github.com/charmbracelet/lipgloss",
-		"github.com/charmbracelet/x/ansi.",
-		// go/types values are immutable once checking completes; these are
-		// pure readers over checked type information. Config.Check and the
-		// importer stay unclassified on purpose.
-		"go/types.Object.", "go/types.Type.", "go/types.Info.",
-		"go/types.Selection.", "go/types.Union.", "go/types.Tuple.",
-		"go/types.Signature.", "go/types.Array.", "go/types.Slice.",
-		"go/types.Map.", "go/types.Chan.", "go/types.Pointer.",
-		"go/types.Basic.", "go/types.Struct.", "go/types.Interface.",
-	}
-	result := make([]Prefix, len(paths))
-	for index, path := range paths {
-		result[index] = Prefix{path, None}
-	}
-	return result
 }

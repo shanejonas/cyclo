@@ -2,9 +2,9 @@
   "schema_version": 1,
   "summary": {
     "functions": 14,
-    "mean_density_milli": 651,
+    "mean_density_milli": 615,
     "max_density_milli": 2666,
-    "incomplete_functions": 4,
+    "incomplete_functions": 3,
     "effects": [
       {
         "kind": "mutation",
@@ -40,7 +40,7 @@
       },
       {
         "kind": "unknown",
-        "count": 5
+        "count": 4
       }
     ]
   },
@@ -296,18 +296,12 @@
       "line": 5,
       "column": 1,
       "name": "example.com/sample.TestPure",
-      "density_milli": 500,
+      "density_milli": 0,
       "mutations": 0,
       "mutated_targets": 0,
-      "unclassified_calls": 1,
-      "complete": false,
-      "effects": [
-        {
-          "kind": "unknown",
-          "detail": "testing.common.Fatal",
-          "line": 7
-        }
-      ]
+      "unclassified_calls": 0,
+      "complete": true,
+      "effects": []
     },
     {
       "path": "unsafe.go",
@@ -342,7 +336,7 @@
       "rule_id": "side_effect_density",
       "actual": 600,
       "limit": 500,
-      "message": "side_effect_density: 600 exceeds 500",
+      "message": "side_effect_density 600 \u003e 500: weight 3 over 5 statements (unknown 2, mutation 1)",
       "effects": [
         {
           "kind": "unknown",
@@ -359,7 +353,13 @@
           "detail": "values",
           "line": 12
         }
-      ]
+      ],
+      "weight": 3,
+      "statements": 5,
+      "kind_weights": {
+        "mutation": 1,
+        "unknown": 2
+      }
     },
     {
       "path": "sample.go",
@@ -389,7 +389,7 @@
       "rule_id": "side_effect_density",
       "actual": 523,
       "limit": 500,
-      "message": "side_effect_density: 523 exceeds 500",
+      "message": "side_effect_density 523 \u003e 500: weight 11 over 21 statements (mutation 5, io 3, global 2, time 1)",
       "effects": [
         {
           "kind": "mutation",
@@ -431,7 +431,15 @@
           "detail": "example.com/sample.global",
           "line": 39
         }
-      ]
+      ],
+      "weight": 11,
+      "statements": 21,
+      "kind_weights": {
+        "global": 2,
+        "io": 3,
+        "mutation": 5,
+        "time": 1
+      }
     },
     {
       "path": "unsafe.go",
@@ -441,7 +449,7 @@
       "rule_id": "side_effect_density",
       "actual": 2666,
       "limit": 500,
-      "message": "side_effect_density: 2666 exceeds 500",
+      "message": "side_effect_density 2666 \u003e 500: weight 8 over 3 statements (unsafe 8)",
       "effects": [
         {
           "kind": "unsafe",
@@ -453,7 +461,12 @@
           "detail": "unsafe.Add",
           "line": 9
         }
-      ]
+      ],
+      "weight": 8,
+      "statements": 3,
+      "kind_weights": {
+        "unsafe": 8
+      }
     }
   ]
 }

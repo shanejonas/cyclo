@@ -77,15 +77,102 @@ func TestPurePrefixesClassifyAsNone(t *testing.T) {
 	}
 	report = evaluate(t, f, DefaultConfig())
 	result = report.Functions[0]
-	if len(result.Effects) != 4 || result.UnclassifiedCalls != 2 {
+	if len(result.Effects) != 4 || result.UnclassifiedCalls != 1 {
 		t.Fatalf("mixed classification: %+v", result)
 	}
 	kinds := map[Kind]int{}
 	for _, effect := range result.Effects {
 		kinds[effect.Kind]++
 	}
-	if kinds[Random] != 1 || kinds[IO] != 1 || kinds[UnknownEffect] != 2 {
+	if kinds[Random] != 1 || kinds[IO] != 2 || kinds[UnknownEffect] != 1 {
 		t.Fatalf("effect kinds: %+v", result.Effects)
+	}
+}
+
+func TestPureStdlibCallsScoreZero(t *testing.T) {
+	f := fact("pure", 1)
+	f.Statements = 10
+	for index, callee := range []string{
+		"strings.Repeat", "bytes.Compare", "slices.Contains", "maps.Keys",
+		"strconv.Itoa", "sort.Strings", "errors.Is", "math/big.NewInt",
+		"encoding/json.Marshal", "context.Background", "sync.Mutex.Lock",
+		"path/filepath.Join", "net/url.Parse",
+		"net/http.ResponseWriter.Header", "flag.FlagSet.Args", "flag.FlagSet.Lookup",
+	} {
+		f.Calls = append(f.Calls, Call{Callee: callee, Line: index + 2})
+	}
+	report := evaluate(t, f, DefaultConfig())
+	for _, diagnostic := range report.Diagnostics {
+		t.Fatalf("pure stdlib finding: %+v", diagnostic)
+	}
+	if report.Functions[0].DensityMilli != 0 {
+		t.Fatalf("density: %+v", report.Functions[0])
+	}
+}
+
+func TestRealEffectsStillFail(t *testing.T) {
+	f := fact("effectful", 1)
+	f.Statements = 10
+	for index, callee := range []string{
+		"os.Open", "net/http.Get", "log/slog.Info",
+		"path/filepath.Abs", "path/filepath.WalkDir",
+		"flag.FlagSet.Parse", "flag.FlagSet.StringVar",
+		"net/http.ResponseWriter.WriteHeader",
+	} {
+		f.Calls = append(f.Calls, Call{Callee: callee, Line: index + 2})
+	}
+	report := evaluate(t, f, DefaultConfig())
+	var density *Diagnostic
+	for i, diagnostic := range report.Diagnostics {
+		if diagnostic.RuleID == "side_effect_density" {
+			density = &report.Diagnostics[i]
+		}
+	}
+	if density == nil {
+		t.Fatal("expected a side_effect_density finding")
+	}
+	// weight 3*7+2=23 over 10 statements = 2300 milli > 500.
+	if density.Actual != 2300 {
+		t.Fatalf("actual = %d", density.Actual)
+	}
+	// Every call classified: no unknown weight remains.
+	if density.KindWeights["unknown"] != 0 {
+		t.Fatalf("kind weights = %+v", density.KindWeights)
+	}
+}
+
+func TestDensityFindingExplainsItself(t *testing.T) {
+	f := fact("mixed", 1)
+	f.Statements = 10
+	f.Calls = []Call{
+		{Callee: "os.Open", Line: 2},
+		{Callee: "mystery", Line: 3},
+		{Callee: "mystery", Line: 4},
+	}
+	f.Mutations = []Mutation{
+		{Root: "x", RootID: "1:1", Line: 5, Provenance: External},
+	}
+	report := evaluate(t, f, DefaultConfig())
+	var density *Diagnostic
+	for i, diagnostic := range report.Diagnostics {
+		if diagnostic.RuleID == "side_effect_density" {
+			density = &report.Diagnostics[i]
+		}
+	}
+	if density == nil {
+		t.Fatal("expected a side_effect_density finding")
+	}
+	// weight 3 (io) + 1 + 1 (unknown) + 1 (mutation) = 6 over 10 statements.
+	if density.Weight != 6 || density.Statements != 10 {
+		t.Fatalf("weight/statements = %d/%d", density.Weight, density.Statements)
+	}
+	wantCounts := map[string]int64{"io": 3, "unknown": 2, "mutation": 1}
+	if !reflect.DeepEqual(density.KindWeights, wantCounts) {
+		t.Fatalf("kind weights = %v", density.KindWeights)
+	}
+	want := "side_effect_density 600 > 500: weight 6 over 10 statements (io 3, unknown 2, mutation 1)"
+	if density.Message != want {
+		t.Fatalf("message = %q, want %q", density.Message, want)
 	}
 }
 

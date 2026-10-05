@@ -44,6 +44,8 @@ func TestAliasingProvenancePreservesOwnedStorage(t *testing.T) {
 		{"local pointer", "local := new(State); local.Count++", quality.Local},
 		{"local embedded value", "local := new(Value); local.Count++", quality.Local},
 		{"local array copy", "local := [1]State{*shared}; local[0].Count++", quality.Local},
+		{"append to local slice", "local := []string{\"a\"}; local = append(local, \"b\")", quality.Local},
+		{"append to shared slice", "local := sharedSlice; local = append(local, \"b\")", quality.Unknown},
 		{"local scalar address", "local := 0; alias := &local; *alias = 1", quality.Local},
 		{"parenthesized pointer address", "local := new(State); holder := &(local); *holder = shared; local.Count++", quality.Unknown},
 		{"range declaration", "for _, local := range []*State{shared} { local.Count++ }", quality.Unknown},
@@ -51,7 +53,7 @@ func TestAliasingProvenancePreservesOwnedStorage(t *testing.T) {
 		{"nested allocated wrapper", "local := new(Nested); local.Pointer = Pointer{shared}; local.Count++", quality.Unknown},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			source := "package repro\ntype State struct { Count int }\ntype Pointer struct { *State }\ntype Nested struct { Pointer }\ntype Value struct { State }\nfunc Mutate(shared *State) { " + test.body + " }\n"
+			source := "package repro\ntype State struct { Count int }\ntype Pointer struct { *State }\ntype Nested struct { Pointer }\ntype Value struct { State }\nvar sharedSlice []string\nfunc Mutate(shared *State) { " + test.body + " }\n"
 			root := qualitySourceModule(t, []byte(source))
 			facts, err := (Analyzer{Root: root}).Extract(context.Background(), nil)
 			if err != nil {

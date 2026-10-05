@@ -285,7 +285,10 @@ func (x *extractor) allocationOrigin(call *ast.CallExpr) quality.Provenance {
 		return quality.Unknown
 	}
 	builtin, ok := x.pkg.TypesInfo.ObjectOf(id).(*types.Builtin)
-	if ok && (builtin.Name() == "make" || builtin.Name() == "new") {
+	// append is locally owned: it either reuses the first argument's backing
+	// array (whose provenance is tracked separately through the binding values)
+	// or allocates a fresh one. It never introduces external sharing by itself.
+	if ok && (builtin.Name() == "make" || builtin.Name() == "new" || builtin.Name() == "append") {
 		return quality.Local
 	}
 	return quality.Unknown
