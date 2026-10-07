@@ -344,21 +344,84 @@ func idAssignments(assign *ast.AssignStmt, fset *token.FileSet, funcName string)
 	return out
 }
 
+// identityScan carries the per-package facts missingIdentityFor needs.
+type identityScan struct {
+	uses    map[string]int
+	mutated map[string]bool
+	pkg     *packages.Package
+}
+
 // findMissingIdentities scans pkg for struct types used as entities (in
 // maps, slices, or as function parameters 3+ times) that lack an ID field.
+// Value objects (never mutated) are skipped: in DDD they are immutable and
+// identified by their attributes, not by identity.
 func findMissingIdentities(pkg *packages.Package, root string) []patterns.MissingIdentityHit {
 	structs := collectStructs(pkg, root)
 	if len(structs) == 0 {
 		return nil
 	}
-	uses := countEntityUses(pkg)
+	scan := identityScan{
+		uses:    countEntityUses(pkg),
+		mutated: collectMutatedStructs(pkg),
+		pkg:     pkg,
+	}
 	var out []patterns.MissingIdentityHit
 	for _, sd := range structs {
-		if hit, ok := missingIdentityFor(sd, uses, pkg); ok {
+		if hit, ok := missingIdentityFor(sd, scan); ok {
 			out = append(out, hit)
 		}
 	}
 	return out
+}
+
+// collectMutatedStructs returns the set of struct type names with at least
+// one field assignment in pkg. Value objects are never mutated.
+func collectMutatedStructs(pkg *packages.Package) map[string]bool {
+	out := map[string]bool{}
+	for _, file := range pkg.Syntax {
+		ast.Inspect(file, func(n ast.Node) bool {
+			for _, e := range assignedExprs(n) {
+				if name := selectorStructName(e, pkg.TypesInfo); name != "" {
+					out[name] = true
+				}
+			}
+			return true
+		})
+	}
+	return out
+}
+
+// assignedExprs returns the assigned-to expressions of n if it is an
+// assignment statement, else nil.
+func assignedExprs(n ast.Node) []ast.Expr {
+	switch stmt := n.(type) {
+	case *ast.AssignStmt:
+		return stmt.Lhs
+	case *ast.IncDecStmt:
+		return []ast.Expr{stmt.X}
+	}
+	return nil
+}
+
+// selectorStructName returns the type name if e is a field access on a
+// value of a named struct type, else "".
+func selectorStructName(e ast.Expr, info *types.Info) string {
+	sel, ok := e.(*ast.SelectorExpr)
+	if !ok {
+		return ""
+	}
+	t := info.TypeOf(sel.X)
+	if ptr, ok := t.(*types.Pointer); ok {
+		t = ptr.Elem()
+	}
+	named, ok := t.(*types.Named)
+	if !ok {
+		return ""
+	}
+	if _, ok := named.Underlying().(*types.Struct); !ok {
+		return ""
+	}
+	return named.Obj().Name()
 }
 
 // countEntityUses counts entity-like uses (maps, slices, params) per type name.
@@ -402,12 +465,17 @@ func countParamUses(fn *ast.FuncDecl, uses map[string]int) {
 }
 
 // missingIdentityFor returns a hit if the struct is used as an entity
-// 3+ times without an ID field.
-func missingIdentityFor(sd structDef, uses map[string]int, pkg *packages.Package) (patterns.MissingIdentityHit, bool) {
-	if uses[sd.name] < 3 {
+// 3+ times without an ID field. Value objects (never mutated) are skipped:
+// in DDD they are immutable and identified by their attributes, not by
+// identity. Methods don't matter — value objects can have behavior.
+func missingIdentityFor(sd structDef, scan identityScan) (patterns.MissingIdentityHit, bool) {
+	if scan.uses[sd.name] < 3 {
 		return patterns.MissingIdentityHit{}, false
 	}
-	if hasIDField(pkg, sd.name) {
+	if !scan.mutated[sd.name] {
+		return patterns.MissingIdentityHit{}, false
+	}
+	if hasIDField(scan.pkg, sd.name) {
 		return patterns.MissingIdentityHit{}, false
 	}
 	return patterns.MissingIdentityHit{
@@ -415,7 +483,7 @@ func missingIdentityFor(sd structDef, uses map[string]int, pkg *packages.Package
 		Path:     sd.path,
 		Line:     sd.line,
 		EndLine:  sd.endLine,
-		UseCount: uses[sd.name],
+		UseCount: scan.uses[sd.name],
 	}, true
 }
 
