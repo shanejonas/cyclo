@@ -60,6 +60,12 @@ func Run(facts []*FuncFacts, options Options) PatternsReport {
 	// contract `func Mine(facts []*FuncFacts, groups []SigGroup, params Params) Mined`,
 	// which collides with sigmine.go's `func Mine`; see the commit report.
 	mined := Mine(prepared, groups, defaultParams(options.Params))
+	// Single-function findings: guard clauses need no clustering, so they
+	// join the candidates here and flow through the same ranking/filtering.
+	if guards := guardCandidates(prepared); len(guards) > 0 {
+		mined.Candidates = append(mined.Candidates, guards...)
+		sortMined(&mined)
+	}
 	report := Build(groups, options.MinScoreMilli, options.Top)
 	report.Candidates = keepCandidates(mined.Candidates, options.MinScoreMilli, options.Top)
 	report.Suppressed = mined.Suppressed

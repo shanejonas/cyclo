@@ -58,3 +58,21 @@ func TestPatternsRejectsBadOptions(t *testing.T) {
 		}
 	}
 }
+
+func TestPatternsReportsGuardClauses(t *testing.T) {
+	t.Chdir("testdata/guard")
+	var output strings.Builder
+	if err := Run(context.Background(), []string{"."}, &output); err != nil {
+		t.Fatalf("patterns must exit 0, got error: %v", err)
+	}
+	text := output.String()
+	if !strings.Contains(text, "guard_clause") {
+		t.Fatalf("expected a guard_clause candidate, got:\n%s", text)
+	}
+	if !strings.Contains(text, "parseFlag") {
+		t.Fatalf("expected the inverted parseFlag to be flagged, got:\n%s", text)
+	}
+	if strings.Contains(text, "parseOther") {
+		t.Fatalf("proper guard clause parseOther must not be flagged, got:\n%s", text)
+	}
+}

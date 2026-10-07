@@ -12,6 +12,8 @@ type FuncFacts struct {
 	Path string
 	// Line is the function's declaration line.
 	Line int
+	// EndLine is the function's closing line.
+	EndLine int
 	// Pdg is the function's program dependence graph. Nil means the body
 	// was not extracted (filtered out of mining, like rstyle's pdg: None).
 	Pdg *Pdg
@@ -30,6 +32,10 @@ type FuncFacts struct {
 	// Implements is true when the method implements an interface method
 	// (rstyle: f.implements.is_some()). Counted by sigmine, never proposed.
 	Implements bool
+	// GuardClauses are inverted conditionals in this function that want to
+	// be guard clauses. AST-level finding from the extractor (Go-specific
+	// extension, not in rstyle's FnFacts); each holds the if-statement line.
+	GuardClauses []int
 }
 
 // EffectClass returns the observable-effect class set for the mismatch check:

@@ -54,14 +54,21 @@ const (
 	// Parameterize proposes extracting one helper taking the differing
 	// parts as parameters.
 	Parameterize CandidateKind = "parameterize"
+	// GuardClause proposes inverting an if/else into a guard clause so the
+	// happy path flows at top level. Single-function finding: no
+	// clustering, fixed score.
+	GuardClause CandidateKind = "guard_clause"
 )
 
 // Site is one function that shows the pattern.
 type Site struct {
 	Path string
 	Line int
-	ID   string
-	Name string
+	// EndLine is the site's last line, for range-overlap checks
+	// (e.g. --changed filtering). Zero when unknown.
+	EndLine int
+	ID      string
+	Name    string
 }
 
 // Breakdown splits the score so each signal stays visible.
@@ -244,7 +251,7 @@ func shortGoPaths(owner string) string {
 }
 
 func makeSite(f *FuncFacts) Site {
-	return Site{Path: f.Path, Line: f.Line, ID: f.ID, Name: f.Name}
+	return Site{Path: f.Path, Line: f.Line, EndLine: f.EndLine, ID: f.ID, Name: f.Name}
 }
 
 func sitesOfFacts(fns []*FuncFacts) []Site {
