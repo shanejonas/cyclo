@@ -55,22 +55,79 @@ func FixValueObjects(fset *token.FileSet, f *ast.File, src []byte) ([]byte, []Va
 	if len(clumps) == 0 {
 		return src, nil, nil
 	}
+	fixes, structTexts := applyClumps(fset, f, clumps)
+	if len(fixes) == 0 {
+		return src, nil, nil
+	}
+	out, err := formatClumpAST(fset, f)
+	if err != nil {
+		return nil, nil, err
+	}
+	out, err = insertStructTexts(fset, f, out, structTexts, fixes)
+	if err != nil {
+		return nil, nil, err
+	}
+	return out, fixes, nil
+}
+
+// applyClumps applies each clump, collecting fixes and struct texts.
+func applyClumps(fset *token.FileSet, f *ast.File, clumps []ValueClump) ([]ValueFix, []string) {
 	var fixes []ValueFix
+	var structTexts []string
 	for _, clump := range clumps {
-		fix, ok := applyValueClump(fset, f, clump)
+		fix, structText, ok := applyValueClump(fset, f, clump)
 		if !ok {
 			continue
 		}
 		fixes = append(fixes, fix)
+		structTexts = append(structTexts, structText)
 	}
-	if len(fixes) == 0 {
-		return src, nil, nil
-	}
+	return fixes, structTexts
+}
+
+// formatClumpAST prints the AST after clump rewrites.
+func formatClumpAST(fset *token.FileSet, f *ast.File) ([]byte, error) {
 	var buf bytes.Buffer
 	if err := format.Node(&buf, fset, f); err != nil {
-		return nil, nil, fmt.Errorf("format after value_object fix: %w", err)
+		return nil, fmt.Errorf("format after value_object fix: %w", err)
 	}
-	return buf.Bytes(), fixes, nil
+	return buf.Bytes(), nil
+}
+
+// insertStructTexts inserts struct declarations via text edit (avoids AST
+// comment misassociation), then gofmt-cleans the result.
+func insertStructTexts(fset *token.FileSet, f *ast.File, out []byte, structTexts []string, fixes []ValueFix) ([]byte, error) {
+	insertPos := valueStructInsertPos(fset, f, out)
+	for i := len(structTexts) - 1; i >= 0; i-- {
+		text := "\n" + structTexts[i] + "\n"
+		out = append(out[:insertPos], append([]byte(text), out[insertPos:]...)...)
+		setFixLines(out, insertPos, fixes)
+	}
+	formatted, err := format.Source(out)
+	if err != nil {
+		return nil, fmt.Errorf("gofmt after value_object struct insert: %w", err)
+	}
+	return formatted, nil
+}
+
+// setFixLines assigns line numbers to fixes (all structs at same insert point).
+func setFixLines(out []byte, insertPos int, fixes []ValueFix) {
+	for j := range fixes {
+		if fixes[j].Line == 0 {
+			fixes[j].Line = bytes.Count(out[:insertPos], []byte("\n")) + 2
+		}
+	}
+}
+
+// valueStructInsertPos finds the byte offset after the import declaration.
+func valueStructInsertPos(fset *token.FileSet, f *ast.File, src []byte) int {
+	for _, d := range f.Decls {
+		if gd, ok := d.(*ast.GenDecl); ok && gd.Tok == token.IMPORT {
+			return lineEnd(src, fset.Position(gd.End()).Offset)
+		}
+	}
+	// No imports: after package clause.
+	return lineEnd(src, fset.Position(f.Name.End()).Offset)
 }
 
 // FindValueClumps detects data clumps in f: groups of primitive params
@@ -237,26 +294,46 @@ func isClumpSubset(a, b []ClumpParam) bool {
 }
 
 // applyValueClump extracts one clump into a struct. Returns false when any
-// safety check fails.
-func applyValueClump(fset *token.FileSet, f *ast.File, clump ValueClump) (ValueFix, bool) {
+// applyValueClump applies one clump extraction. Returns the fix, the struct
+// source text (for text insertion), and whether it succeeded.
+func applyValueClump(fset *token.FileSet, f *ast.File, clump ValueClump) (ValueFix, string, bool) {
 	typeName := valueTypeName(clump.Params)
 	paramName := lowerFirst(typeName)
 	if !clumpSafe(clump, paramName) {
-		return ValueFix{}, false
+		return ValueFix{}, "", false
 	}
 	if !rewriteClumpCallSites(f, clump, typeName) {
-		return ValueFix{}, false
+		return ValueFix{}, "", false
 	}
-	structDecl := buildValueStruct(typeName, clump.Params)
-	insertValueStruct(f, structDecl)
 	for _, fn := range clump.Funcs {
 		if !rewriteFuncSignature(fn, clump.Params, paramName, typeName) {
-			return ValueFix{}, false
+			return ValueFix{}, "", false
 		}
 		rewriteBodyIdents(fn.Body, clump.Params, paramName)
 	}
-	line := fset.PositionFor(structDecl.Pos(), false).Line
-	return ValueFix{Line: line, TypeName: typeName, Kind: "value_object"}, true
+	structText := buildValueStructText(typeName, clump.Params)
+	return ValueFix{TypeName: typeName, Kind: "value_object"}, structText, true
+}
+
+// buildValueStructText generates the struct declaration source text.
+func buildValueStructText(typeName string, params []ClumpParam) string {
+	var sb strings.Builder
+	sb.WriteString("// " + typeName + " groups " + paramList(params) + ".\n")
+	sb.WriteString("type " + typeName + " struct {\n")
+	for _, p := range params {
+		sb.WriteString("\t" + capitalize(p.Name) + " " + p.Type + "\n")
+	}
+	sb.WriteString("}")
+	return sb.String()
+}
+
+// paramList joins param names for the doc comment.
+func paramList(params []ClumpParam) string {
+	var names []string
+	for _, p := range params {
+		names = append(names, p.Name)
+	}
+	return strings.Join(names, ", ")
 }
 
 // clumpSafe runs all safety checks for a clump.
@@ -536,37 +613,6 @@ func identUsed(body *ast.BlockStmt, name string) bool {
 }
 
 // buildValueStruct creates the struct declaration.
-func buildValueStruct(typeName string, params []ClumpParam) *ast.GenDecl {
-	var fields []*ast.Field
-	for _, p := range params {
-		fields = append(fields, &ast.Field{
-			Names: []*ast.Ident{{Name: capitalize(p.Name)}},
-			Type:  &ast.Ident{Name: p.Type},
-		})
-	}
-	return &ast.GenDecl{
-		Tok: token.TYPE,
-		Specs: []ast.Spec{
-			&ast.TypeSpec{
-				Name: &ast.Ident{Name: typeName},
-				Type: &ast.StructType{Fields: &ast.FieldList{List: fields}},
-			},
-		},
-	}
-}
-
-// insertValueStruct inserts the struct after imports, before first func.
-func insertValueStruct(f *ast.File, decl *ast.GenDecl) {
-	idx := 0
-	for i, d := range f.Decls {
-		gd, ok := d.(*ast.GenDecl)
-		if ok && gd.Tok == token.IMPORT {
-			idx = i + 1
-		}
-	}
-	f.Decls = append(f.Decls[:idx], append([]ast.Decl{decl}, f.Decls[idx:]...)...)
-}
-
 // rewriteFuncSignature replaces clump params with the struct param.
 // Returns false if the params aren't found.
 func rewriteFuncSignature(fn *ast.FuncDecl, params []ClumpParam, paramName, structType string) bool {
