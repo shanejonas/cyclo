@@ -82,6 +82,12 @@ func Run(facts []*FuncFacts, options Options) PatternsReport {
 		mined.Candidates = append(mined.Candidates, ams...)
 		sortMined(&mined)
 	}
+	// Primitive obsession: domain concepts as raw string/int params,
+	// single-param signal, fixed score.
+	if pos := primitiveObsessionCandidates(prepared); len(pos) > 0 {
+		mined.Candidates = append(mined.Candidates, pos...)
+		sortMined(&mined)
+	}
 	report := Build(groups, options.MinScoreMilli, options.Top)
 	report.Candidates = keepCandidates(mined.Candidates, options.MinScoreMilli, options.Top)
 	report.Suppressed = mined.Suppressed

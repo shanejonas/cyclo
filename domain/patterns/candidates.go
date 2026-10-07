@@ -67,6 +67,10 @@ const (
 	// operate on its fields. DDD-inspired; fixed score below value
 	// objects (more judgment involved).
 	AnemicModel CandidateKind = "anemic_model"
+	// PrimitiveObsession proposes a named type for a domain concept used as
+	// a raw string/int param across functions. DDD-inspired; fixed score
+	// below value objects (more heuristic).
+	PrimitiveObsession CandidateKind = "primitive_obsession"
 )
 
 // Site is one function that shows the pattern.

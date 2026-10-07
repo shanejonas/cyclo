@@ -26,7 +26,7 @@ Statically apply fixes for patterns miner candidates. No LLM, no tokens:
 pure AST rewrites that are provably behavior-preserving.
 Dry-run by default (shows a diff); --apply writes the files.
 
-  --kind KIND   which fixes to apply: guard_clause (default), value_object, parameterize, anemic_model, or all
+  --kind KIND   which fixes to apply: guard_clause (default), value_object, parameterize, anemic_model, primitive_obsession, or all
   --apply       write the fixes to disk (default: dry-run diff only)
 
 Exit 0: always, on success (even with no fixes). Exit 2: parse or IO failure.
@@ -95,13 +95,16 @@ func fixFile(path string, opts options, output io.Writer) (int, error) {
 	return showDiff(path, src, out, fixes, output)
 }
 
-// kindFixers maps fix kinds to their implementations. Adding a new kind
-// is a new entry here plus its fixer function.
-var kindFixers = map[string]func(*token.FileSet, *ast.File, []byte) ([]byte, []gopatterns.Fix, error){
-	"guard_clause": fixGuardClause,
-	"value_object": fixValueObjectKind,
-	"parameterize": fixParameterizeKind,
-	"anemic_model": fixAnemicModelKind,
+// kindFixer applies fixes of one kind.
+type kindFixer func(fset *token.FileSet, f *ast.File, src []byte) ([]byte, []gopatterns.Fix, error)
+
+// kindFixers dispatches --kind to the fixer.
+var kindFixers = map[string]kindFixer{
+	"guard_clause":        fixGuardClause,
+	"value_object":        fixValueObjectKind,
+	"parameterize":        fixParameterizeKind,
+	"anemic_model":        fixAnemicModelKind,
+	"primitive_obsession": fixPrimitiveObsessionKind,
 }
 
 // fixSource parses src and returns the fixed source and the fixes applied.
@@ -109,7 +112,7 @@ func fixSource(path string, src []byte, kind string) ([]byte, []gopatterns.Fix, 
 	if kind == "all" {
 		return fixAllKinds(path, src)
 	}
-	fix, ok := kindFixers[kind]
+	fixer, ok := kindFixers[kind]
 	if !ok {
 		return nil, nil, fmt.Errorf("unknown kind %q", kind)
 	}
@@ -118,7 +121,7 @@ func fixSource(path string, src []byte, kind string) ([]byte, []gopatterns.Fix, 
 	if err != nil {
 		return nil, nil, fmt.Errorf("parse %s: %w", path, err)
 	}
-	return fix(fset, f, src)
+	return fixer(fset, f, src)
 }
 
 // fixValueObjectKind applies value-object fixes.
@@ -159,6 +162,15 @@ func fixAnemicModelKind(fset *token.FileSet, f *ast.File, src []byte) ([]byte, [
 	return fixed, toFixes(anemicFixes), nil
 }
 
+// fixPrimitiveObsessionKind applies primitive-obsession fixes.
+func fixPrimitiveObsessionKind(fset *token.FileSet, f *ast.File, src []byte) ([]byte, []gopatterns.Fix, error) {
+	fixed, primFixes, err := gopatterns.FixPrimitiveObsession(fset, f, src)
+	if err != nil {
+		return nil, nil, err
+	}
+	return fixed, toFixes(primFixes), nil
+}
+
 // toFixes converts typed fixes to the Fix interface.
 func toFixes[T gopatterns.Fix](fixes []T) []gopatterns.Fix {
 	out := make([]gopatterns.Fix, len(fixes))
@@ -185,7 +197,12 @@ func fixAllKinds(path string, src []byte) ([]byte, []gopatterns.Fix, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	return src4, append(append(append(fixes1, fixes2...), fixes3...), fixes4...), nil
+	src5, fixes5, err := fixSource(path, src4, "primitive_obsession")
+	if err != nil {
+		return nil, nil, err
+	}
+	all := append(append(append(fixes1, fixes2...), fixes3...), fixes4...)
+	return src5, append(all, fixes5...), nil
 }
 
 // applyFixes writes the fixed source and reports.
@@ -319,8 +336,13 @@ func parseOptions(args []string) (options, error) {
 }
 
 func (opts options) validate() error {
-	if !slices.Contains([]string{"guard_clause", "value_object", "parameterize", "anemic_model", "all"}, opts.kind) {
-		return fmt.Errorf("kind must be guard_clause, value_object, parameterize, anemic_model, or all")
+	kinds := make([]string, 0, len(kindFixers)+1)
+	for k := range kindFixers {
+		kinds = append(kinds, k)
+	}
+	kinds = append(kinds, "all")
+	if !slices.Contains(kinds, opts.kind) {
+		return fmt.Errorf("kind must be one of: %s", strings.Join(kinds, ", "))
 	}
 	return nil
 }
