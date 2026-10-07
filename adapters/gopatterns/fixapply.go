@@ -6,6 +6,7 @@ import (
 	"go/ast"
 	"go/format"
 	"go/token"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -825,4 +826,249 @@ func isGoKeyword(s string) bool {
 		return true
 	}
 	return false
+}
+
+// applySpecificationFix applies a Specification FixSpec: extracts a repeated
+// boolean business rule into a Specification type with IsSatisfiedBy, and
+// rewrites matching if conditions to specification calls.
+func applySpecificationFix(spec *patterns.FixSpec, src []byte) ([]byte, error) {
+	typeName, ruleKey, ok := specParams(spec)
+	if !ok {
+		return nil, fmt.Errorf("specification: FixSpec missing type or rulekey")
+	}
+	fset, f, err := parseSpec(spec, src)
+	if err != nil {
+		return nil, err
+	}
+	specName := typeName + "Specification"
+	if hasTypeDecl(f, specName) {
+		return src, nil
+	}
+	matches := findSpecMatches(f, ruleKey)
+	if len(matches) == 0 {
+		return src, nil
+	}
+	edits := specEdits(fset, f, src, specName, typeName, matches)
+	out := applyEdits(src, edits)
+	formatted, err := format.Source(out)
+	if err != nil {
+		return nil, fmt.Errorf("gofmt after specification fix: %w", err)
+	}
+	return formatted, nil
+}
+
+// specParams extracts the type name and rule key from a FixSpec.
+func specParams(spec *patterns.FixSpec) (typeName, ruleKey string, ok bool) {
+	typeName = spec.Params["type"]
+	ruleKey = spec.Params["rulekey"]
+	return typeName, ruleKey, typeName != "" && ruleKey != ""
+}
+
+// findSpecMatches returns the if statements whose condition matches the rule.
+func findSpecMatches(f *ast.File, ruleKey string) []specMatch {
+	var matches []specMatch
+	ast.Inspect(f, func(n ast.Node) bool {
+		ifStmt, ok := n.(*ast.IfStmt)
+		if !ok {
+			return true
+		}
+		if !isMultiOperand(ifStmt.Cond) {
+			return true
+		}
+		key, varName := specMatchKey(ifStmt.Cond)
+		if !specKeysMatch(key, ruleKey) {
+			return true
+		}
+		matches = append(matches, specMatch{stmt: ifStmt, varName: varName})
+		return true
+	})
+	return matches
+}
+
+// isMultiOperand reports whether the expression has 2+ boolean operands.
+func isMultiOperand(cond ast.Expr) bool {
+	return len(flattenBoolOps(cond)) >= specMinOperands
+}
+
+// specMatchKey computes the match key for an if condition, falling back
+// to structural matching when type info is unavailable.
+func specMatchKey(cond ast.Expr) (key, varName string) {
+	key, varName, _ = specRuleKey(cond, nil)
+	if key == "" {
+		key = specStructKey(cond)
+	}
+	return key, varName
+}
+
+// specMatch is one if statement matching a business rule.
+type specMatch struct {
+	stmt    *ast.IfStmt
+	varName string
+}
+
+// hasTypeDecl reports whether the file declares a type with the given name.
+func hasTypeDecl(f *ast.File, name string) bool {
+	found := false
+	ast.Inspect(f, func(n ast.Node) bool {
+		ts, ok := n.(*ast.TypeSpec)
+		if ok && ts.Name.Name == name {
+			found = true
+			return false
+		}
+		return true
+	})
+	return found
+}
+
+// specStructKey builds a type-agnostic structural key for matching.
+// Used when types.Info is unavailable in the fixer.
+func specStructKey(cond ast.Expr) string {
+	operands := flattenBoolOps(cond)
+	var parts []string
+	for _, op := range operands {
+		field, opStr, base := specOperandParts(op, nil)
+		if field == "" {
+			return ""
+		}
+		// Normalize the base variable to "v" for cross-site matching.
+		parts = append(parts, "v."+field+":"+opStr)
+		_ = base
+	}
+	sort.Strings(parts)
+	return strings.Join(parts, ",")
+}
+
+// specKeysMatch reports whether two rule keys describe the same rule,
+// ignoring the type prefix and variable names.
+func specKeysMatch(a, b string) bool {
+	aParts := strings.Split(a, "|")
+	bParts := strings.Split(b, "|")
+	aKey := aParts[len(aParts)-1]
+	bKey := bParts[len(bParts)-1]
+	// Normalize variable prefixes: "user.Age" -> "v.Age".
+	normalize := func(s string) string {
+		fields := strings.Split(s, ",")
+		for i, f := range fields {
+			if idx := strings.Index(f, "."); idx > 0 {
+				fields[i] = "v" + f[idx:]
+			}
+		}
+		sort.Strings(fields)
+		return strings.Join(fields, ",")
+	}
+	return normalize(aKey) == normalize(bKey)
+}
+
+// specEdits builds the text edits: insert the Specification type, rewrite
+// matching conditions to IsSatisfiedBy calls.
+// specEditCtx bundles the context for building specification edits
+// (keeps fn_params within the quality gate).
+type specEditCtx struct {
+	fset     *token.FileSet
+	f        *ast.File
+	src      []byte
+	specName string
+	typeName string
+	matches  []specMatch
+}
+
+func specEdits(fset *token.FileSet, f *ast.File, src []byte, specName, typeName string, matches []specMatch) []textEdit {
+	return specEditsCtx(specEditCtx{fset: fset, f: f, src: src, specName: specName, typeName: typeName, matches: matches})
+}
+
+// specEditsCtx builds the text edits: rewrite matching conditions and
+// insert the Specification type.
+func specEditsCtx(ctx specEditCtx) []textEdit {
+	var edits []textEdit
+	// Rewrite each matching if condition.
+	for _, m := range ctx.matches {
+		condStart := ctx.fset.Position(m.stmt.Cond.Pos()).Offset
+		condEnd := ctx.fset.Position(m.stmt.Cond.End()).Offset
+		replacement := fmt.Sprintf("(%s{}).IsSatisfiedBy(%s)", ctx.specName, m.varName)
+		edits = append(edits, textEdit{start: condStart, end: condEnd, replacement: []byte(replacement)})
+	}
+	edits = append(edits, specDeclEdit(ctx))
+	return edits
+}
+
+// specDeclEdit builds the edit inserting the Specification type declaration.
+func specDeclEdit(ctx specEditCtx) textEdit {
+	insertPos := specInsertPos(ctx.fset, ctx.f, ctx.src)
+	first := ctx.matches[0]
+	firstCond := ctx.src[ctx.fset.Position(first.stmt.Cond.Pos()).Offset : ctx.fset.Position(first.stmt.Cond.End()).Offset]
+	paramName := first.varName
+	if paramName == "" {
+		paramName = "v"
+	}
+	body := specRenameVar(string(firstCond), first.varName, paramName)
+	decl := fmt.Sprintf("\n// %s encapsulates a business rule (Specification pattern).\ntype %s struct{}\n\n// IsSatisfiedBy reports whether the rule holds for v.\nfunc (%s) IsSatisfiedBy(%s %s) bool {\n\treturn %s\n}\n", ctx.specName, ctx.specName, ctx.specName, paramName, ctx.typeName, body)
+	return textEdit{start: insertPos, end: insertPos, replacement: []byte(decl)}
+}
+
+// specInsertPos finds where to insert the Specification type: after imports.
+func specInsertPos(fset *token.FileSet, f *ast.File, src []byte) int {
+	if len(f.Imports) > 0 {
+		last := f.Imports[len(f.Imports)-1]
+		end := fset.Position(last.End()).Offset
+		// Skip to end of line.
+		for end < len(src) && src[end] != '\n' {
+			end++
+		}
+		return end + 1
+	}
+	// After package clause.
+	end := fset.Position(f.Name.End()).Offset
+	for end < len(src) && src[end] != '\n' {
+		end++
+	}
+	return end + 1
+}
+
+// specRenameVar renames variable occurrences in a condition string.
+// Uses word-boundary matching to avoid partial replacements.
+func specRenameVar(cond, from, to string) string {
+	if from == "" || from == to {
+		return cond
+	}
+	var out strings.Builder
+	i := 0
+	for i < len(cond) {
+		if n, ok := specVarAt(cond, i, from); ok {
+			out.WriteString(to)
+			i += n
+			continue
+		}
+		out.WriteByte(cond[i])
+		i++
+	}
+	return out.String()
+}
+
+// specVarAt reports whether the variable name starts at position i with
+// word boundaries on both sides, returning its length.
+func specVarAt(s string, i int, name string) (int, bool) {
+	if !strings.HasPrefix(s[i:], name) {
+		return 0, false
+	}
+	before := i == 0 || !isIdentChar(s[i-1])
+	after := i+len(name) >= len(s) || !isIdentChar(s[i+len(name)])
+	if !before || !after {
+		return 0, false
+	}
+	return len(name), true
+}
+
+// isIdentChar reports whether c can be part of a Go identifier.
+func isIdentChar(c byte) bool {
+	return c == '_' || isASCIILetter(c) || isDigit(c)
+}
+
+// isASCIILetter reports whether c is an ASCII letter.
+func isASCIILetter(c byte) bool {
+	return 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z'
+}
+
+// isDigit reports whether c is an ASCII digit.
+func isDigit(c byte) bool {
+	return '0' <= c && c <= '9'
 }

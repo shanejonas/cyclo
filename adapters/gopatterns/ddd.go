@@ -2,9 +2,11 @@ package gopatterns
 
 import (
 	"go/ast"
+	"go/printer"
 	"go/token"
 	"go/types"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/shanejonas/cyclo/domain/patterns"
@@ -414,4 +416,202 @@ func litNamedStruct(t types.Type) (*types.Named, bool) {
 		return nil, false
 	}
 	return named, true
+}
+
+// specMinOperands is the minimum number of && / || operands for a boolean
+// expression to count as a business rule worth a Specification.
+const specMinOperands = 2
+
+// findSpecificationHits records boolean business-rule expressions: if
+// conditions with 2+ && / || operands. The rule key normalizes field
+// accesses so the same rule in different functions groups together even
+// when variable names differ.
+func findSpecificationHits(fn *ast.FuncDecl, fset *token.FileSet, info *types.Info) []patterns.SpecificationHit {
+	var out []patterns.SpecificationHit
+	if fn.Body == nil {
+		return out
+	}
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		ifStmt, ok := n.(*ast.IfStmt)
+		if !ok {
+			return true
+		}
+		operands := flattenBoolOps(ifStmt.Cond)
+		if len(operands) < specMinOperands {
+			return true
+		}
+		ruleKey, varName, typeName := specRuleKey(ifStmt.Cond, info)
+		if ruleKey == "" {
+			return true
+		}
+		var condBuf strings.Builder
+		if err := printer.Fprint(&condBuf, fset, ifStmt.Cond); err != nil {
+			return true
+		}
+		out = append(out, patterns.SpecificationHit{
+			Line:     fset.Position(ifStmt.Pos()).Line,
+			RuleKey:  ruleKey,
+			CondText: condBuf.String(),
+			VarName:  varName,
+			TypeName: typeName,
+		})
+		return true
+	})
+	return out
+}
+
+// flattenBoolOps flattens a && / || chain into its leaf operands.
+func flattenBoolOps(e ast.Expr) []ast.Expr {
+	bin, ok := e.(*ast.BinaryExpr)
+	if !ok || (bin.Op != token.LAND && bin.Op != token.LOR) {
+		return []ast.Expr{e}
+	}
+	return append(flattenBoolOps(bin.X), flattenBoolOps(bin.Y)...)
+}
+
+// specRuleKey builds a normalized grouping key from a boolean condition:
+// the sorted field accesses with their comparison operators, plus the
+// tested variable's type. Returns the key, variable name, and type name.
+func specRuleKey(cond ast.Expr, info *types.Info) (key, varName, typeName string) {
+	operands := flattenBoolOps(cond)
+	if len(operands) < specMinOperands {
+		return "", "", ""
+	}
+	parts, seenVar, seenType, ok := specKeyParts(operands, info)
+	if !ok {
+		return "", "", ""
+	}
+	sort.Strings(parts)
+	return seenType + "|" + strings.Join(parts, ","), seenVar, seenType
+}
+
+// specKeyParts extracts the normalized parts, base variable, and type from
+// boolean operands. Reports false when operands don't form a single-subject
+// rule.
+func specKeyParts(operands []ast.Expr, info *types.Info) (parts []string, seenVar, seenType string, ok bool) {
+	for _, op := range operands {
+		field, opStr, base := specOperandParts(op, info)
+		if field == "" {
+			return nil, "", "", false
+		}
+		parts = append(parts, field+":"+opStr)
+		if seenVar == "" {
+			seenVar = base
+		} else if seenVar != base {
+			// Rule spans multiple variables; not a single-subject rule.
+			return nil, "", "", false
+		}
+		if seenType == "" {
+			seenType = specBaseType(op, info)
+		}
+	}
+	return parts, seenVar, seenType, true
+}
+
+// specOperandParts extracts the field name, operator, and base variable
+// from one boolean operand like `user.Age > 18` or `user.Active`.
+func specOperandParts(op ast.Expr, info *types.Info) (field, opStr, base string) {
+	op = specUnwrapParens(op)
+	if field, base, ok := specBareSelector(op); ok {
+		return field, "truthy", base
+	}
+	return specComparisonParts(op)
+}
+
+// specUnwrapParens strips parenthesized wrappers from an expression.
+func specUnwrapParens(op ast.Expr) ast.Expr {
+	for {
+		paren, ok := op.(*ast.ParenExpr)
+		if !ok {
+			return op
+		}
+		op = paren.X
+	}
+}
+
+// specBareSelector extracts field and base from `user.Active`.
+func specBareSelector(op ast.Expr) (field, base string, ok bool) {
+	sel, ok := op.(*ast.SelectorExpr)
+	if !ok {
+		return "", "", false
+	}
+	id, ok := sel.X.(*ast.Ident)
+	if !ok {
+		return "", "", false
+	}
+	return sel.Sel.Name, id.Name, true
+}
+
+// specComparisonParts extracts field, operator, and base from `user.Age > 18`.
+func specComparisonParts(op ast.Expr) (field, opStr, base string) {
+	bin, ok := op.(*ast.BinaryExpr)
+	if !ok {
+		return "", "", ""
+	}
+	sel := specSideSelector(bin)
+	if sel == nil {
+		return "", "", ""
+	}
+	id := sel.X.(*ast.Ident)
+	return sel.Sel.Name, bin.Op.String(), id.Name
+}
+
+// specSideSelector returns the `ident.Field` selector on either side of a
+// binary expression, or nil.
+func specSideSelector(bin *ast.BinaryExpr) *ast.SelectorExpr {
+	if isSelectorOfIdent(bin.X) {
+		return bin.X.(*ast.SelectorExpr)
+	}
+	if isSelectorOfIdent(bin.Y) {
+		return bin.Y.(*ast.SelectorExpr)
+	}
+	return nil
+}
+
+// isSelectorOfIdent reports whether e is `ident.Field`.
+func isSelectorOfIdent(e ast.Expr) bool {
+	sel, ok := e.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+	_, ok = sel.X.(*ast.Ident)
+	return ok
+}
+
+// specBaseType returns the named type of the base variable in an operand.
+func specBaseType(op ast.Expr, info *types.Info) string {
+	if info == nil {
+		return ""
+	}
+	sel := specFirstSelector(op)
+	if sel == nil {
+		return ""
+	}
+	return specNamedType(info.TypeOf(sel.X.(*ast.Ident)))
+}
+
+// specFirstSelector returns the first `ident.Field` selector in the expression.
+func specFirstSelector(op ast.Expr) *ast.SelectorExpr {
+	var sel *ast.SelectorExpr
+	ast.Inspect(op, func(n ast.Node) bool {
+		if s, ok := n.(*ast.SelectorExpr); ok {
+			if _, ok := s.X.(*ast.Ident); ok {
+				sel = s
+				return false
+			}
+		}
+		return true
+	})
+	return sel
+}
+
+// specNamedType returns the named type's name, or "".
+func specNamedType(t types.Type) string {
+	if t == nil {
+		return ""
+	}
+	if named, ok := derefNamed(t); ok {
+		return named.Obj().Name()
+	}
+	return ""
 }

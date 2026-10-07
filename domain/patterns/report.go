@@ -104,6 +104,7 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 	{PrimitiveObsession, func(prepared []*FuncFacts, options Options) []Candidate { return primitiveObsessionCandidates(prepared) }},
 	{ValueObject, func(prepared []*FuncFacts, options Options) []Candidate { return valueObjectCandidates(prepared) }},
 	{Factory, func(prepared []*FuncFacts, options Options) []Candidate { return factoryCandidates(prepared) }},
+	{Specification, func(prepared []*FuncFacts, options Options) []Candidate { return specificationCandidates(prepared) }},
 	{MissingIdentity, func(prepared []*FuncFacts, options Options) []Candidate { return missingIdentityCandidates(options.MissingIdentities) }},
 	{EntityIdentity, func(prepared []*FuncFacts, options Options) []Candidate { return entityIdentityCandidates(prepared) }},
 	{AnemicModel, func(prepared []*FuncFacts, options Options) []Candidate { return anemicModelCandidates(options.AnemicModels) }},

@@ -99,6 +99,11 @@ const (
 	// literal (5+ fields) created in multiple functions. DDD-inspired;
 	// the transform is mechanical.
 	Factory CandidateKind = "factory"
+	// Specification proposes extracting a business rule (a boolean
+	// expression with 2+ conditions) repeated in 2+ functions into a
+	// Specification type with IsSatisfiedBy. DDD-inspired (Evans); the
+	// transform is mechanical.
+	Specification CandidateKind = "specification"
 )
 
 // FixKindOrder defines the order in which pattern fixes are applied when
@@ -114,16 +119,19 @@ const (
 //     built afterwards take fewer, more meaningful params.
 //  4. factory extracts constructors; it runs after the type-creating
 //     passes so it can use the new types.
-//  5. The independent semantic fixes (entity identity, anemic models,
+//  5. specification extracts business rules; it runs with the other
+//     semantic fixes after the structural passes.
+//  6. The independent semantic fixes (entity identity, anemic models,
 //     switches, interfaces, generics) run in the middle: they don't
 //     depend on the type-creation passes and nothing depends on them.
-//  6. parameterize runs last: it's PDG-based clone detection, the most
+//  7. parameterize runs last: it's PDG-based clone detection, the most
 //     sensitive to code shape, so it sees the final structure.
 var FixKindOrder = []CandidateKind{
 	GuardClause,
 	PrimitiveObsession,
 	ValueObject,
 	Factory,
+	Specification,
 	MissingIdentity,
 	EntityIdentity,
 	AnemicModel,

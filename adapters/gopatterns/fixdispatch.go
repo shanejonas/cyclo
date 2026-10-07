@@ -26,6 +26,7 @@ var appliers = map[patterns.CandidateKind]fixApplier{
 	patterns.TypeSwitch:          applyTypeSwitchFix,
 	patterns.EntityIdentity:      applyEntityIdentityFix,
 	patterns.Factory:             applyFactoryFix,
+	patterns.Specification:        applySpecificationFix,
 	// MutableIdentity is detection-only: no safe mechanical fix exists.
 	// Aggregate is detection-only: choosing the root is design.
 	// Repository is detection-only: extraction is design.

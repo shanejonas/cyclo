@@ -130,6 +130,7 @@ func funcFactsOf(fp gopatterns.FuncPdg) *patterns.FuncFacts {
 		AggregateMods:     fp.AggregateMods,
 		DbCalls:           fp.DbCalls,
 		FactoryLits:       fp.FactoryLits,
+		SpecRules:         fp.SpecRules,
 		Params:            fp.Params,
 	}
 }

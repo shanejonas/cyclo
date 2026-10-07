@@ -262,3 +262,91 @@ func factoryCandidate(k factoryTypeKey, facts []*FuncFacts, funcs map[string]boo
 		},
 	}
 }
+
+// specificationScoreMilli is the fixed score for repeated business rules.
+// The Specification extraction is mechanical.
+const specificationScoreMilli = 450
+
+// specificationCandidates finds boolean business rules (2+ conditions)
+// repeated in 2+ functions. Such rules want a Specification type with
+// IsSatisfiedBy (Evans).
+func specificationCandidates(facts []*FuncFacts) []Candidate {
+	byRule, first, fileOf := groupSpecRules(facts)
+	var out []Candidate
+	for k, funcs := range byRule {
+		if len(funcs) < 2 {
+			continue
+		}
+		out = append(out, specificationCandidate(k, facts, funcs, first[k], fileOf[k]))
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Breakdown.Support != out[j].Breakdown.Support {
+			return out[i].Breakdown.Support > out[j].Breakdown.Support
+		}
+		return out[i].Observation < out[j].Observation
+	})
+	return out
+}
+
+// specRuleKey identifies a business rule by its normalized key.
+type specRuleKey struct {
+	key      string
+	typeName string
+}
+
+// groupSpecRules groups specification hits by rule key, tracking the
+// functions containing each rule and the first hit for fixer context.
+func groupSpecRules(facts []*FuncFacts) (map[specRuleKey]map[string]bool, map[specRuleKey]SpecificationHit, map[specRuleKey]string) {
+	byRule := map[specRuleKey]map[string]bool{}
+	first := map[specRuleKey]SpecificationHit{}
+	fileOf := map[specRuleKey]string{}
+	for _, f := range facts {
+		for _, h := range f.SpecRules {
+			if h.RuleKey == "" || h.TypeName == "" {
+				continue
+			}
+			k := specRuleKey{h.RuleKey, h.TypeName}
+			if byRule[k] == nil {
+				byRule[k] = map[string]bool{}
+				first[k] = h
+				fileOf[k] = f.Path
+			}
+			byRule[k][f.ID] = true
+		}
+	}
+	return byRule, first, fileOf
+}
+
+// specificationCandidate builds the fixable candidate for a business rule.
+func specificationCandidate(k specRuleKey, facts []*FuncFacts, funcs map[string]bool, hit SpecificationHit, file string) Candidate {
+	names := make([]string, 0, len(funcs))
+	for id := range funcs {
+		names = append(names, id)
+	}
+	sort.Strings(names)
+	specName := k.typeName + "Specification"
+	return Candidate{
+		Kind:       Specification,
+		ScoreMilli: specificationScoreMilli,
+		Breakdown: Breakdown{
+			Support:       len(funcs),
+			CoverageMilli: 1000,
+		},
+		Observation:      fmt.Sprintf("business rule on %s repeated in %d functions", k.typeName, len(funcs)),
+		Inference:        "a boolean business rule scattered across callers wants a Specification",
+		PossibleRefactor: fmt.Sprintf("extract a %s with IsSatisfiedBy", specName),
+		Sites:            candidateSites(facts, names),
+		FixSpec: &FixSpec{
+			Kind:    Specification,
+			File:    file,
+			Line:    hit.Line,
+			EndLine: hit.Line,
+			Params: map[string]string{
+				"type":     k.typeName,
+				"varname":  hit.VarName,
+				"cond":     hit.CondText,
+				"rulekey":  k.key,
+			},
+		},
+	}
+}

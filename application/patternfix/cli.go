@@ -58,12 +58,12 @@ type options struct {
 // The grouping mirrors FixKindOrder:
 //  1. guard_clause + primitive_obsession: simplify control flow, create types
 //  2. value_object: bundle params into the new types
-//  3. factory + independent semantic fixes: use the bundled types
+//  3. factory + specification + independent semantic fixes: use the bundled types
 //  4. parameterize: PDG-based, most sensitive to code shape, runs last
 var fixPhases = [][]patterns.CandidateKind{
 	{patterns.GuardClause, patterns.PrimitiveObsession},
 	{patterns.ValueObject},
-	{patterns.Factory, patterns.MissingIdentity, patterns.EntityIdentity,
+	{patterns.Factory, patterns.Specification, patterns.MissingIdentity, patterns.EntityIdentity,
 		patterns.AnemicModel, patterns.TypeSwitch, patterns.EnumDispatch,
 		patterns.TraitMethod, patterns.CapabilitySet, patterns.GenericFn},
 	{patterns.Parameterize},
@@ -587,7 +587,7 @@ func parseOptions(args []string) (options, error) {
 }
 
 func (opts options) validate() error {
-	valid := []string{"guard_clause", "value_object", "parameterize", "trait_method", "capability_set", "enum_dispatch", "generic_fn", "anemic_model", "primitive_obsession", "type_switch", "entity_identity", "missing_identity", "mutable_identity", "aggregate", "repository", "factory", "all"}
+	valid := []string{"guard_clause", "value_object", "parameterize", "trait_method", "capability_set", "enum_dispatch", "generic_fn", "anemic_model", "primitive_obsession", "type_switch", "entity_identity", "missing_identity", "mutable_identity", "aggregate", "repository", "factory", "specification", "all"}
 	if !slices.Contains(valid, opts.kind) {
 		return fmt.Errorf("kind must be one of %v", valid)
 	}
@@ -646,6 +646,7 @@ func toFacts(ext *gopatterns.Extraction) ([]*patterns.FuncFacts, []patterns.Anem
 			AggregateMods:    fp.AggregateMods,
 			DbCalls:          fp.DbCalls,
 			FactoryLits:      fp.FactoryLits,
+			SpecRules:        fp.SpecRules,
 			Params:           params,
 		})
 	}
