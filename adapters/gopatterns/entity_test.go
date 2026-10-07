@@ -4,7 +4,11 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
+	"path/filepath"
 	"testing"
+
+	"golang.org/x/tools/go/packages"
 )
 
 func parseTestFunc(t *testing.T, src string) (*ast.FuncDecl, *token.FileSet) {
@@ -105,5 +109,109 @@ func UpdateUser(u *User) { u.Name = "x" }
 	}
 	if hits := FindMutableIdentities(fn, fset); len(hits) != 0 {
 		t.Errorf("non-ID assignment should be skipped, got %d hits", len(hits))
+	}
+}
+
+// loadTestPackage writes src to a temp module and loads it with
+// packages.Load, returning the first package.
+func loadTestPackage(t *testing.T, src string) *packages.Package {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module testp\n\ngo 1.21\n"), 0644); err != nil {
+		t.Fatalf("go.mod: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "p.go"), []byte(src), 0644); err != nil {
+		t.Fatalf("p.go: %v", err)
+	}
+	cfg := &packages.Config{Dir: dir, Mode: packages.LoadSyntax}
+	pkgs, err := packages.Load(cfg, ".")
+	if err != nil {
+		t.Fatalf("packages.Load: %v", err)
+	}
+	if len(pkgs) == 0 {
+		t.Fatal("no packages loaded")
+	}
+	return pkgs[0]
+}
+
+func missingIdentityNames(t *testing.T, src string) map[string]bool {
+	t.Helper()
+	pkg := loadTestPackage(t, src)
+	// root is the temp dir: derive from the package's first file position
+	filename := pkg.Fset.PositionFor(pkg.Syntax[0].Pos(), false).Filename
+	root := filepath.Dir(filename)
+	hits := findMissingIdentities(pkg, root)
+	out := map[string]bool{}
+	for _, h := range hits {
+		out[h.TypeName] = true
+	}
+	return out
+}
+
+func TestMissingIdentitySkipsValueObjects(t *testing.T) {
+	src := `package p
+// Weights is pure data: no methods, never mutated.
+type Weights struct {
+	Mutation int64
+	IO       int64
+}
+func use1(w Weights) int { return int(w.Mutation) }
+func use2(w Weights) int { return int(w.IO) }
+func use3(w Weights) int { return int(w.Mutation + w.IO) }
+`
+	names := missingIdentityNames(t, src)
+	if names["Weights"] {
+		t.Errorf("Weights is a value object (no methods, never mutated) and should be skipped")
+	}
+}
+
+func TestMissingIdentityFlagsEntities(t *testing.T) {
+	src := `package p
+// Order is entity-like: it is mutated.
+type Order struct {
+	Total int
+}
+func (o *Order) ApplyDiscount(d int) { o.Total -= d }
+func use1(o Order) int { return o.Total }
+func use2(o Order) int { return o.Total }
+func use3(o *Order) { o.ApplyDiscount(1) }
+`
+	names := missingIdentityNames(t, src)
+	if !names["Order"] {
+		t.Errorf("Order is mutated with 3+ uses: want missing_identity hit, got %v", names)
+	}
+}
+
+func TestMissingIdentitySkipsImmutableWithMethods(t *testing.T) {
+	src := `package p
+// Weights has behavior but is never mutated: a value object, not an entity.
+type Weights struct {
+	Mutation int64
+	IO       int64
+}
+func (w Weights) value() int64 { return w.Mutation + w.IO }
+func use1(w Weights) int64 { return w.value() }
+func use2(w Weights) int64 { return w.Mutation }
+func use3(w Weights) int64 { return w.IO }
+`
+	names := missingIdentityNames(t, src)
+	if names["Weights"] {
+		t.Errorf("Weights is never mutated (value object with behavior) and should be skipped")
+	}
+}
+
+func TestMissingIdentityFlagsMutatedStructs(t *testing.T) {
+	src := `package p
+// Counter has no methods but is mutated: entity-like, not a value object.
+type Counter struct {
+	N int
+}
+func use1(c *Counter) { c.N++ }
+func use2(c Counter) int { return c.N }
+func use3(c Counter) int { return c.N * 2 }
+`
+	names := missingIdentityNames(t, src)
+	if !names["Counter"] {
+		t.Errorf("Counter is mutated with 3+ uses: want missing_identity hit, got %v", names)
 	}
 }
