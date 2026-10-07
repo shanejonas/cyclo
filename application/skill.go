@@ -104,9 +104,9 @@ Use ` + "`cyclo.setDetailsView`" + ` with ` + "`{\"view\":\"quality\"}`" + ` or 
 
 ## Fix patterns automatically
 
-Run ` + "`cyclo patterns [paths...]`" + ` to find mechanical code patterns: inverted guard clauses, data clumps (value objects), parameterize candidates, anemic models, primitive obsession, and more. These are structural — the fix is a deterministic AST transform.
+Run ` + "`cyclo patterns [paths...]`" + ` to find mechanical code patterns: inverted guard clauses, data clumps (value objects), parameterize candidates, anemic models, primitive obsession, type switches, and more. These are structural — the fix is a deterministic AST transform.
 
-Run ` + "`cyclo fix --kind all [paths...]`" + ` to auto-fix them. Dry-run by default (shows a diff); add ` + "`--apply`" + ` to write. No LLM, no tokens — pure static analysis. Use ` + "`--kind guard_clause|value_object|parameterize|anemic_model|primitive_obsession`" + ` to fix one kind.
+Run ` + "`cyclo fix --kind all [paths...]`" + ` to auto-fix them. Dry-run by default (shows a diff); add ` + "`--apply`" + ` to write. No LLM, no tokens — pure static analysis. Use ` + "`--kind guard_clause|value_object|parameterize|anemic_model|primitive_obsession|type_switch`" + ` to fix one kind.
 
 **Workflow:** Run ` + "`cyclo patterns`" + ` first, then ` + "`cyclo fix --apply`" + ` to clear the mechanical issues. This saves tokens — don't hand-rewrite what the fixer handles.
 

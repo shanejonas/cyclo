@@ -226,6 +226,17 @@ func toFacts(ext *gopatterns.Extraction) ([]*patterns.FuncFacts, []patterns.Anem
 				NumCases: d.NumCases,
 			})
 		}
+		var tss []patterns.TypeSwitchHit
+		for _, t := range fp.TypeSwitches {
+			tss = append(tss, patterns.TypeSwitchHit{
+				Line:   t.Line,
+				Bound:  t.Bound,
+				Expr:   t.Expr,
+				Method: t.Method,
+				Types:  t.Types,
+				Args:   t.Args,
+			})
+		}
 		var params []patterns.ParamInfo
 		for _, p := range fp.Params {
 			params = append(params, patterns.ParamInfo{
@@ -242,6 +253,7 @@ func toFacts(ext *gopatterns.Extraction) ([]*patterns.FuncFacts, []patterns.Anem
 			Pdg:            &fp.Pdg,
 			GuardClauses:   guards,
 			EnumDispatches: dispatches,
+			TypeSwitches:   tss,
 			Params:         params,
 		})
 	}

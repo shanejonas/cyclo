@@ -47,6 +47,10 @@ type FuncFacts struct {
 	// EnumDispatches are enum-value switches in this function that want to
 	// be dispatch tables. AST-level finding from the extractor.
 	EnumDispatches []EnumDispatchHit
+	// TypeSwitches are type switches in this function whose arms all call
+	// the same method on the case-bound value. AST-level finding from the
+	// extractor.
+	TypeSwitches []TypeSwitchHit
 	// Params are the function's primitive-typed parameters (name and type).
 	// Used for data-clump detection (value object proposals). Empty when the
 	// function has no primitive params or params were not extracted.
@@ -69,6 +73,24 @@ type EnumDispatchHit struct {
 	Line int
 	// NumCases counts the value case clauses.
 	NumCases int
+}
+
+// TypeSwitchHit is one type switch whose arms all call the same method on
+// the case-bound value: the switch line, the bound variable name, the
+// switched expression text, the shared method name, and the case type names.
+type TypeSwitchHit struct {
+	// Line is the line of the switch statement.
+	Line int
+	// Bound is the variable bound by `switch v := x.(type)`.
+	Bound string
+	// Expr is the source text of the switched expression (x).
+	Expr string
+	// Method is the method name called in every arm.
+	Method string
+	// Types are the case type names (Dog, Cat, ...).
+	Types []string
+	// Args is the source text of the call arguments, identical in every arm.
+	Args string
 }
 
 // EffectClass returns the observable-effect class set for the mismatch check:

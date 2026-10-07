@@ -37,6 +37,9 @@ type FuncPdg struct {
 	// EnumDispatches are enum-value switches that want to be dispatch
 	// tables (AST-level finding, not PDG-derived).
 	EnumDispatches []EnumDispatchHit
+	// TypeSwitches are type switches in this function whose arms all call
+	// the same method on the case-bound value (AST-level finding).
+	TypeSwitches []TypeSwitchHit
 	// Params are the function's primitive-typed parameters. Used for
 	// data-clump detection (value object proposals).
 	Params []patterns.ParamInfo
@@ -182,6 +185,7 @@ func extractFunc(pkg *packages.Package, fn *ast.FuncDecl, path string) FuncPdg {
 		Pdg:          patterns.Pdg{Nodes: b.nodes, Edges: b.edges},
 		GuardClauses:   findGuardClauses(fn, pkg.Fset),
 		EnumDispatches: findEnumDispatches(fn, pkg.Fset),
+		TypeSwitches:   findTypeSwitches(fn, pkg.Fset),
 		Params:       primitiveParams(fn, pkg.TypesInfo),
 	}
 }

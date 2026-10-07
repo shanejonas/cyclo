@@ -120,6 +120,17 @@ func toFacts(pdgs []gopatterns.FuncPdg) []*patterns.FuncFacts {
 				NumCases: d.NumCases,
 			})
 		}
+		var tss []patterns.TypeSwitchHit
+		for _, t := range fp.TypeSwitches {
+			tss = append(tss, patterns.TypeSwitchHit{
+				Line:   t.Line,
+				Bound:  t.Bound,
+				Expr:   t.Expr,
+				Method: t.Method,
+				Types:  t.Types,
+				Args:   t.Args,
+			})
+		}
 		facts = append(facts, &patterns.FuncFacts{
 			ID:             fp.Name,
 			Name:           fp.Name,
@@ -130,6 +141,7 @@ func toFacts(pdgs []gopatterns.FuncPdg) []*patterns.FuncFacts {
 			SigKey:         "fn(" + strings.Join(params, ",") + ")",
 			GuardClauses:   guards,
 			EnumDispatches: dispatches,
+			TypeSwitches:   tss,
 			Params:         fp.Params,
 		})
 	}
