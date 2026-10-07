@@ -101,8 +101,12 @@ func applyOneConcept(fset *token.FileSet, f *ast.File, concept string, group []p
 
 // groupSafe reports whether every occurrence in the group is fixable.
 func groupSafe(group []primitiveConceptInfo) bool {
+	names := make(map[string]bool, len(group))
 	for _, info := range group {
-		if !primitiveParamSafe(info.fn, info.param.Name) {
+		names[info.fn.Name.Name] = true
+	}
+	for _, info := range group {
+		if !primitiveParamSafe(info.fn, info.param.Name, names) {
 			return false
 		}
 	}
@@ -292,75 +296,84 @@ func primitiveFixTypeName(concept string) string {
 }
 
 // primitiveParamSafe reports whether the param can be safely converted to
-// a named type. Unsafe: assigned to, used in + concatenation, passed to
-// selector calls (e.g. strings.Contains), or shadowed.
-// primitiveParamSafe reports whether the param can be safely converted to
-// a named type. Unsafe: assigned to, concatenated with +, passed to
-// selector calls, or shadowed.
-func primitiveParamSafe(fn *ast.FuncDecl, paramName string) bool {
-	return !paramAssigned(fn, paramName) &&
-		!paramConcatenated(fn, paramName) &&
-		!paramPassedToSelector(fn, paramName) &&
-		!paramShadowed(fn, paramName)
-}
-
-// paramAssigned reports whether the param is assigned to in the body.
-func paramAssigned(fn *ast.FuncDecl, paramName string) bool {
-	assigned := false
+// a named type. A named string type is neither comparable nor assignable
+// with a plain string, so the fixer is conservative: every use of the param
+// in the body must be either an argument to a group-function call (which the
+// fixer rewrites with a conversion) or an operand of ==/!= against an
+// untyped constant (assignable to the named type). Anything else —
+// assignment, concatenation, typed comparisons, returns, other calls —
+// would not compile, so the fix is skipped.
+func primitiveParamSafe(fn *ast.FuncDecl, paramName string, groupFns map[string]bool) bool {
+	if paramShadowed(fn, paramName) {
+		return false
+	}
+	safe := true
+	var parents []ast.Node
 	ast.Inspect(fn.Body, func(n ast.Node) bool {
-		stmt, ok := n.(*ast.AssignStmt)
-		if !ok || assigned {
-			return !assigned
+		if n == nil {
+			parents = parents[:len(parents)-1]
+			return true
 		}
-		for _, lhs := range stmt.Lhs {
-			if ident, ok := lhs.(*ast.Ident); ok && ident.Name == paramName {
-				assigned = true
-				return false
-			}
+		parents = append(parents, n)
+		if !safe {
+			return false
 		}
-		return true
-	})
-	return assigned
-}
-
-// paramConcatenated reports whether the param is used with + (string concat).
-func paramConcatenated(fn *ast.FuncDecl, paramName string) bool {
-	concat := false
-	ast.Inspect(fn.Body, func(n ast.Node) bool {
-		expr, ok := n.(*ast.BinaryExpr)
-		if !ok || expr.Op != token.ADD || concat {
-			return !concat
-		}
-		if containsIdent(expr.X, paramName) || containsIdent(expr.Y, paramName) {
-			concat = true
+		if id, ok := n.(*ast.Ident); ok && id.Name == paramName && !paramUseSafe(parents, groupFns) {
+			safe = false
 			return false
 		}
 		return true
 	})
-	return concat
+	return safe
 }
 
-// paramPassedToSelector reports whether the param is passed to a selector
-// call (e.g. strings.Contains). Conservative: those need a real string.
-func paramPassedToSelector(fn *ast.FuncDecl, paramName string) bool {
-	unsafe := false
-	ast.Inspect(fn.Body, func(n ast.Node) bool {
-		call, ok := n.(*ast.CallExpr)
-		if !ok || unsafe {
-			return !unsafe
-		}
-		if _, isSel := call.Fun.(*ast.SelectorExpr); !isSel {
+// paramUseSafe reports whether one use of the param (the innermost node on
+// the parents stack) stays valid after the type change.
+func paramUseSafe(parents []ast.Node, groupFns map[string]bool) bool {
+	if len(parents) < 2 {
+		return false
+	}
+	id := parents[len(parents)-1]
+	switch parent := parents[len(parents)-2].(type) {
+	case *ast.CallExpr:
+		return isRewrittenCallArg(parent, id, groupFns)
+	case *ast.BinaryExpr:
+		return isConstComparison(parent, id)
+	default:
+		return false
+	}
+}
+
+// isRewrittenCallArg reports whether the ident is an argument of a
+// group-function call, which the fixer rewrites with a type conversion.
+func isRewrittenCallArg(call *ast.CallExpr, id ast.Node, groupFns map[string]bool) bool {
+	ident, ok := call.Fun.(*ast.Ident)
+	if !ok || !groupFns[ident.Name] {
+		return false
+	}
+	for _, arg := range call.Args {
+		if arg == id {
 			return true
 		}
-		for _, arg := range call.Args {
-			if containsIdent(arg, paramName) {
-				unsafe = true
-				return false
-			}
+	}
+	return false
+}
+
+// isConstComparison reports whether the binary expression compares the
+// ident against an untyped constant, which is assignable to the named type.
+func isConstComparison(bin *ast.BinaryExpr, id ast.Node) bool {
+	if bin.Op != token.EQL && bin.Op != token.NEQ {
+		return false
+	}
+	for _, operand := range []ast.Expr{bin.X, bin.Y} {
+		if operand == id {
+			continue
 		}
-		return true
-	})
-	return unsafe
+		if !isUntypedConstant(operand) {
+			return false
+		}
+	}
+	return true
 }
 
 // paramShadowed reports whether the param name is redeclared in the body.
@@ -408,19 +421,6 @@ func lhsHasName(lhs []ast.Expr, name string) bool {
 		}
 	}
 	return false
-}
-
-// containsIdent reports whether expr contains an identifier with the name.
-func containsIdent(expr ast.Expr, name string) bool {
-	found := false
-	ast.Inspect(expr, func(n ast.Node) bool {
-		if ident, ok := n.(*ast.Ident); ok && ident.Name == name {
-			found = true
-			return false
-		}
-		return true
-	})
-	return found
 }
 
 // applyPrimitiveConcept applies the transform for one concept:
