@@ -257,5 +257,16 @@ func buildPrimitiveObsessionCandidate(key string, occs []primitiveOccurrence) Ca
 		Inference:        "domain concept without a type — primitive obsession",
 		PossibleRefactor: fmt.Sprintf("introduce type %s %s", typeName, typ),
 		Sites:            sites,
+		FixSpec: &FixSpec{
+			Kind:    PrimitiveObsession,
+			File:    sites[0].Path,
+			Line:    sites[0].Line,
+			EndLine: sites[0].EndLine,
+			Params: map[string]string{
+				"concept":   concept,
+				"type":      typ,
+				"type_name": typeName,
+			},
+		},
 	}
 }
