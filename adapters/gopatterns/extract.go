@@ -55,6 +55,8 @@ type FuncPdg struct {
 	DbCalls []patterns.DbCallHit
 	// FactoryLits are complex struct literals in this function.
 	FactoryLits []patterns.FactoryHit
+	// SpecRules are boolean business-rule expressions (2+ conditions).
+	SpecRules []patterns.SpecificationHit
 }
 
 // Extraction is the full result of package analysis: per-function PDGs
@@ -244,6 +246,8 @@ func extractFunc(pkg *packages.Package, fn *ast.FuncDecl, path string, ctx extra
 		DbCalls: FindDbCalls(fn, pkg.Fset, pkg.TypesInfo, path),
 		// FactoryLits are complex struct literals.
 		FactoryLits: findFactoryLits(fn, pkg.Fset, pkg.TypesInfo, pkg.Types),
+		// SpecRules are boolean business-rule expressions (2+ conditions).
+		SpecRules: findSpecificationHits(fn, pkg.Fset, pkg.TypesInfo),
 	}
 }
 

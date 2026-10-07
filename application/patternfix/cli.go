@@ -58,12 +58,12 @@ type options struct {
 // The grouping mirrors FixKindOrder:
 //  1. guard_clause + primitive_obsession: simplify control flow, create types
 //  2. value_object: bundle params into the new types
-//  3. factory + independent semantic fixes: use the bundled types
+//  3. factory + specification + independent semantic fixes: use the bundled types
 //  4. parameterize: PDG-based, most sensitive to code shape, runs last
 var fixPhases = [][]patterns.CandidateKind{
 	{patterns.GuardClause, patterns.PrimitiveObsession},
 	{patterns.ValueObject},
-	{patterns.Factory, patterns.MissingIdentity, patterns.EntityIdentity,
+	{patterns.Factory, patterns.Specification, patterns.MissingIdentity, patterns.EntityIdentity,
 		patterns.AnemicModel, patterns.TypeSwitch, patterns.EnumDispatch,
 		patterns.TraitMethod, patterns.CapabilitySet, patterns.GenericFn},
 	{patterns.Parameterize},

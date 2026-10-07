@@ -62,6 +62,10 @@ type FuncFacts struct {
 	DbCalls []DbCallHit
 	// FactoryLits are complex struct literals in this function.
 	FactoryLits []FactoryHit
+	// SpecRules are boolean business-rule expressions (2+ conditions with
+	// &&/||) in this function. Rules repeated across functions want a
+	// Specification type (Evans).
+	SpecRules []SpecificationHit
 	// Params are the function's primitive-typed parameters (name and type).
 	// Used for data-clump detection (value object proposals). Empty when the
 	// function has no primitive params or params were not extracted.
@@ -150,6 +154,17 @@ type FactoryHit struct {
 	NumFields int
 	DeclFile  string
 	HasLogic  bool
+}
+
+// SpecificationHit is one boolean business-rule expression: the if-statement
+// line, the normalized rule key (for grouping across functions), the source
+// text of the condition, the variable being tested, and its type name.
+type SpecificationHit struct {
+	Line     int
+	RuleKey  string
+	CondText string
+	VarName  string
+	TypeName string
 }
 
 // EffectClass returns the observable-effect class set for the mismatch check:
