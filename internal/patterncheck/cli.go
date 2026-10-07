@@ -77,9 +77,12 @@ func toFacts(pdgs []gopatterns.FuncPdg) []*patterns.FuncFacts {
 			}
 		}
 		fp := fp
-		var guards []int
+		var guards []patterns.GuardClauseHit
 		for _, g := range fp.GuardClauses {
-			guards = append(guards, g.Line)
+			guards = append(guards, patterns.GuardClauseHit{
+				Line:      g.Line,
+				BodyStmts: g.BodyStmts,
+			})
 		}
 		facts = append(facts, &patterns.FuncFacts{
 			ID:           fp.Name,

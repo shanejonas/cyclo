@@ -12,7 +12,7 @@ func TestGuardCandidatesProposeInversion(t *testing.T) {
 		Path:         "completions.go",
 		Line:         660,
 		EndLine:      700,
-		GuardClauses: []int{673},
+		GuardClauses: []GuardClauseHit{{Line: 673, BodyStmts: 3}},
 	}}
 	got := guardCandidates(facts)
 	if len(got) != 1 {
@@ -26,8 +26,11 @@ func TestGuardCandidatesProposeInversion(t *testing.T) {
 		t.Fatalf("expected 1 site, got %d", len(c.Sites))
 	}
 	s := c.Sites[0]
-	if s.Line != 673 || s.EndLine != 700 || s.Path != "completions.go" {
-		t.Fatalf("site should pinpoint the if statement: %+v", s)
+	if s.Line != 660 || s.EndLine != 700 || s.Path != "completions.go" {
+		t.Fatalf("site should cover the function range: %+v", s)
+	}
+	if !strings.Contains(c.Observation, "673") {
+		t.Fatalf("observation should name the if-statement line: %q", c.Observation)
 	}
 	if c.Observation == "" || c.Inference == "" || c.PossibleRefactor == "" {
 		t.Fatal("candidate must carry observation, inference, and refactor text")
@@ -56,7 +59,7 @@ func TestRunIncludesGuardClauses(t *testing.T) {
 		Path:         "completions.go",
 		Line:         660,
 		EndLine:      700,
-		GuardClauses: []int{673},
+		GuardClauses: []GuardClauseHit{{Line: 673, BodyStmts: 3}},
 	}}
 	report := Run(facts, Options{})
 	found := false

@@ -1,5 +1,7 @@
 package patterns
 
+import "fmt"
+
 // Guard-clause proposals: single-function findings from the extractor's
 // AST-level inverted-conditional detection. Unlike the mined candidates,
 // these need no clustering: one function, one site, fixed score.
@@ -10,14 +12,15 @@ package patterns
 const guardClauseScoreMilli = 500
 
 // guardCandidates proposes a guard clause for every inverted conditional
-// the extractor found. Each candidate names the if-statement line as its
-// site; the site's EndLine is the function's closing line so range-based
-// filters (e.g. --changed) treat the whole function body as relevant.
+// the extractor found. Each candidate names the containing function as its
+// site (full body range, so range-based filters like --changed work); the
+// if-statement line is in the observation for precise location.
 func guardCandidates(facts []*FuncFacts) []Candidate {
 	var out []Candidate
 	for _, f := range facts {
-		for _, line := range f.GuardClauses {
+		for _, hit := range f.GuardClauses {
 			f := f
+			hit := hit
 			out = append(out, Candidate{
 				Kind:       GuardClause,
 				ScoreMilli: guardClauseScoreMilli,
@@ -25,12 +28,12 @@ func guardCandidates(facts []*FuncFacts) []Candidate {
 					Support:       1,
 					CoverageMilli: 1000,
 				},
-				Observation:      "the else branch is an early return while the happy path is nested in the if body",
+				Observation:      fmt.Sprintf("the else branch at line %d is an early return while a %d-statement happy path is nested in the if body", hit.Line, hit.BodyStmts),
 				Inference:        "the condition is inverted",
 				PossibleRefactor: "invert the condition and return early, letting the happy path flow at top level",
 				Sites: []Site{{
 					Path:    f.Path,
-					Line:    line,
+					Line:    f.Line,
 					EndLine: f.EndLine,
 					ID:      f.ID,
 					Name:    f.Name,

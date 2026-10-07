@@ -34,8 +34,17 @@ type FuncFacts struct {
 	Implements bool
 	// GuardClauses are inverted conditionals in this function that want to
 	// be guard clauses. AST-level finding from the extractor (Go-specific
-	// extension, not in rstyle's FnFacts); each holds the if-statement line.
-	GuardClauses []int
+	// extension, not in rstyle's FnFacts).
+	GuardClauses []GuardClauseHit
+}
+
+// GuardClauseHit is one inverted conditional: the if-statement line and
+// the size of the trapped happy path.
+type GuardClauseHit struct {
+	// Line is the if-statement line.
+	Line int
+	// BodyStmts counts statements in the if body (the trapped happy path).
+	BodyStmts int
 }
 
 // EffectClass returns the observable-effect class set for the mismatch check:
