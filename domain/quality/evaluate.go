@@ -113,7 +113,49 @@ func evaluateFunction(f Function, c Config) (FunctionResult, []Diagnostic) {
 			diagnostics = append(diagnostics, diagnostic)
 		}
 	}
+	diagnostics = appendDDDDiagnostics(diagnostics, f, c, allowed)
 	return result, diagnostics
+}
+
+// appendDDDDiagnostics evaluates DDD rule violations (Evans): aggregate
+// boundaries, repository bypasses, and mutable identities.
+func appendDDDDiagnostics(ds []Diagnostic, f Function, c Config, allowed []string) []Diagnostic {
+	aggTypes := distinctDDDTypes(f.DDD, "aggregate")
+	ds = appendRule(ds, f.Location,
+		ruleCheck{id: "aggregate", actual: int64(len(aggTypes)), rule: c.Aggregate}, allowed)
+	repoCalls := countDDD(f.DDD, "repository")
+	ds = appendRule(ds, f.Location,
+		ruleCheck{id: "repository", actual: int64(repoCalls), rule: c.Repository}, allowed)
+	mutIDs := countDDD(f.DDD, "mutable_identity")
+	ds = appendRule(ds, f.Location,
+		ruleCheck{id: "mutable_identity", actual: int64(mutIDs), rule: c.MutableIdentity}, allowed)
+	return ds
+}
+
+// distinctDDDTypes returns the unique detail strings for a DDD rule.
+func distinctDDDTypes(violations []DDDViolation, ruleID string) []string {
+	set := map[string]bool{}
+	for _, v := range violations {
+		if v.RuleID == ruleID {
+			set[v.Detail] = true
+		}
+	}
+	out := make([]string, 0, len(set))
+	for d := range set {
+		out = append(out, d)
+	}
+	return out
+}
+
+// countDDD counts violations of a DDD rule.
+func countDDD(violations []DDDViolation, ruleID string) int {
+	n := 0
+	for _, v := range violations {
+		if v.RuleID == ruleID {
+			n++
+		}
+	}
+	return n
 }
 
 func parameterBudget(f Function, c Config) int64 {

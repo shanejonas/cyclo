@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-var ruleIDs = []string{"fn_length", "fn_params", "mutation_per_target", "mutated_targets", "side_effect_density", "invalid_suppression"}
+var ruleIDs = []string{"fn_length", "fn_params", "mutation_per_target", "mutated_targets", "side_effect_density", "invalid_suppression", "aggregate", "repository", "mutable_identity"}
 
 func suppression(comment string) ([]string, string) {
 	comment = strings.TrimSpace(comment)

@@ -55,6 +55,13 @@ type FuncFacts struct {
 	EntityIdentities []EntityIdentityHit
 	// MutableIdentities are ID assignments outside constructors.
 	MutableIdentities []MutableIdentityHit
+	// AggregateMods are named struct types whose fields this function
+	// mutates. Co-modified types suggest an aggregate boundary.
+	AggregateMods []AggregateModHit
+	// DbCalls are direct database calls in this function.
+	DbCalls []DbCallHit
+	// FactoryLits are complex struct literals in this function.
+	FactoryLits []FactoryHit
 	// Params are the function's primitive-typed parameters (name and type).
 	// Used for data-clump detection (value object proposals). Empty when the
 	// function has no primitive params or params were not extracted.
@@ -112,6 +119,29 @@ type MutableIdentityHit struct {
 	Line     int
 	Field    string
 	FuncName string
+}
+
+// AggregateModHit records one named struct type whose fields are mutated
+// inside a function. Pairs of types mutated together across functions
+// suggest an aggregate boundary.
+type AggregateModHit struct {
+	TypeName string
+}
+
+// DbCallHit is one direct database call in business logic: the call line
+// and the call text (e.g. "db.Query").
+type DbCallHit struct {
+	Line int
+	Call string
+}
+
+// FactoryHit is one complex struct literal: the literal line, the struct
+// type name, the field count, and the file declaring the struct type.
+type FactoryHit struct {
+	Line      int
+	TypeName  string
+	NumFields int
+	DeclFile  string
 }
 
 // EffectClass returns the observable-effect class set for the mismatch check:

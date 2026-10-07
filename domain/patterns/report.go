@@ -120,6 +120,9 @@ func addSingleFunctionCandidates(mined *Mined, prepared []*FuncFacts, options Op
 		func() []Candidate { return entityIdentityCandidates(prepared) },
 		func() []Candidate { return missingIdentityCandidates(options.MissingIdentities) },
 		func() []Candidate { return mutableIdentityCandidates(prepared) },
+		func() []Candidate { return aggregateCandidates(prepared) },
+		func() []Candidate { return repositoryCandidates(prepared) },
+		func() []Candidate { return factoryCandidates(prepared) },
 	}
 	for _, build := range builders {
 		if cands := build(); len(cands) > 0 {
