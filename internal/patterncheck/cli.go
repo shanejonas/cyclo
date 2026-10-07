@@ -20,7 +20,8 @@ import (
 const usage = `Usage: cyclo patterns [OPTIONS] [DIRECTORIES OR GO FILES...]
 
 Mine the codebase for latent shared abstractions: structurally parallel
-functions that suggest interfaces, params structs, or generics.
+functions that suggest interfaces, params structs, or generics, plus
+inverted conditionals that want to be guard clauses.
 Informational only: always exits 0, never a quality gate.
   --format FORMAT   text (default) or json
   --threshold N     minimum WL similarity (0-1000) for clustering [default 600]
@@ -76,13 +77,22 @@ func toFacts(pdgs []gopatterns.FuncPdg) []*patterns.FuncFacts {
 			}
 		}
 		fp := fp
+		var guards []patterns.GuardClauseHit
+		for _, g := range fp.GuardClauses {
+			guards = append(guards, patterns.GuardClauseHit{
+				Line:      g.Line,
+				BodyStmts: g.BodyStmts,
+			})
+		}
 		facts = append(facts, &patterns.FuncFacts{
-			ID:     fp.Name,
-			Name:   fp.Name,
-			Path:   fp.Path,
-			Line:   fp.Line,
-			Pdg:    &fp.Pdg,
-			SigKey: "fn(" + strings.Join(params, ",") + ")",
+			ID:           fp.Name,
+			Name:         fp.Name,
+			Path:         fp.Path,
+			Line:         fp.Line,
+			EndLine:      fp.EndLine,
+			Pdg:          &fp.Pdg,
+			SigKey:       "fn(" + strings.Join(params, ",") + ")",
+			GuardClauses: guards,
 		})
 	}
 	return facts
