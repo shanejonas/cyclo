@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# verify-cyclo: launch/doctor/drive/cleanup helper for the verify-cyclo skill.
+#
+#   verify-cyclo build <run-dir>            # build <run-dir>/cyclo from the repo
+#   verify-cyclo doctor <cyclo-bin>        # read-only readiness check
+#   verify-cyclo tui <cyclo-bin> <target-dir> <run-dir> [--wait N] [--keys KEYS]
+#                                          # drive the TUI under script(1), save typescript
+#   verify-cyclo cleanup <run-dir>         # remove scratch + binary, keep evidence
+#
+# <run-dir> layout:
+#   cyclo              the built binary (removed by cleanup)
+#   scratch/           throwaway state: isolated XDG_STATE_HOME, temp git repos (removed by cleanup)
+#   evidence/          proof artifacts (survives cleanup)
+set -euo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
+
+usage() {
+  sed -n '2,10p' "${BASH_SOURCE[0]}"
+  exit 1
+}
+
+cmd_build() {
+  local run_dir="$1"
+  mkdir -p "$run_dir/scratch" "$run_dir/evidence"
+  (cd "$REPO" && go build -buildvcs=false -o "$run_dir/cyclo" .)
+  echo "built $run_dir/cyclo"
+}
+
+cmd_doctor() {
+  local bin="$1" fail=0
+  [ -x "$bin" ] || { echo "doctor: FAIL: $bin is not executable"; fail=1; }
+  if [ -x "$bin" ]; then
+    "$bin" check --help 2>&1 | grep -q "Usage: cyclo check" \
+      || { echo "doctor: FAIL: check --help did not print usage"; fail=1; }
+  fi
+  command -v go >/dev/null || { echo "doctor: FAIL: go not on PATH (needed to load Go packages)"; fail=1; }
+  command -v git >/dev/null || { echo "doctor: FAIL: git not on PATH (needed for --changed drives)"; fail=1; }
+  command -v script >/dev/null || { echo "doctor: FAIL: script(1) not found (needed for TUI drives)"; fail=1; }
+  [ "$fail" -eq 0 ] && echo "doctor: ok"
+  return "$fail"
+}
+
+cmd_tui() {
+  local bin="$1" target="$2" run_dir="$3"
+  shift 3
+  local wait=6 keys="q"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --wait) wait="$2"; shift 2 ;;
+      --keys) keys="$2"; shift 2 ;;
+      *) echo "unknown option: $1" >&2; usage ;;
+    esac
+  done
+  mkdir -p "$run_dir/evidence" "$run_dir/scratch/xdg-state"
+  local typescript="$run_dir/evidence/tui.typescript"
+  rm -f "$typescript"
+  XDG_STATE_HOME="$run_dir/scratch/xdg-state" \
+    timeout 60 script -qec \
+      "stty cols 160 rows 50; (sleep $wait; printf '%b' '$keys') | '$bin' --control-port 0 '$target'" \
+      /dev/null >"$typescript" 2>&1
+  echo "typescript: $typescript ($(wc -c <"$typescript") bytes)"
+}
+
+cmd_cleanup() {
+  local run_dir="$1"
+  rm -rf "$run_dir/scratch" "$run_dir/cyclo"
+  echo "cleaned scratch and binary; evidence kept:"
+  ls -la "$run_dir/evidence" 2>/dev/null || echo "(no evidence dir)"
+}
+
+cmd="${1:-}"
+shift || true
+case "$cmd" in
+  build)    [ $# -eq 1 ] || usage; cmd_build "$1" ;;
+  doctor)   [ $# -eq 1 ] || usage; cmd_doctor "$1" ;;
+  tui)      [ $# -ge 3 ] || usage; cmd_tui "$@" ;;
+  cleanup)  [ $# -eq 1 ] || usage; cmd_cleanup "$1" ;;
+  *) usage ;;
+esac
