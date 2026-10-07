@@ -317,42 +317,4 @@ func packageEndOffset(fset *token.FileSet, f *ast.File, src []byte) int {
 	return offset + 1
 }
 
-// applyEnumDispatchFix converts a type switch to an interface method call.
-func applyEnumDispatchFix(spec *patterns.FixSpec, src []byte) ([]byte, error) {
-	return nil, fmt.Errorf("enum_dispatch fixer not yet implemented")
-}
 
-// applyGenericFnFix generates a generic function.
-func applyGenericFnFix(spec *patterns.FixSpec, src []byte) ([]byte, error) {
-	return nil, fmt.Errorf("generic_fn fixer not yet implemented")
-}
-
-// applyAnemicModelFix applies an anemic_model FixSpec.
-func applyAnemicModelFix(spec *patterns.FixSpec, src []byte) ([]byte, error) {
-	fset, f, err := parseSpec(spec, src)
-	if err != nil {
-		return nil, err
-	}
-	// Delegate to existing fixer; it finds anemic structs and converts
-	// functions to methods.
-	out, _, err := FixAnemicModels(fset, f, src)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// applyPrimitiveObsessionFix applies a primitive_obsession FixSpec.
-func applyPrimitiveObsessionFix(spec *patterns.FixSpec, src []byte) ([]byte, error) {
-	fset, f, err := parseSpec(spec, src)
-	if err != nil {
-		return nil, err
-	}
-	// Delegate to existing fixer; it finds primitive concepts and
-	// introduces named types.
-	out, _, err := FixPrimitiveObsession(fset, f, src)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
