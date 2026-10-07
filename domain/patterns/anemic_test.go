@@ -78,3 +78,27 @@ func TestAnemicModelWiredIntoRun(t *testing.T) {
 		t.Fatal("Run should include anemic_model candidates from Options")
 	}
 }
+
+func TestRunEmitsNoDuplicateCandidates(t *testing.T) {
+	// Regression: anemic_model, value_object, and primitive_obsession were
+	// emitted twice — once by direct calls in Run and once via the
+	// addSingleFunctionCandidates builder list.
+	hits := []AnemicModelHit{{
+		TypeName: "Cart",
+		Path:     "cart.go",
+		Line:     5,
+		EndLine:  8,
+		Funcs:    []string{"AddItem", "RemoveItem", "Checkout"},
+	}}
+	report := Run(nil, Options{AnemicModels: hits})
+	// Exact check: one hit in, one candidate out for anemic_model.
+	anemic := 0
+	for _, c := range report.Candidates {
+		if c.Kind == AnemicModel {
+			anemic++
+		}
+	}
+	if anemic != 1 {
+		t.Fatalf("expected 1 anemic_model candidate, got %d (duplicates?)", anemic)
+	}
+}

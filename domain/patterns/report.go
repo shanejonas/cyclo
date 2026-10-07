@@ -76,24 +76,6 @@ func Run(facts []*FuncFacts, options Options) PatternsReport {
 		mined.Candidates = append(mined.Candidates, tss...)
 		sortMined(&mined)
 	}
-	// Data clumps: value-object proposals from param co-occurrence, also
-	// single-pass and fixed-score.
-	if vos := valueObjectCandidates(prepared); len(vos) > 0 {
-		mined.Candidates = append(mined.Candidates, vos...)
-		sortMined(&mined)
-	}
-	// Anemic models: methodless structs with external behavior, from the
-	// extractor's type analysis passed via Options. Fixed-score.
-	if ams := anemicModelCandidates(options.AnemicModels); len(ams) > 0 {
-		mined.Candidates = append(mined.Candidates, ams...)
-		sortMined(&mined)
-	}
-	// Primitive obsession: domain concepts as raw string/int params,
-	// single-param signal, fixed score.
-	if pos := primitiveObsessionCandidates(prepared); len(pos) > 0 {
-		mined.Candidates = append(mined.Candidates, pos...)
-		sortMined(&mined)
-	}
 	// Enum dispatch: value switches that want to be dispatch tables,
 	// single-pass AST findings, fixed score.
 	if eds := enumDispatchCandidates(prepared); len(eds) > 0 {
