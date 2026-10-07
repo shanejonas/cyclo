@@ -99,6 +99,29 @@ type Candidate struct {
 	// Definitions are the functions that fill the method holes.
 	Definitions     []Site
 	CounterEvidence []string
+	// FixSpec is the precise info a fixer needs to apply this candidate
+	// statically. Nil if the candidate is not auto-fixable (should not
+	// happen — every kind must have a fixer).
+	FixSpec *FixSpec
+}
+
+// FixSpec carries the exact positions and parameters a fixer needs to
+// apply a candidate without re-detecting. It is JSON-serializable so
+// `cyclo patterns --format json` output can be piped to `cyclo fix`.
+type FixSpec struct {
+	Kind CandidateKind `json:"kind"`
+	// File is the path to the source file containing the pattern.
+	File string `json:"file"`
+	// Line and EndLine bound the primary location (e.g. the if statement
+	// for guard_clause, the struct definition for value_object).
+	Line    int `json:"line"`
+	EndLine int `json:"end_line"`
+	// Params holds kind-specific transform parameters as strings.
+	// Each fixer documents the keys it expects.
+	Params map[string]string `json:"params"`
+	// Definitions are the method/function sites for interface generation
+	// (trait_method, capability_set). Each entry is "path:line:name".
+	Definitions []string `json:"definitions,omitempty"`
 }
 
 // Suppressed is a pattern that looks like a candidate but is already
@@ -586,6 +609,13 @@ func finish(ev *candidateEvidence) Candidate {
 		counter = append(counter, "signature is common in this codebase (low specificity)")
 	}
 	inference, refactor := traitText(ev)
+	sitesList := sitesOfFacts(ev.sites)
+	defsList := definitionSites(allDefs)
+	// Build definitions for FixSpec: "path:line:name" entries.
+	var defStrs []string
+	for _, d := range defsList {
+		defStrs = append(defStrs, fmt.Sprintf("%s:%d:%s", d.Path, d.Line, d.Name))
+	}
 	return Candidate{
 		Kind:             ev.kind,
 		ScoreMilli:       ScoreMilli(ev.breakdown, mismatch),
@@ -593,9 +623,17 @@ func finish(ev *candidateEvidence) Candidate {
 		Observation:      ev.summary,
 		Inference:        inference,
 		PossibleRefactor: refactor,
-		Sites:            sitesOfFacts(ev.sites),
-		Definitions:      definitionSites(allDefs),
+		Sites:            sitesList,
+		Definitions:      defsList,
 		CounterEvidence:  counter,
+		FixSpec: &FixSpec{
+			Kind:        ev.kind,
+			File:        sitesList[0].Path,
+			Line:        sitesList[0].Line,
+			EndLine:     sitesList[0].EndLine,
+			Params:      map[string]string{},
+			Definitions: defStrs,
+		},
 	}
 }
 
@@ -855,6 +893,7 @@ func genericFn(ix *candidateIndex, sites []*FuncFacts, cluster *Cluster) *Candid
 	// External type holes are often the ones that matter: show all.
 	holes := columnsTextOf(ix, types)
 	breakdown := breakdownOf(sites, cluster, 0)
+	sitesList := sitesOfFacts(sites)
 	return &Candidate{
 		Kind:             GenericFn,
 		ScoreMilli:       ScoreMilli(breakdown, false) / 2,
@@ -862,7 +901,14 @@ func genericFn(ix *candidateIndex, sites []*FuncFacts, cluster *Cluster) *Candid
 		Observation:      summaryOf(ix, sites, cluster),
 		Inference:        "the same code runs over several workspace types that differ only by type",
 		PossibleRefactor: fmt.Sprintf("one generic definition over %s; keep the existing names as type aliases", holes),
-		Sites:            sitesOfFacts(sites),
+		Sites:            sitesList,
+		FixSpec: &FixSpec{
+			Kind:    GenericFn,
+			File:    sitesList[0].Path,
+			Line:    sitesList[0].Line,
+			EndLine: sitesList[0].EndLine,
+			Params:  map[string]string{},
+		},
 	}
 }
 
@@ -940,6 +986,7 @@ func parameterize(ix *candidateIndex, sites []*FuncFacts, cluster *Cluster) *Can
 	if len(cluster.Columns) > 0 {
 		holes = columnsText(ix, cluster.Columns)
 	}
+	sitesList := sitesOfFacts(sites)
 	return &Candidate{
 		Kind:             Parameterize,
 		ScoreMilli:       ScoreMilli(breakdown, false) / 3,
@@ -947,7 +994,14 @@ func parameterize(ix *candidateIndex, sites []*FuncFacts, cluster *Cluster) *Can
 		Observation:      summaryOf(ix, sites, cluster),
 		Inference:        "the same computation is written out once per site",
 		PossibleRefactor: fmt.Sprintf("extract one helper and pass the differing parts as parameters: %s", holes),
-		Sites:            sitesOfFacts(sites),
+		Sites:            sitesList,
+		FixSpec: &FixSpec{
+			Kind:    Parameterize,
+			File:    sitesList[0].Path,
+			Line:    sitesList[0].Line,
+			EndLine: sitesList[0].EndLine,
+			Params:  map[string]string{},
+		},
 	}
 }
 

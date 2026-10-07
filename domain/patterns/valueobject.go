@@ -208,6 +208,10 @@ func buildValueObjectCandidate(c *clump) Candidate {
 
 	group := strings.Join(keys, ", ")
 	structDef := fmt.Sprintf("struct { %s }", strings.Join(fields, "; "))
+	// Build FixSpec params: the param group as "name:type" pairs.
+	params := map[string]string{
+		"group": strings.Join(keys, ","),
+	}
 	return Candidate{
 		Kind:       ValueObject,
 		ScoreMilli: valueObjectScoreMilli,
@@ -219,6 +223,13 @@ func buildValueObjectCandidate(c *clump) Candidate {
 		Inference:        "these primitives travel together — they describe a single domain concept",
 		PossibleRefactor: fmt.Sprintf("extract an immutable value object: type <Name> %s", structDef),
 		Sites:            sites,
+		FixSpec: &FixSpec{
+			Kind:    ValueObject,
+			File:    sites[0].Path,
+			Line:    sites[0].Line,
+			EndLine: sites[0].EndLine,
+			Params:  params,
+		},
 	}
 }
 
