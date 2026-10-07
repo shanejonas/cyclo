@@ -41,11 +41,15 @@ func combine(acc, value uint64) uint64 {
 }
 
 // label is the node label text. Names (callee ids, fields, literal values)
-// are deliberately absent — only kinds and signature/type classes.
+// are deliberately absent — only kinds and signature/type classes — so
+// Dog::bark ≡ Cat::meow. CCGraph-style refinement: calls carry their package
+// scope (std vs local), so same-shape code calling stdlib vs local helpers
+// no longer collides. Data type classes stay erased: type differences must
+// surface as alignment holes (generic_fn), not as label mismatches.
 func label(n PdgNode) string {
 	switch n.Kind {
 	case Call:
-		return "call:" + n.SigClass
+		return "call:" + callScope(n.CalleeID) + ":" + n.SigClass
 	case Lit:
 		return "lit:" + n.LitKind
 	case Op:
@@ -56,6 +60,52 @@ func label(n PdgNode) string {
 	default:
 		return string(n.Kind)
 	}
+}
+
+// callScope classifies a call's package scope from its FuncID callee id
+// ("pkgpath.Name" or "pkgpath.Type.Method", "builtin.Name"): stdlib package
+// paths contain no dot. The trailing name segment is stripped; if what
+// remains ends in an (exported, uppercase) type name it was the
+// pkgpath.Type.Method form, so that segment goes too. Only the class is
+// labeled, never the callee name.
+func callScope(calleeID string) string {
+	if strings.HasPrefix(calleeID, "builtin.") {
+		return "builtin"
+	}
+	rest := stripCalleeName(calleeID)
+	if rest == "" {
+		return "unknown"
+	}
+	if strings.Contains(rest, ".") {
+		return "local"
+	}
+	return "std"
+}
+
+// stripCalleeName removes the trailing function/method name from a FuncID,
+// plus a trailing type qualifier when the Method form is used.
+func stripCalleeName(calleeID string) string {
+	rest := calleeID
+	if i := strings.LastIndex(rest, "."); i >= 0 {
+		rest = rest[:i]
+	} else {
+		return ""
+	}
+	return stripTypeQualifier(rest)
+}
+
+// stripTypeQualifier removes a trailing ".Type" when Type looks like an
+// exported Go type name (uppercase first letter): the pkgpath.Type.Method
+// form as opposed to pkgpath.Name.
+func stripTypeQualifier(rest string) string {
+	i := strings.LastIndex(rest, ".")
+	if i < 0 || i+1 >= len(rest) {
+		return rest
+	}
+	if c := rest[i+1]; c >= 'A' && c <= 'Z' {
+		return rest[:i]
+	}
+	return rest
 }
 
 func edgeTag(kind EdgeKind, argPos int) uint64 {
@@ -203,6 +253,11 @@ type Wl struct {
 	calls    int
 	diameter int
 	charVec  []float64
+	pdg      *Pdg
+	// projCache lazily holds WL histograms for single-edge-kind projections,
+	// keyed by edge kind. Used by SimilarityWeighted; computed on demand so
+	// functions that never reach pair comparison pay nothing.
+	projCache map[EdgeKind][][]histEntry
 }
 
 // characteristicVector counts node kinds and edge kinds for CCGraph-style
@@ -293,6 +348,7 @@ func NewWl(pdg *Pdg) *Wl {
 		calls:    countCalls(pdg),
 		diameter: d,
 		charVec:  characteristicVector(pdg),
+		pdg:      pdg,
 	}
 }
 
@@ -409,6 +465,92 @@ func weightedIntersection(a, b *Wl, w []uint64, denom uint64, h int) (uint64, ui
 		den += w[i] * denom
 	}
 	return num, den
+}
+
+// Projection weights for SimilarityWeighted: control edges count 1.0,
+// data edges 0.6, so "same logic, different data" outranks "same data,
+// different logic".
+const (
+	ctrlSimWeight = 10
+	dataSimWeight = 6
+)
+
+// buildProjection builds the WL working graph over a single edge kind.
+// For the control projection, labels are coarsened to node kinds only: the
+// control similarity must capture the skeleton (branching/looping shape),
+// not data distinctions like which function is called. The data projection
+// keeps full labels.
+func buildProjection(pdg *Pdg, kind EdgeKind) Graph {
+	n := len(pdg.Nodes)
+	labels := make([]uint64, n)
+	for i, node := range pdg.Nodes {
+		l := label(node)
+		if kind == Ctrl {
+			l = string(node.Kind)
+		}
+		labels[i] = fnv1a([]byte(l))
+	}
+	inc, out := projectionAdjacency(pdg, n, kind)
+	return Graph{labels: labels, inc: inc, out: out}
+}
+
+// projectionAdjacency builds the in/out adjacency lists over one edge kind.
+func projectionAdjacency(pdg *Pdg, n int, kind EdgeKind) (inc, out [][]Nb) {
+	inc = make([][]Nb, n)
+	out = make([][]Nb, n)
+	for _, e := range pdg.Edges {
+		if e.Kind != kind || e.From >= n || e.To >= n {
+			continue
+		}
+		tag := edgeTag(e.Kind, e.ArgPos)
+		out[e.From] = append(out[e.From], Nb{node: uint64(e.To), tag: tag})
+		inc[e.To] = append(inc[e.To], Nb{node: uint64(e.From), tag: tag})
+	}
+	return inc, out
+}
+
+// projHists returns the WL histograms for one edge-kind projection, computed
+// lazily on first use and cached. Full maxLevels rounds are kept so any pair
+// level h can slice them.
+func (w *Wl) projHists(kind EdgeKind) [][]histEntry {
+	if w.projCache == nil {
+		w.projCache = map[EdgeKind][][]histEntry{}
+	}
+	if h, ok := w.projCache[kind]; ok {
+		return h
+	}
+	g := buildProjection(w.pdg, kind)
+	rounds := refineRounds(&g)
+	hists := histograms(rounds)
+	w.projCache[kind] = hists
+	return hists
+}
+
+// projSimilarity is the histogram-kernel similarity over one edge-kind
+// projection, in thousandths.
+func projSimilarity(a, b *Wl, kind EdgeKind) uint32 {
+	h := levels(a, b)
+	denom := maxNodes(a, b)
+	w := weights(h)
+	ah, bh := a.projHists(kind), b.projHists(kind)
+	var num, den uint64
+	for i := 0; i < h && i < len(ah) && i < len(bh); i++ {
+		num += w[i] * uint64(intersection(ah[i], bh[i]))
+		den += w[i] * denom
+	}
+	if den == 0 {
+		return 0
+	}
+	return uint32(num * 1000 / den)
+}
+
+// SimilarityWeighted combines control-projection and data-projection WL
+// similarities with control edges weighing 1.0 and data edges 0.6. Same
+// 0-1000 scale as SimilarityMilli, so the 600 cluster threshold applies.
+func SimilarityWeighted(a, b *Wl) uint32 {
+	ctrl := uint64(projSimilarity(a, b, Ctrl))
+	data := uint64(projSimilarity(a, b, Data))
+	return uint32((ctrlSimWeight*ctrl + dataSimWeight*data) / uint64(ctrlSimWeight+dataSimWeight))
 }
 
 // Mineable is rstyle's size floor: worth comparing.
