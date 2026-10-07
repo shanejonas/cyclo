@@ -380,3 +380,117 @@ func g(y int, host string, port int) int {
 	}
 	_ = out
 }
+
+func TestPhasedDryRun(t *testing.T) {
+	path := writeTempGo(t, `package main
+
+func f(x int) int {
+	if x > 0 {
+		println("positive")
+		println(x)
+	} else {
+		return -1
+	}
+	return x
+}
+`)
+	var out bytes.Buffer
+	err := Run(context.Background(), []string{"--phased", path}, &out)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	s := out.String()
+	// Dry-run phased should show phase grouping.
+	if !strings.Contains(s, "phase 1") {
+		t.Errorf("expected phase grouping, got:\n%s", s)
+	}
+	if !strings.Contains(s, "fixable candidate(s) across") {
+		t.Errorf("expected phased summary, got:\n%s", s)
+	}
+	// Dry-run must not modify the file.
+	content, _ := os.ReadFile(path)
+	if !strings.Contains(string(content), "} else {") {
+		t.Error("dry-run modified the file")
+	}
+}
+
+func TestPhasedTerminates(t *testing.T) {
+	// Code with no fixable patterns: phased loop must terminate quickly.
+	path := writeTempGo(t, `package main
+
+func add(a, b int) int {
+	return a + b
+}
+`)
+	var out bytes.Buffer
+	err := Run(context.Background(), []string{"--phased", "--apply", path}, &out)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	s := out.String()
+	if !strings.Contains(s, "phased fix: 0 candidate(s) fixed") {
+		t.Errorf("expected zero fixes, got:\n%s", s)
+	}
+}
+
+func TestPhasedApplyFixesInOrder(t *testing.T) {
+	// Guard clause fix should apply in phase 1.
+	path := writeTempGo(t, `package main
+
+func f(x int) int {
+	if x > 0 {
+		println("positive")
+		println(x)
+	} else {
+		return -1
+	}
+	return x
+}
+`)
+	var out bytes.Buffer
+	err := Run(context.Background(), []string{"--phased", "--apply", path}, &out)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	s := out.String()
+	if !strings.Contains(s, "phase 1") {
+		t.Errorf("expected phase 1 output, got:\n%s", s)
+	}
+	content, _ := os.ReadFile(path)
+	if !strings.Contains(string(content), "if x <= 0 {") {
+		t.Errorf("expected guard fix applied, got:\n%s", string(content))
+	}
+}
+
+func TestPhaseHas(t *testing.T) {
+	if !phaseHas(fixPhases[0], patterns.GuardClause) {
+		t.Error("phase 1 should have guard_clause")
+	}
+	if !phaseHas(fixPhases[1], patterns.ValueObject) {
+		t.Error("phase 2 should have value_object")
+	}
+	if !phaseHas(fixPhases[3], patterns.Parameterize) {
+		t.Error("phase 4 should have parameterize")
+	}
+	if phaseHas(fixPhases[0], patterns.Parameterize) {
+		t.Error("phase 1 should not have parameterize")
+	}
+}
+
+func TestDedupe(t *testing.T) {
+	in := []string{"a", "b", "a", "c", "b"}
+	out := dedupe(in)
+	if len(out) != 3 {
+		t.Errorf("expected 3, got %d: %v", len(out), out)
+	}
+	if out[0] != "a" || out[1] != "b" || out[2] != "c" {
+		t.Errorf("order not preserved: %v", out)
+	}
+}
+
+func TestPhaseNames(t *testing.T) {
+	names := phaseNames([]patterns.CandidateKind{patterns.GuardClause, patterns.ValueObject})
+	if names != "guard_clause,value_object" {
+		t.Errorf("unexpected: %q", names)
+	}
+}
