@@ -94,9 +94,13 @@ func TestIsRepositoryFile(t *testing.T) {
 		{"pkg/repo.go", true},
 		{"dao/user.go", true},
 		{"store/session.go", true},
+		{"adapters/sqlite/annotations.go", true}, // adapters/ is the repo layer (Shane's convention)
+		{"adapters/gopatterns/ddd.go", true},  // any adapters/ path is infrastructure
+		{"adapters/goquality/analyzer.go", true},
 		{"internal/service/order.go", false},
 		{"pkg/reporter.go", false}, // "reporter" is not "repo"
 		{"internal/restore.go", false},
+		{"domain/order/service.go", false},
 	}
 	for _, c := range cases {
 		if got := isRepositoryFile(c.path); got != c.want {
