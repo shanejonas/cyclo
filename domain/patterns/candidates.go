@@ -62,6 +62,10 @@ const (
 	// data clump: the same primitive params traveling together across
 	// functions. DDD-inspired; fixed score below guard clauses.
 	ValueObject CandidateKind = "value_object"
+	// PrimitiveObsession proposes a named type for a domain concept used as
+	// a raw string/int param across functions. DDD-inspired; fixed score
+	// below value objects (more heuristic).
+	PrimitiveObsession CandidateKind = "primitive_obsession"
 )
 
 // Site is one function that shows the pattern.
