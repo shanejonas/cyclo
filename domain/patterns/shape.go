@@ -129,6 +129,21 @@ func FuncID(fn *types.Func) string {
 	return fn.Pkg().Path() + "." + name
 }
 
+// ReceiverType returns the receiver's named type as "pkgpath.Name" for
+// methods, or "" for free functions and unresolvable receivers. This is
+// the miner's self-type: signature groups need two or more distinct ones.
+func ReceiverType(fn *types.Func) string {
+	sig, ok := fn.Type().(*types.Signature)
+	if !ok || sig.Recv() == nil {
+		return ""
+	}
+	named, ok := namedOf(sig.Recv().Type())
+	if !ok || named.Obj().Pkg() == nil {
+		return ""
+	}
+	return named.Obj().Pkg().Path() + "." + named.Obj().Name()
+}
+
 func namedOf(t types.Type) (*types.Named, bool) {
 	t = types.Unalias(t)
 	if pointer, ok := t.(*types.Pointer); ok {
