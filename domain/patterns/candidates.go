@@ -45,7 +45,9 @@ const (
 	TraitMethod CandidateKind = "trait_method"
 	// CapabilitySet proposes an interface from several parallel methods.
 	CapabilitySet CandidateKind = "capability_set"
-	// EnumDispatch proposes an interface from a type switch's arm calls.
+	// EnumDispatch proposes a dispatch table for an enum-value switch:
+	// `switch color { case Red: doRed() }` becomes a map[Color]func()
+	// lookup. AST-level finding from the extractor.
 	EnumDispatch CandidateKind = "enum_dispatch"
 	// GenericFn proposes one generic definition over workspace types.
 	GenericFn CandidateKind = "generic_fn"
@@ -1085,45 +1087,6 @@ func existingTraitFor(verdicts []traitVerdict, hidden []existing) string {
 	return ""
 }
 
-// fromDispatch judges one type-switch dispatch: the arm callee ids against
-// the layer-1 groups.
-func fromDispatch(ix *candidateIndex, f *FuncFacts, d *Dispatch) outcome {
-	values := make([]string, len(d.Arms))
-	for i, a := range d.Arms {
-		values[i] = a.CalleeID
-	}
-	shown := make([]string, len(values))
-	for i, v := range values {
-		shown[i] = ix.displayCallee(v)
-	}
-	// Go adaptation: rstyle matches on an enum; the Go detector finds type
-	// switches.
-	summary := fmt.Sprintf("`%s` switches on a type and calls analogous methods per arm: M0 = %s",
-		f.Name, strings.Join(shown, " | "))
-	switch v := judge(ix, values); v.kind {
-	case verdictTrait:
-		return outcome{kind: outcomeFound, ev: &candidateEvidence{
-			kind: EnumDispatch,
-			breakdown: Breakdown{
-				Support:       len(d.Arms),
-				LiftMilli:     v.group.ScoreMilli,
-				Holes:         1,
-				CoverageMilli: 1000,
-			},
-			sites:    []*FuncFacts{f},
-			verdicts: []traitVerdict{{group: v.group, defs: v.defs}},
-			summary:  summary,
-		}}
-	case verdictSuppressed:
-		return outcome{kind: outcomeHidden, suppressed: &Suppressed{
-			Reason: v.existing.reason,
-			Sites:  []Site{makeSite(f)},
-		}}
-	default:
-		return outcome{kind: outcomeNothing}
-	}
-}
-
 func compareSite(a, b Site) int {
 	if a.Path != b.Path {
 		return strings.Compare(a.Path, b.Path)
@@ -1233,12 +1196,6 @@ func MineCached(facts []*FuncFacts, groups []SigGroup, params Params, cache *WlC
 	for _, c := range ClusterPdgsCached(pdgs, params, cache) {
 		cluster := c
 		outcomes = append(outcomes, fromCluster(ix, fns, &cluster))
-	}
-	for i, f := range fns {
-		for _, d := range FindDispatch(pdgs[i]) {
-			dispatch := d
-			outcomes = append(outcomes, fromDispatch(ix, f, &dispatch))
-		}
 	}
 	return collectOutcomes(outcomes)
 }

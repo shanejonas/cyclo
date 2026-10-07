@@ -91,6 +91,12 @@ func Run(facts []*FuncFacts, options Options) PatternsReport {
 		mined.Candidates = append(mined.Candidates, pos...)
 		sortMined(&mined)
 	}
+	// Enum dispatch: value switches that want to be dispatch tables,
+	// single-pass AST findings, fixed score.
+	if eds := enumDispatchCandidates(prepared); len(eds) > 0 {
+		mined.Candidates = append(mined.Candidates, eds...)
+		sortMined(&mined)
+	}
 	report := Build(groups, options.MinScoreMilli, options.Top)
 	report.Candidates = keepCandidates(mined.Candidates, options.MinScoreMilli, options.Top)
 	report.Suppressed = mined.Suppressed

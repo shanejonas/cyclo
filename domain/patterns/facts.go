@@ -44,6 +44,9 @@ type FuncFacts struct {
 	// be guard clauses. AST-level finding from the extractor (Go-specific
 	// extension, not in rstyle's FnFacts).
 	GuardClauses []GuardClauseHit
+	// EnumDispatches are enum-value switches in this function that want to
+	// be dispatch tables. AST-level finding from the extractor.
+	EnumDispatches []EnumDispatchHit
 	// Params are the function's primitive-typed parameters (name and type).
 	// Used for data-clump detection (value object proposals). Empty when the
 	// function has no primitive params or params were not extracted.
@@ -57,6 +60,15 @@ type GuardClauseHit struct {
 	Line int
 	// BodyStmts counts statements in the if body (the trapped happy path).
 	BodyStmts int
+}
+
+// EnumDispatchHit is one enum-value switch that wants to be a dispatch
+// table: the switch line and the number of value cases.
+type EnumDispatchHit struct {
+	// Line is the switch-statement line.
+	Line int
+	// NumCases counts the value case clauses.
+	NumCases int
 }
 
 // EffectClass returns the observable-effect class set for the mismatch check:

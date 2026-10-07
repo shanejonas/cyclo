@@ -113,16 +113,24 @@ func toFacts(pdgs []gopatterns.FuncPdg) []*patterns.FuncFacts {
 				BodyStmts: g.BodyStmts,
 			})
 		}
+		var dispatches []patterns.EnumDispatchHit
+		for _, d := range fp.EnumDispatches {
+			dispatches = append(dispatches, patterns.EnumDispatchHit{
+				Line:     d.Line,
+				NumCases: d.NumCases,
+			})
+		}
 		facts = append(facts, &patterns.FuncFacts{
-			ID:           fp.Name,
-			Name:         fp.Name,
-			Path:         fp.Path,
-			Line:         fp.Line,
-			EndLine:      fp.EndLine,
-			Pdg:          &fp.Pdg,
-			SigKey:       "fn(" + strings.Join(params, ",") + ")",
-			GuardClauses: guards,
-			Params:       fp.Params,
+			ID:             fp.Name,
+			Name:           fp.Name,
+			Path:           fp.Path,
+			Line:           fp.Line,
+			EndLine:        fp.EndLine,
+			Pdg:            &fp.Pdg,
+			SigKey:         "fn(" + strings.Join(params, ",") + ")",
+			GuardClauses:   guards,
+			EnumDispatches: dispatches,
+			Params:         fp.Params,
 		})
 	}
 	return facts

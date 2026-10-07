@@ -34,6 +34,9 @@ type FuncPdg struct {
 	// GuardClauses are inverted conditionals in this function that want
 	// to be guard clauses (AST-level finding, not PDG-derived).
 	GuardClauses []GuardClauseHit
+	// EnumDispatches are enum-value switches that want to be dispatch
+	// tables (AST-level finding, not PDG-derived).
+	EnumDispatches []EnumDispatchHit
 	// Params are the function's primitive-typed parameters. Used for
 	// data-clump detection (value object proposals).
 	Params []patterns.ParamInfo
@@ -177,7 +180,8 @@ func extractFunc(pkg *packages.Package, fn *ast.FuncDecl, path string) FuncPdg {
 		Line:         pos.Line,
 		EndLine:      end.Line,
 		Pdg:          patterns.Pdg{Nodes: b.nodes, Edges: b.edges},
-		GuardClauses: findGuardClauses(fn, pkg.Fset),
+		GuardClauses:   findGuardClauses(fn, pkg.Fset),
+		EnumDispatches: findEnumDispatches(fn, pkg.Fset),
 		Params:       primitiveParams(fn, pkg.TypesInfo),
 	}
 }
