@@ -104,9 +104,13 @@ Use ` + "`cyclo.setDetailsView`" + ` with ` + "`{\"view\":\"quality\"}`" + ` or 
 
 ## Fix patterns automatically
 
-Run ` + "`cyclo patterns [paths...]`" + ` to find mechanical code patterns: inverted guard clauses, data clumps (value objects), parameterize candidates, anemic models, primitive obsession, type switches, and more. These are structural — the fix is a deterministic AST transform.
+Run ` + "`cyclo patterns [paths...]`" + ` to find mechanical code patterns across 18 kinds: guard clauses, value objects, parameterize candidates, anemic models, primitive obsession, type switches, enum dispatch, trait methods, capability sets, generic functions, entity identity, missing identity, factories, specifications, and domain services (detection-only). These are structural — the fix is a deterministic AST transform.
 
-Run ` + "`cyclo fix --kind all [paths...]`" + ` to auto-fix them. Dry-run by default (shows a diff); add ` + "`--apply`" + ` to write. No LLM, no tokens — pure static analysis. Use ` + "`--kind guard_clause|value_object|parameterize|anemic_model|primitive_obsession|type_switch|entity_identity|missing_identity|factory`" + ` to fix one kind.
+Run ` + "`cyclo fix --kind all [paths...]`" + ` to auto-fix them. Dry-run by default (shows a diff); add ` + "`--apply`" + ` to write. No LLM, no tokens — pure static analysis. Use ` + "`--kind guard_clause|value_object|parameterize|anemic_model|primitive_obsession|type_switch|enum_dispatch|trait_method|capability_set|generic_fn|entity_identity|missing_identity|factory|specification|domain_service`" + ` to fix one kind.
+
+Use ` + "`cyclo fix --phased --apply [paths...]`" + ` when fixes interact: it mines, applies one phase, re-mines, and repeats to a fixpoint (max 3 cycles). Phases run guard/value-object work first, structural patterns next, and parameterize last.
+
+` + "`domain_service`" + ` is detection-only: it identifies stateless functions operating on 2+ domain types as legitimate Domain Services (Evans), and suppresses the corresponding ` + "`anemic_model`" + ` suggestions. ` + "`specification`" + ` extracts repeated boolean business rules into ` + "`IsSatisfiedBy`" + ` types. ` + "`trait_method`" + ` proposes interfaces from parallel methods on types in the same package.
 
 **Workflow:** Run ` + "`cyclo patterns`" + ` first, then ` + "`cyclo fix --apply`" + ` to clear the mechanical issues. This saves tokens — don't hand-rewrite what the fixer handles. In an agent loop, use ` + "`cyclo fix --changed --apply`" + ` to fix only candidates in functions your diff touched (against ` + "`--base REF`" + `, defaulting to the merge-base with main/master).
 
