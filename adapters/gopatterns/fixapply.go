@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"go/ast"
+	"go/format"
 	"go/token"
 	"strconv"
 	"strings"
@@ -30,7 +31,12 @@ func applyGuardFix(spec *patterns.FixSpec, src []byte) ([]byte, error) {
 	if !ok {
 		return nil, fmt.Errorf("guard_clause: cannot fix if at line %d", ifLine)
 	}
-	return applyEdits(src, []textEdit{edit}), nil
+	out := applyEdits(src, []textEdit{edit})
+	formatted, err := format.Source(out)
+	if err != nil {
+		return nil, fmt.Errorf("gofmt after guard fix: %w", err)
+	}
+	return formatted, nil
 }
 
 // guardIfLine extracts the if_line param from a FixSpec.
