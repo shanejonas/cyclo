@@ -202,24 +202,114 @@ type Wl struct {
 	hists    [][]histEntry
 	calls    int
 	diameter int
+	charVec  []float64
 }
+
+// characteristicVector counts node kinds and edge kinds for CCGraph-style
+// pre-filtering: [decl, assign, control, call, other, ctrlEdges, dataEdges].
+func characteristicVector(pdg *Pdg) []float64 {
+	vec := make([]float64, 7)
+	countNodes(pdg, vec)
+	countEdges(pdg, vec)
+	return vec
+}
+
+// countNodes tallies node kinds into the characteristic vector.
+func countNodes(pdg *Pdg, vec []float64) {
+	for _, n := range pdg.Nodes {
+		vec[nodeKindIndex(n.Kind)]++
+	}
+}
+
+// nodeKindIndex maps a node kind to its characteristic vector position.
+func nodeKindIndex(kind NodeKind) int {
+	switch kind {
+	case Let:
+		return 0
+	case Op:
+		return 1
+	case Branch, Match, Loop, Iterate:
+		return 2
+	case Call:
+		return 3
+	default:
+		return 4
+	}
+}
+
+// countEdges tallies edge kinds into the characteristic vector.
+func countEdges(pdg *Pdg, vec []float64) {
+	for _, e := range pdg.Edges {
+		if e.Kind == Ctrl {
+			vec[5]++
+		} else if e.Kind == Data {
+			vec[6]++
+		}
+	}
+}
+
+// cosineSimilarity returns the cosine of the angle between two vectors.
+func cosineSimilarity(a, b []float64) float64 {
+	var dot, normA, normB float64
+	for i := range a {
+		dot += a[i] * b[i]
+		normA += a[i] * a[i]
+		normB += b[i] * b[i]
+	}
+	if normA == 0 || normB == 0 {
+		return 0
+	}
+	return dot / (sqrt(normA) * sqrt(normB))
+}
+
+func sqrt(x float64) float64 {
+	// Newton's method, sufficient for similarity thresholding
+	z := x
+	for i := 0; i < 10; i++ {
+		z = z - (z*z-x)/(2*z)
+	}
+	return z
+}
+
+// charVecSimilar reports whether two graphs are characteristically similar
+// enough to warrant the full WL kernel. CCGraph Stage 2 filtering.
+func charVecSimilar(a, b *Wl) bool {
+	return cosineSimilarity(a.charVec, b.charVec) >= charVecThreshold
+}
+
+const charVecThreshold = 0.3
 
 // NewWl builds the WL refinement of a PDG.
 func NewWl(pdg *Pdg) *Wl {
 	g := buildGraph(pdg)
-	rounds := refineRounds(&g)
+	d := diameter(&g)
+	// CCGraph optimization: only compute rounds up to diameter+1 (capped),
+	// not the full maxLevels. Small-diameter graphs save refinement work.
+	rounds := refineRoundsDiameter(&g, d)
 	return &Wl{
 		graph:    g,
 		rounds:   rounds,
 		hists:    histograms(rounds),
 		calls:    countCalls(pdg),
-		diameter: diameter(&g),
+		diameter: d,
+		charVec:  characteristicVector(pdg),
 	}
 }
 
 func refineRounds(g *Graph) [][]uint64 {
+	return refineRoundsDiameter(g, maxLevels-1)
+}
+
+func refineRoundsDiameter(g *Graph, d int) [][]uint64 {
+	h := d + 1
+	if h < 1 {
+		h = 1
+	}
+	if h > maxLevels {
+		h = maxLevels
+	}
 	rounds := [][]uint64{g.labels}
-	for i := 1; i < maxLevels; i++ {
+	for i := 1; i < h; i++ {
 		rounds = append(rounds, refine(g, rounds[len(rounds)-1]))
 	}
 	return rounds

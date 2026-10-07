@@ -173,9 +173,15 @@ func pairsToCompare(pdgs []*Pdg) [][2]int {
 }
 
 // pairSelected reports whether a comparable pair reaches the WL similarity
-// threshold, or (experiment) the pair-coverage floor.
+// threshold, or (experiment) the pair-coverage floor. CCGraph two-stage
+// filtering: characteristic vector cosine similarity is checked before the
+// expensive WL kernel.
 func pairSelected(pdgs []*Pdg, wls []*Wl, a, b int, params Params) bool {
 	if !Comparable(wls[a], wls[b]) {
+		return false
+	}
+	// Stage 2: skip pairs with dissimilar characteristic vectors
+	if !charVecSimilar(wls[a], wls[b]) {
 		return false
 	}
 	if SimilarityMilli(wls[a], wls[b]) >= params.ThresholdMilli {
