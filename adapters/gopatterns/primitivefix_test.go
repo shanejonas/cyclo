@@ -118,3 +118,43 @@ func TestPrimitiveFixImplementsFix(t *testing.T) {
 		t.Error("FixKind wrong")
 	}
 }
+
+func TestFixPrimitiveObsessionKeepsTypeDeclTogether(t *testing.T) {
+	// Regression: the inserted `type Name string` was split apart when a
+	// doc comment followed the import block, emitting `type` ... docs ...
+	// `Name string`. The declaration must stay together.
+	src := `package p
+
+import "strings"
+
+// ParseCalendar turns a feed into event drafts.
+// Second line of docs.
+func findProp(name string) string {
+	_ = strings.TrimSpace("x")
+	return name
+}
+func findOther(name string) string {
+	return name
+}
+`
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, "test.go", src, parser.ParseComments)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	out, _, err := FixPrimitiveObsession(fset, f, []byte(src))
+	if err != nil {
+		t.Fatalf("fix: %v", err)
+	}
+	s := string(out)
+	if !strings.Contains(s, "type Name string") {
+		t.Errorf("type declaration split apart, got:\n%s", s)
+	}
+	// The doc comment must stay with its function, not the type.
+	docIdx := strings.Index(s, "// ParseCalendar")
+	typeIdx := strings.Index(s, "type Name string")
+	funcIdx := strings.Index(s, "func findProp")
+	if !(typeIdx < docIdx && docIdx < funcIdx) {
+		t.Errorf("doc comment misplaced, got:\n%s", s)
+	}
+}

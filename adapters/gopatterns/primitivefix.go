@@ -433,31 +433,31 @@ func applyPrimitiveConcept(fset *token.FileSet, f *ast.File, group []primitiveCo
 	return wrapGroupCallSites(f, group, typeName)
 }
 
-// insertTypeDecl adds `type TypeName typ` after the imports.
+// insertTypeDecl adds `type TypeName typ` after the imports. The new
+// declaration is anchored to the end of the import block (or the package
+// clause when there are no imports) so the printer keeps the type keyword
+// and its spec together: a position-less GenDecl lets a following doc
+// comment split them apart, emitting `type` ... docs ... `Name string`.
 func insertTypeDecl(f *ast.File, typ, typeName string) {
+	anchor := f.Name.End()
+	insertAt := 0
+	for i, decl := range f.Decls {
+		if gen, ok := decl.(*ast.GenDecl); ok && gen.Tok == token.IMPORT {
+			anchor = gen.End()
+			insertAt = i + 1
+		}
+	}
 	typeDecl := &ast.GenDecl{
 		Tok:    token.TYPE,
-		TokPos: token.NoPos,
+		TokPos: anchor,
 		Specs: []ast.Spec{
 			&ast.TypeSpec{
-				Name: &ast.Ident{Name: typeName, NamePos: token.NoPos},
+				Name: &ast.Ident{Name: typeName, NamePos: anchor},
 				Type: &ast.Ident{Name: typ},
 			},
 		},
 	}
-	insertAt := importEnd(f)
 	f.Decls = append(f.Decls[:insertAt], append([]ast.Decl{typeDecl}, f.Decls[insertAt:]...)...)
-}
-
-// importEnd returns the decl index just past the imports.
-func importEnd(f *ast.File) int {
-	insertAt := 0
-	for i, decl := range f.Decls {
-		if gen, ok := decl.(*ast.GenDecl); ok && gen.Tok == token.IMPORT {
-			insertAt = i + 1
-		}
-	}
-	return insertAt
 }
 
 // updateSignatures rewrites param types to the named type.
