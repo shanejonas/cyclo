@@ -85,3 +85,74 @@ func f(a, b, c bool) {
 		t.Errorf("unexpected flatten results: %v", counts)
 	}
 }
+
+func TestSpecRejectsTwoVariableRule(t *testing.T) {
+	// c.x != first.x references two variables; extracting it would leave
+	// a dangling `first` in IsSatisfiedBy. Must not produce a rule key.
+	src := `package test
+type Cmp struct{ typeName string }
+func f(c Cmp, first Cmp) bool {
+	if c.typeName != first.typeName || c.typeName != "" {
+		return true
+	}
+	return false
+}
+`
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, "test.go", src, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, decl := range f.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Body == nil {
+			continue
+		}
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			if ifStmt, ok := n.(*ast.IfStmt); ok {
+				key, _, _ := specRuleKey(ifStmt.Cond, nil)
+				if key != "" {
+					t.Errorf("two-variable rule should not produce a key, got %q", key)
+				}
+			}
+			return true
+		})
+	}
+}
+
+func TestSpecAcceptsLiteralComparison(t *testing.T) {
+	// user.Age > 18 compares against a literal: single-subject, valid.
+	src := `package test
+type User struct{ Age int }
+func f(user User) bool {
+	if user.Age > 18 && user.Age < 65 {
+		return true
+	}
+	return false
+}
+`
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, "test.go", src, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, decl := range f.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Body == nil {
+			continue
+		}
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			if ifStmt, ok := n.(*ast.IfStmt); ok {
+				key, varName, _ := specRuleKey(ifStmt.Cond, nil)
+				if key != "" && varName == "user" {
+					found = true
+				}
+			}
+			return true
+		})
+	}
+	if !found {
+		t.Error("literal comparison should produce a single-subject rule key")
+	}
+}
