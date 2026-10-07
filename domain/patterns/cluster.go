@@ -37,12 +37,6 @@ type Params struct {
 	SingleCallGuard bool
 	// MaxHoles caps how many differing parts a parameterize helper may take.
 	MaxHoles int
-	// WeightedSimilarity uses the control-weighted WL similarity (control
-	// edges 1.0, data edges 0.6) for pair selection instead of the flat
-	// kernel. It ranks same-logic pairs above same-data pairs, but the
-	// coarser control projection groups more aggressively, which the greedy
-	// clustering does not always turn into clean clusters. Default off.
-	WeightedSimilarity bool
 }
 
 // DefaultParams mirrors Rust's Default: 600/600 thresholds, no pair-coverage
@@ -181,8 +175,7 @@ func pairsToCompare(pdgs []*Pdg) [][2]int {
 // pairSelected reports whether a comparable pair reaches the WL similarity
 // threshold, or (experiment) the pair-coverage floor. CCGraph two-stage
 // filtering: characteristic vector cosine similarity is checked before the
-// expensive WL kernel. The similarity itself is control-weighted: control
-// edges count 1.0, data edges 0.6.
+// expensive WL kernel.
 func pairSelected(pdgs []*Pdg, wls []*Wl, a, b int, params Params) bool {
 	if !Comparable(wls[a], wls[b]) {
 		return false
@@ -191,11 +184,13 @@ func pairSelected(pdgs []*Pdg, wls []*Wl, a, b int, params Params) bool {
 	if !charVecSimilar(wls[a], wls[b]) {
 		return false
 	}
-	sim := SimilarityMilli(wls[a], wls[b])
-	if params.WeightedSimilarity {
-		sim = SimilarityWeighted(wls[a], wls[b])
-	}
-	if sim >= params.ThresholdMilli {
+	// A pair is selected if EITHER the flat kernel OR the control-weighted
+	// kernel reaches the threshold. The weighted kernel ranks "same logic,
+	// different data" higher, finding more real clones; the flat kernel
+	// preserves pairs the weighting might miss. Union ensures no lost pairs.
+	flatSim := SimilarityMilli(wls[a], wls[b])
+	weightedSim := SimilarityWeighted(wls[a], wls[b])
+	if flatSim >= params.ThresholdMilli || weightedSim >= params.ThresholdMilli {
 		return true
 	}
 	if params.PairCoverageMilli != nil {
@@ -429,9 +424,25 @@ func columnsOf(joined []joinedMember) []Column {
 // buildCluster aligns every group member against the medoid template and
 // keeps the ones reaching the coverage floor. It returns false when nothing
 // joins, so the caller can retire just the seed.
-func buildCluster(pdgs []*Pdg, wls []*Wl, group []int, params Params) (Cluster, bool) {
-	template := medoid(wls, group)
+// rankTemplates orders group members by total similarity, best first.
+func rankTemplates(wls []*Wl, group []int) []int {
+	ranked := append([]int{}, group...)
+	sort.Slice(ranked, func(i, j int) bool {
+		ti, tj := totalSimilarity(wls, group, ranked[i]), totalSimilarity(wls, group, ranked[j])
+		if ti != tj {
+			return ti > tj
+		}
+		return ranked[i] < ranked[j]
+	})
+	return ranked
+}
+
+// tryTemplate aligns group members against one template, keeping those
+// reaching the coverage floor. It returns the joined members and their
+// total coverage.
+func tryTemplate(pdgs []*Pdg, wls []*Wl, group []int, template int, params Params) ([]joinedMember, uint64) {
 	var joined []joinedMember
+	var totalCov uint64
 	for _, v := range group {
 		if v == template {
 			continue
@@ -439,11 +450,14 @@ func buildCluster(pdgs []*Pdg, wls []*Wl, group []int, params Params) (Cluster, 
 		jm := joinMember(pdgs, wls, template, v)
 		if jm.alignment.CoverageMilli >= params.MinCoverageMilli {
 			joined = append(joined, jm)
+			totalCov += uint64(jm.alignment.CoverageMilli)
 		}
 	}
-	if len(joined) == 0 {
-		return Cluster{}, false
-	}
+	return joined, totalCov
+}
+
+// makeCluster builds the Cluster from a template and its joined members.
+func makeCluster(template int, joined []joinedMember) Cluster {
 	members := make([]int, 0, len(joined)+1)
 	members = append(members, template)
 	coverage := make([]uint32, 0, len(joined)+1)
@@ -452,7 +466,44 @@ func buildCluster(pdgs []*Pdg, wls []*Wl, group []int, params Params) (Cluster, 
 		members = append(members, jm.index)
 		coverage = append(coverage, jm.alignment.CoverageMilli)
 	}
-	return Cluster{Members: members, CoverageMilli: coverage, Columns: columnsOf(joined)}, true
+	return Cluster{Members: members, CoverageMilli: coverage, Columns: columnsOf(joined)}
+}
+
+// bestTemplate tries each candidate template and returns the one yielding
+// the most joined members (ties broken by total coverage).
+func bestTemplate(pdgs []*Pdg, wls []*Wl, group []int, ranked []int, params Params) (Cluster, int) {
+	var best Cluster
+	bestCount := 0
+	var bestCoverage uint64
+	for _, template := range ranked {
+		joined, totalCov := tryTemplate(pdgs, wls, group, template, params)
+		if len(joined) > bestCount || len(joined) == bestCount && totalCov > bestCoverage {
+			bestCount = len(joined)
+			bestCoverage = totalCov
+			best = makeCluster(template, joined)
+		}
+	}
+	return best, bestCount
+}
+
+// buildCluster aligns every group member against the template and keeps the
+// ones reaching the coverage floor. It tries the top candidates by total
+// similarity as templates (not just the medoid), because the similarity-best
+// template is not always the alignment-best: with the weighted kernel's
+// coarser control projection, a central member may score high on similarity
+// while a peripheral pair aligns better with each other. It returns false
+// when nothing joins, so the caller can retire just the seed.
+func buildCluster(pdgs []*Pdg, wls []*Wl, group []int, params Params) (Cluster, bool) {
+	ranked := rankTemplates(wls, group)
+	tries := 3
+	if len(ranked) < tries {
+		tries = len(ranked)
+	}
+	best, count := bestTemplate(pdgs, wls, group, ranked[:tries], params)
+	if count == 0 {
+		return Cluster{}, false
+	}
+	return best, true
 }
 
 // seedGroup is the seed plus its still-unassigned neighbours, ascending.
