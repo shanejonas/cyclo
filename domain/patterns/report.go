@@ -38,6 +38,10 @@ type Options struct {
 	// Params tunes clustering; the zero value means DefaultParams(), mirroring
 	// Rust where Options::default() carries Params::default().
 	Params Params
+	// AnemicModels are methodless structs with field-operating functions,
+	// from the extractor's AST-level type analysis. Empty means the
+	// extractor did not run or found none.
+	AnemicModels []AnemicModelHit
 }
 
 // Build keeps groups at or above minScoreMilli, then the first top (all when
@@ -70,6 +74,12 @@ func Run(facts []*FuncFacts, options Options) PatternsReport {
 	// single-pass and fixed-score.
 	if vos := valueObjectCandidates(prepared); len(vos) > 0 {
 		mined.Candidates = append(mined.Candidates, vos...)
+		sortMined(&mined)
+	}
+	// Anemic models: methodless structs with external behavior, from the
+	// extractor's type analysis passed via Options. Fixed-score.
+	if ams := anemicModelCandidates(options.AnemicModels); len(ams) > 0 {
+		mined.Candidates = append(mined.Candidates, ams...)
 		sortMined(&mined)
 	}
 	report := Build(groups, options.MinScoreMilli, options.Top)

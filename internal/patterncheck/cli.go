@@ -51,7 +51,10 @@ func Run(ctx context.Context, args []string, output io.Writer) error {
 	}
 	params := patterns.DefaultParams()
 	params.ThresholdMilli = uint32(opts.threshold)
-	report := patterns.Run(toFacts(pdgs), patterns.Options{Params: params})
+	report := patterns.Run(toFacts(pdgs.Funcs), patterns.Options{
+		Params:       params,
+		AnemicModels: pdgs.AnemicModels,
+	})
 	if opts.format == "json" {
 		out, err := patterns.JSON(&report)
 		if err != nil {

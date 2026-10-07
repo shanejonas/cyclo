@@ -39,9 +39,19 @@ type FuncPdg struct {
 	Params []patterns.ParamInfo
 }
 
-// Extract loads the packages enclosing paths and returns a PDG per function.
-// Paths are directories (".", "./...") or .go files, resolved under root.
-func Extract(ctx context.Context, root string, paths []string) ([]FuncPdg, error) {
+// Extraction is the full result of package analysis: per-function PDGs
+// plus package-level type findings (anemic models).
+type Extraction struct {
+	Funcs []FuncPdg
+	// AnemicModels are exported methodless structs with 3+ functions
+	// operating on their fields (DDD anemic domain model detection).
+	AnemicModels []patterns.AnemicModelHit
+}
+
+// Extract loads the packages enclosing paths and returns PDGs per
+// function plus anemic-model hits. Paths are directories (".", "./...")
+// or .go files, resolved under root.
+func Extract(ctx context.Context, root string, paths []string) (*Extraction, error) {
 	abs, err := absRoot(root)
 	if err != nil {
 		return nil, err
@@ -54,9 +64,10 @@ func Extract(ctx context.Context, root string, paths []string) ([]FuncPdg, error
 	if err != nil {
 		return nil, err
 	}
-	out := []FuncPdg{}
+	out := &Extraction{}
 	for _, pkg := range pkgs {
-		out = append(out, packagePdgs(pkg, abs)...)
+		out.Funcs = append(out.Funcs, packagePdgs(pkg, abs)...)
+		out.AnemicModels = append(out.AnemicModels, findAnemicModels(pkg, abs)...)
 	}
 	return out, nil
 }
