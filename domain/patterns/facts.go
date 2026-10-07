@@ -1,5 +1,13 @@
 package patterns
 
+// ParamInfo is a function parameter's name and primitive type name
+// (e.g. {Name: "amount", Type: "int"}). Only basic types are recorded;
+// named types are already domain types and need no proposal.
+type ParamInfo struct {
+	Name string
+	Type string
+}
+
 // FuncFacts is the Go equivalent of rstyle's facts::FnFacts for the patterns
 // miner: a function's identity, its PDG, and the effect summary used for the
 // effect-mismatch check. The extractor (adapters/gopatterns) builds these.
@@ -36,6 +44,10 @@ type FuncFacts struct {
 	// be guard clauses. AST-level finding from the extractor (Go-specific
 	// extension, not in rstyle's FnFacts).
 	GuardClauses []GuardClauseHit
+	// Params are the function's primitive-typed parameters (name and type).
+	// Used for data-clump detection (value object proposals). Empty when the
+	// function has no primitive params or params were not extracted.
+	Params []ParamInfo
 }
 
 // GuardClauseHit is one inverted conditional: the if-statement line and
