@@ -200,7 +200,7 @@ func parseOptions(args []string) (options, error) {
 }
 
 func (opts options) validate() error {
-	valid := []string{"guard_clause", "value_object", "parameterize", "trait_method", "capability_set", "enum_dispatch", "generic_fn", "anemic_model", "primitive_obsession", "all"}
+	valid := []string{"guard_clause", "value_object", "parameterize", "trait_method", "capability_set", "enum_dispatch", "generic_fn", "anemic_model", "primitive_obsession", "type_switch", "all"}
 	if !slices.Contains(valid, opts.kind) {
 		return fmt.Errorf("kind must be one of %v", valid)
 	}
@@ -219,6 +219,17 @@ func toFacts(ext *gopatterns.Extraction) ([]*patterns.FuncFacts, []patterns.Anem
 				BodyStmts: g.BodyStmts,
 			})
 		}
+		var tss []patterns.TypeSwitchHit
+		for _, t := range fp.TypeSwitches {
+			tss = append(tss, patterns.TypeSwitchHit{
+				Line:   t.Line,
+				Bound:  t.Bound,
+				Expr:   t.Expr,
+				Method: t.Method,
+				Types:  t.Types,
+				Args:   t.Args,
+			})
+		}
 		var params []patterns.ParamInfo
 		for _, p := range fp.Params {
 			params = append(params, patterns.ParamInfo{
@@ -234,6 +245,7 @@ func toFacts(ext *gopatterns.Extraction) ([]*patterns.FuncFacts, []patterns.Anem
 			EndLine:      fp.EndLine,
 			Pdg:          &fp.Pdg,
 			GuardClauses: guards,
+			TypeSwitches: tss,
 			Params:       params,
 		})
 	}

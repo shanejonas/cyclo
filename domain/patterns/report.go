@@ -73,6 +73,12 @@ func Run(facts []*FuncFacts, options Options) PatternsReport {
 		mined.Candidates = append(mined.Candidates, guards...)
 		sortMined(&mined)
 	}
+	// Type switches: same-method arms want interface dispatch, also
+	// single-pass and fixed-score.
+	if tss := typeSwitchCandidates(prepared); len(tss) > 0 {
+		mined.Candidates = append(mined.Candidates, tss...)
+		sortMined(&mined)
+	}
 	// Data clumps: value-object proposals from param co-occurrence, also
 	// single-pass and fixed-score.
 	if vos := valueObjectCandidates(prepared); len(vos) > 0 {

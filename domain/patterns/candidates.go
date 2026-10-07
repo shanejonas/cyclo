@@ -71,6 +71,10 @@ const (
 	// a raw string/int param across functions. DDD-inspired; fixed score
 	// below value objects (more heuristic).
 	PrimitiveObsession CandidateKind = "primitive_obsession"
+	// TypeSwitch proposes replacing a type switch whose arms all call the
+	// same method on the case-bound value with a direct interface method
+	// call. Single-function finding: no clustering, fixed score.
+	TypeSwitch CandidateKind = "type_switch"
 )
 
 // Site is one function that shows the pattern.
