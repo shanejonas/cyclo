@@ -25,14 +25,19 @@ inverted conditionals that want to be guard clauses.
 Informational only: always exits 0, never a quality gate.
   --format FORMAT   text (default) or json
   --threshold N     minimum WL similarity (0-1000) for clustering [default 600]
+  --cache           reuse WL refinements from .cyclo/patterns-cache.json,
+                    speeding up repeat runs on large repos
 
 Exit 0: always, on success (even with no candidates). Exit 2: extraction or
 analysis failure.
 `
 
+const wlCachePath = ".cyclo/patterns-cache.json"
+
 type options struct {
 	format    string
 	threshold uint
+	useCache  bool
 	paths     []string
 }
 
@@ -51,9 +56,15 @@ func Run(ctx context.Context, args []string, output io.Writer) error {
 	}
 	params := patterns.DefaultParams()
 	params.ThresholdMilli = uint32(opts.threshold)
+	cache, saveCache, err := openWlCache(opts.useCache)
+	if err != nil {
+		return err
+	}
+	defer saveCache()
 	report := patterns.Run(toFacts(pdgs.Funcs), patterns.Options{
 		Params:       params,
 		AnemicModels: pdgs.AnemicModels,
+		WlCache:      cache,
 	})
 	if opts.format == "json" {
 		out, err := patterns.JSON(&report)
@@ -65,6 +76,21 @@ func Run(ctx context.Context, args []string, output io.Writer) error {
 	}
 	_, err = io.WriteString(output, patterns.Text(&report)+"\n")
 	return err
+}
+
+// openWlCache loads the WL cache when enabled, returning the cache and a
+// deferred save. A missing cache file is fine (cold start); corrupt files
+// error out. Save failures are best-effort and never fail the mining run.
+func openWlCache(enabled bool) (cache *patterns.WlCache, save func(), err error) {
+	save = func() {}
+	if !enabled {
+		return nil, save, nil
+	}
+	cache = patterns.NewWlCache()
+	if err := cache.Load(wlCachePath); err != nil {
+		return nil, save, err
+	}
+	return cache, func() { _ = cache.Save(wlCachePath) }, nil
 }
 
 // toFacts converts extracted PDGs to miner facts. The signature key derives
@@ -107,10 +133,11 @@ func parseOptions(args []string) (options, error) {
 	flags.SetOutput(io.Discard)
 	format := flags.String("format", "text", "output format")
 	threshold := flags.Uint("threshold", 600, "minimum WL similarity (0-1000)")
+	useCache := flags.Bool("cache", false, "reuse WL refinements from .cyclo/patterns-cache.json")
 	if err := flags.Parse(args); err != nil {
 		return options{}, err
 	}
-	result := options{format: *format, threshold: *threshold, paths: flags.Args()}
+	result := options{format: *format, threshold: *threshold, useCache: *useCache, paths: flags.Args()}
 	return result, result.validate()
 }
 

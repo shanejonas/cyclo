@@ -42,6 +42,9 @@ type Options struct {
 	// from the extractor's AST-level type analysis. Empty means the
 	// extractor did not run or found none.
 	AnemicModels []AnemicModelHit
+	// WlCache memoizes WL refinements across runs for incremental mining.
+	// Nil computes every refinement fresh.
+	WlCache *WlCache
 }
 
 // Build keeps groups at or above minScoreMilli, then the first top (all when
@@ -63,7 +66,7 @@ func Run(facts []*FuncFacts, options Options) PatternsReport {
 	// Layer 2: candidates. NOTE: candidates.go is ported in parallel with the
 	// contract `func Mine(facts []*FuncFacts, groups []SigGroup, params Params) Mined`,
 	// which collides with sigmine.go's `func Mine`; see the commit report.
-	mined := Mine(prepared, groups, defaultParams(options.Params))
+	mined := MineCached(prepared, groups, defaultParams(options.Params), options.WlCache)
 	// Single-function findings: guard clauses need no clustering, so they
 	// join the candidates here and flow through the same ranking/filtering.
 	if guards := guardCandidates(prepared); len(guards) > 0 {

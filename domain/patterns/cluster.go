@@ -37,6 +37,12 @@ type Params struct {
 	SingleCallGuard bool
 	// MaxHoles caps how many differing parts a parameterize helper may take.
 	MaxHoles int
+	// WeightedSimilarity uses the control-weighted WL similarity (control
+	// edges 1.0, data edges 0.6) for pair selection instead of the flat
+	// kernel. It ranks same-logic pairs above same-data pairs, but the
+	// coarser control projection groups more aggressively, which the greedy
+	// clustering does not always turn into clean clusters. Default off.
+	WeightedSimilarity bool
 }
 
 // DefaultParams mirrors Rust's Default: 600/600 thresholds, no pair-coverage
@@ -175,7 +181,8 @@ func pairsToCompare(pdgs []*Pdg) [][2]int {
 // pairSelected reports whether a comparable pair reaches the WL similarity
 // threshold, or (experiment) the pair-coverage floor. CCGraph two-stage
 // filtering: characteristic vector cosine similarity is checked before the
-// expensive WL kernel.
+// expensive WL kernel. The similarity itself is control-weighted: control
+// edges count 1.0, data edges 0.6.
 func pairSelected(pdgs []*Pdg, wls []*Wl, a, b int, params Params) bool {
 	if !Comparable(wls[a], wls[b]) {
 		return false
@@ -184,7 +191,11 @@ func pairSelected(pdgs []*Pdg, wls []*Wl, a, b int, params Params) bool {
 	if !charVecSimilar(wls[a], wls[b]) {
 		return false
 	}
-	if SimilarityMilli(wls[a], wls[b]) >= params.ThresholdMilli {
+	sim := SimilarityMilli(wls[a], wls[b])
+	if params.WeightedSimilarity {
+		sim = SimilarityWeighted(wls[a], wls[b])
+	}
+	if sim >= params.ThresholdMilli {
 		return true
 	}
 	if params.PairCoverageMilli != nil {
@@ -461,15 +472,21 @@ func seedGroup(adjacency map[int]map[int]bool, free map[int]bool, seed int) []in
 }
 
 // prepare canonicalizes every graph and hashes it, mirroring Rust's
-// canonicalize-then-Wl::new prologue.
-func prepare(pdgs []*Pdg, params Params) ([]*Pdg, []*Wl) {
+// canonicalize-then-Wl::new prologue. With a non-nil cache, WL refinements
+// for unchanged functions are reused instead of recomputed.
+func prepare(pdgs []*Pdg, params Params, cache *WlCache) ([]*Pdg, []*Wl) {
 	canonical := make([]*Pdg, len(pdgs))
 	for i, p := range pdgs {
 		canonical[i] = Canonicalize(p, params.Normalize)
 	}
 	wls := make([]*Wl, len(canonical))
 	for i, p := range canonical {
+		if w, ok := cache.Get(p); ok {
+			wls[i] = w
+			continue
+		}
 		wls[i] = NewWl(p)
+		cache.Put(p, wls[i])
 	}
 	return canonical, wls
 }
@@ -478,7 +495,13 @@ func prepare(pdgs []*Pdg, params Params) ([]*Pdg, []*Wl) {
 // first. Each function lands in at most one cluster; members must align with
 // the template above the coverage floor.
 func ClusterPdgs(pdgs []*Pdg, params Params) []Cluster {
-	canonical, wls := prepare(pdgs, params)
+	return ClusterPdgsCached(pdgs, params, nil)
+}
+
+// ClusterPdgsCached is ClusterPdgs with an optional WL cache for incremental
+// runs. A nil cache computes every refinement fresh.
+func ClusterPdgsCached(pdgs []*Pdg, params Params, cache *WlCache) []Cluster {
+	canonical, wls := prepare(pdgs, params, cache)
 	adjacency := buildAdjacency(canonical, wls, pairsToCompare(canonical), params)
 	free := map[int]bool{}
 	for v := range adjacency {

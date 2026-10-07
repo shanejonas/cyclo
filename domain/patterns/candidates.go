@@ -1218,6 +1218,11 @@ func withPdgs(facts []*FuncFacts) []*FuncFacts {
 // Mine is the layer-2 entry: candidates and suppressed patterns for facts,
 // given the layer-1 signature groups and the clustering params.
 func Mine(facts []*FuncFacts, groups []SigGroup, params Params) Mined {
+	return MineCached(facts, groups, params, nil)
+}
+
+// MineCached is Mine with an optional WL cache for incremental runs.
+func MineCached(facts []*FuncFacts, groups []SigGroup, params Params, cache *WlCache) Mined {
 	ix := newCandidateIndex(facts, groups, params)
 	fns := withPdgs(facts)
 	pdgs := make([]*Pdg, len(fns))
@@ -1225,7 +1230,7 @@ func Mine(facts []*FuncFacts, groups []SigGroup, params Params) Mined {
 		pdgs[i] = f.Pdg
 	}
 	var outcomes []outcome
-	for _, c := range ClusterPdgs(pdgs, params) {
+	for _, c := range ClusterPdgsCached(pdgs, params, cache) {
 		cluster := c
 		outcomes = append(outcomes, fromCluster(ix, fns, &cluster))
 	}
