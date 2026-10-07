@@ -14,6 +14,7 @@ import (
 
 	"github.com/shanejonas/cyclo/adapters/goquality"
 	"github.com/shanejonas/cyclo/domain/quality"
+	"github.com/shanejonas/cyclo/internal/gitchanged"
 )
 
 var ErrFindings = errors.New("quality guardrails exceeded")
@@ -102,32 +103,19 @@ func onlyChanged(opts options, facts []quality.Function, report quality.Report, 
 	if err != nil {
 		return report, err
 	}
-	root, err := gitRoot(cwd)
+	root, err := gitchanged.GitRoot(cwd)
 	if err != nil {
 		return report, err
 	}
-	base, err := resolveBase(root, opts.base)
+	base, err := gitchanged.ResolveBase(root, opts.base)
 	if err != nil {
 		return report, err
 	}
-	ranges, err := changedRanges(root, base, rootSpecs(opts.paths, root, cwd))
+	ranges, err := gitchanged.ChangedRanges(root, base, gitchanged.RootSpecs(opts.paths, root, cwd))
 	if err != nil {
 		return report, err
 	}
 	return filterChanged(report, facts, touchedFunctions(facts, ranges, root, cwd), config)
-}
-
-// rootSpecs converts CLI paths (relative to cwd) to repo-root-relative git
-// pathspecs, defaulting to the whole tree.
-func rootSpecs(paths []string, root, cwd string) []string {
-	if len(paths) == 0 {
-		paths = []string{"."}
-	}
-	specs := make([]string, len(paths))
-	for index, path := range paths {
-		specs[index] = rootRelative(path, root, cwd)
-	}
-	return specs
 }
 
 func writeReport(output io.Writer, report quality.Report, format string) error {

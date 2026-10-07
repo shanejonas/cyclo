@@ -60,8 +60,10 @@ const (
 type Site struct {
 	Path string
 	Line int
-	ID   string
-	Name string
+	// EndLine is the function's closing line (for diff-overlap checks).
+	EndLine int
+	ID      string
+	Name    string
 }
 
 // Breakdown splits the score so each signal stays visible.
@@ -244,7 +246,7 @@ func shortGoPaths(owner string) string {
 }
 
 func makeSite(f *FuncFacts) Site {
-	return Site{Path: f.Path, Line: f.Line, ID: f.ID, Name: f.Name}
+	return Site{Path: f.Path, Line: f.Line, EndLine: f.EndLine, ID: f.ID, Name: f.Name}
 }
 
 func sitesOfFacts(fns []*FuncFacts) []Site {

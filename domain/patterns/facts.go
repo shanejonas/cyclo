@@ -12,6 +12,8 @@ type FuncFacts struct {
 	Path string
 	// Line is the function's declaration line.
 	Line int
+	// EndLine is the function's closing line (for diff-overlap checks).
+	EndLine int
 	// Pdg is the function's program dependence graph. Nil means the body
 	// was not extracted (filtered out of mining, like rstyle's pdg: None).
 	Pdg *Pdg

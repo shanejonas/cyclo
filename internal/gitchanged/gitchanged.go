@@ -1,4 +1,8 @@
-package qualitycheck
+// Package gitchanged is the shared git-diff boundary for cyclo's CLIs.
+// It maps a git diff to repo-root-relative line ranges, so subcommands can
+// scope their output to what the diff touches. It has no dependency on any
+// analysis domain.
+package gitchanged
 
 import (
 	"fmt"
@@ -9,20 +13,20 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-
-	"github.com/shanejonas/cyclo/domain/quality"
 )
 
-// lineRange is an inclusive range of new-side line numbers touched by the git diff.
-type lineRange struct {
-	start, end int
+// LineRange is an inclusive range of new-side line numbers touched by the git
+// diff.
+type LineRange struct {
+	Start, End int
+}
+
+// Overlaps reports whether [start, end] intersects r.
+func Overlaps(start, end int, r LineRange) bool {
+	return start <= r.End && r.Start <= end
 }
 
 var hunkHeader = regexp.MustCompile(`^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@`)
-
-func overlaps(start, end int, r lineRange) bool {
-	return start <= r.end && r.start <= end
-}
 
 func gitOutput(dir string, args ...string) (string, error) {
 	command := exec.Command("git", args...)
@@ -31,7 +35,8 @@ func gitOutput(dir string, args ...string) (string, error) {
 	return string(output), err
 }
 
-func gitRoot(cwd string) (string, error) {
+// GitRoot returns the repo root for cwd, or an error outside a git repo.
+func GitRoot(cwd string) (string, error) {
 	output, err := gitOutput(cwd, "rev-parse", "--show-toplevel")
 	if err != nil {
 		return "", fmt.Errorf("not a git repository: %w", err)
@@ -39,11 +44,11 @@ func gitRoot(cwd string) (string, error) {
 	return strings.TrimSpace(output), nil
 }
 
-// resolveBase picks the diff base: an explicit --base ref, else the merge-base
+// ResolveBase picks the diff base: an explicit --base ref, else the merge-base
 // of HEAD with main or master (so a branch diffs against its branch point,
 // not the moving tip), else HEAD. An empty base means the repo has no commits
 // yet, in which case only untracked files contribute changes.
-func resolveBase(root, explicit string) (string, error) {
+func ResolveBase(root, explicit string) (string, error) {
 	if explicit != "" {
 		return verifyBase(root, explicit)
 	}
@@ -74,10 +79,10 @@ func branchBase(root string) (string, bool) {
 	return "", false
 }
 
-// changedRanges maps repo-root-relative paths to the new-side line ranges the
+// ChangedRanges maps repo-root-relative paths to the new-side line ranges the
 // diff touches. Untracked files count as fully changed.
-func changedRanges(root, base string, paths []string) (map[string][]lineRange, error) {
-	result := map[string][]lineRange{}
+func ChangedRanges(root, base string, paths []string) (map[string][]LineRange, error) {
+	result := map[string][]LineRange{}
 	if base != "" {
 		args := append([]string{"diff", "--no-color", "--no-ext-diff", "--no-textconv", "--unified=0", base, "--"}, paths...)
 		output, err := gitOutput(root, args...)
@@ -95,18 +100,18 @@ func changedRanges(root, base string, paths []string) (map[string][]lineRange, e
 }
 
 // untrackedRanges treats every untracked Go file as fully changed.
-func untrackedRanges(root string, paths []string) (map[string][]lineRange, error) {
+func untrackedRanges(root string, paths []string) (map[string][]LineRange, error) {
 	files, err := untrackedFiles(root, paths)
 	if err != nil {
 		return nil, err
 	}
-	result := make(map[string][]lineRange, len(files))
+	result := make(map[string][]LineRange, len(files))
 	for _, path := range files {
 		lines, err := countLines(filepath.Join(root, path))
 		if err != nil {
 			continue
 		}
-		result[path] = []lineRange{{1, lines}}
+		result[path] = []LineRange{{1, lines}}
 	}
 	return result, nil
 }
@@ -143,8 +148,8 @@ func countLines(path string) (int, error) {
 
 // parseFileRanges extracts per-file new-side touch ranges from unified diff
 // output. A pure-deletion hunk touches the single new-side line it precedes.
-func parseFileRanges(output string) map[string][]lineRange {
-	result := map[string][]lineRange{}
+func parseFileRanges(output string) map[string][]LineRange {
+	result := map[string][]LineRange{}
 	var current string
 	for line := range strings.SplitSeq(output, "\n") {
 		if path, ok := diffNewPath(line); ok {
@@ -161,10 +166,10 @@ func parseFileRanges(output string) map[string][]lineRange {
 	return result
 }
 
-func parseHunkRange(line string) (lineRange, bool) {
+func parseHunkRange(line string) (LineRange, bool) {
 	matches := hunkHeader.FindStringSubmatch(line)
 	if matches == nil {
-		return lineRange{}, false
+		return LineRange{}, false
 	}
 	start, _ := strconv.Atoi(matches[1])
 	count := 1
@@ -175,7 +180,7 @@ func parseHunkRange(line string) (lineRange, bool) {
 	if count == 0 {
 		end = start
 	}
-	return lineRange{start, end}, true
+	return LineRange{start, end}, true
 }
 
 // diffNewPath extracts the b/ (new-side) path from a "diff --git" header,
@@ -199,53 +204,28 @@ func diffNewPath(line string) (string, bool) {
 	return strings.TrimPrefix(new, "b/"), true
 }
 
-// touchedFunctions returns the set of fact keys (path + name) for functions
-// whose line range intersects a diff touch range.
-func touchedFunctions(facts []quality.Function, ranges map[string][]lineRange, root, cwd string) map[string]bool {
-	result := map[string]bool{}
-	for _, fact := range facts {
-		rel := rootRelative(fact.Location.Path, root, cwd)
-		fileRanges, ok := ranges[rel]
-		if !ok {
-			continue
-		}
-		start := fact.Location.Line
-		end := start + strings.Count(fact.Source, "\n")
-		for _, r := range fileRanges {
-			if overlaps(start, end, r) {
-				result[fact.Location.Path+"\x00"+fact.Location.Name] = true
-				break
-			}
-		}
-	}
-	return result
-}
-
-func rootRelative(factPath, root, cwd string) string {
-	abs := factPath
+// RootRelative converts a path (absolute, or relative to cwd) to a
+// repo-root-relative slash path for matching against diff output.
+func RootRelative(path, root, cwd string) string {
+	abs := path
 	if !filepath.IsAbs(abs) {
-		abs = filepath.Join(cwd, factPath)
+		abs = filepath.Join(cwd, path)
 	}
 	if rel, err := filepath.Rel(root, abs); err == nil {
-		return rel
+		return filepath.ToSlash(rel)
 	}
-	return factPath
+	return path
 }
 
-// filterChanged keeps only diagnostics whose function the diff touches,
-// then rebuilds the work plan over the remaining findings.
-func filterChanged(report quality.Report, facts []quality.Function, touched map[string]bool, config quality.Config) (quality.Report, error) {
-	diagnostics := make([]quality.Diagnostic, 0, len(report.Diagnostics))
-	for _, diagnostic := range report.Diagnostics {
-		if touched[diagnostic.Path+"\x00"+diagnostic.Name] {
-			diagnostics = append(diagnostics, diagnostic)
-		}
+// RootSpecs converts CLI paths (relative to cwd) to repo-root-relative git
+// pathspecs, defaulting to the whole tree.
+func RootSpecs(paths []string, root, cwd string) []string {
+	if len(paths) == 0 {
+		paths = []string{"."}
 	}
-	report.Diagnostics = diagnostics
-	groups, err := quality.BuildFixGroups(facts, diagnostics, config)
-	if err != nil {
-		return report, err
+	specs := make([]string, len(paths))
+	for index, path := range paths {
+		specs[index] = RootRelative(path, root, cwd)
 	}
-	report.FixGroups = groups
-	return report, nil
+	return specs
 }

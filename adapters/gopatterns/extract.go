@@ -28,7 +28,9 @@ type FuncPdg struct {
 	Name string
 	Path string
 	Line int
-	Pdg  patterns.Pdg
+	// EndLine is the function's closing line (for diff-overlap checks).
+	EndLine int
+	Pdg     patterns.Pdg
 }
 
 // Extract loads the packages enclosing paths and returns a PDG per function.
@@ -144,6 +146,7 @@ func extractFunc(pkg *packages.Package, fn *ast.FuncDecl, path string) FuncPdg {
 		name = patterns.FuncID(object)
 	}
 	pos := pkg.Fset.PositionFor(fn.Pos(), false)
+	end := pkg.Fset.PositionFor(fn.End(), false)
 	b := &builder{
 		info:  pkg.TypesInfo,
 		fset:  pkg.Fset,
@@ -151,7 +154,7 @@ func extractFunc(pkg *packages.Package, fn *ast.FuncDecl, path string) FuncPdg {
 	}
 	b.params(fn)
 	b.stmt(fn.Body)
-	return FuncPdg{Name: name, Path: path, Line: pos.Line, Pdg: patterns.Pdg{Nodes: b.nodes, Edges: b.edges}}
+	return FuncPdg{Name: name, Path: path, Line: pos.Line, EndLine: end.Line, Pdg: patterns.Pdg{Nodes: b.nodes, Edges: b.edges}}
 }
 
 // ctrlFrame is one level of the control stack: nodes lowered inside it gain a
