@@ -859,8 +859,9 @@ func isGoKeyword(s string) bool {
 }
 
 // applySpecificationFix applies a Specification FixSpec: extracts a repeated
-// boolean business rule into a Specification type with IsSatisfiedBy, and
-// rewrites matching if conditions to specification calls.
+// boolean business rule into an idiomatic Go predicate — a method on the type
+// when it's declared locally, a plain function otherwise — and rewrites
+// matching if conditions to predicate calls.
 func applySpecificationFix(spec *patterns.FixSpec, src []byte) ([]byte, error) {
 	typeName, ruleKey, ok := specParams(spec)
 	if !ok {
@@ -870,21 +871,147 @@ func applySpecificationFix(spec *patterns.FixSpec, src []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	specName := typeName + "Specification"
-	if hasTypeDecl(f, specName) {
-		return src, nil
-	}
 	matches := findSpecMatches(f, ruleKey)
 	if len(matches) == 0 {
 		return src, nil
 	}
-	edits := specEdits(fset, f, src, specName, typeName, matches)
+	// Derive the predicate name from the first match's condition.
+	predName := predicateName(matches[0].stmt.Cond)
+	if predName == "" {
+		return nil, fmt.Errorf("specification: cannot derive predicate name")
+	}
+	predName = uniquePredName(f, predName)
+	// Method on local type, function for external/unknown types.
+	isLocal := hasTypeDecl(f, baseTypeName(typeName))
+	edits := predEdits(fset, f, src, predName, typeName, isLocal, matches)
 	out := applyEdits(src, edits)
 	formatted, err := format.Source(out)
 	if err != nil {
 		return nil, fmt.Errorf("gofmt after specification fix: %w", err)
 	}
 	return formatted, nil
+}
+
+// baseTypeName strips a package qualifier: "apidomain.AgentArgs" -> "AgentArgs".
+func baseTypeName(typeName string) string {
+	if i := strings.LastIndex(typeName, "."); i >= 0 {
+		return typeName[i+1:]
+	}
+	return typeName
+}
+
+// uniquePredName ensures the predicate name doesn't collide with an existing
+// declaration in the file.
+func uniquePredName(f *ast.File, name string) string {
+	if !hasFuncDecl(f, name) && !hasTypeDecl(f, name) {
+		return name
+	}
+	for i := 2; ; i++ {
+		candidate := fmt.Sprintf("%s%d", name, i)
+		if !hasFuncDecl(f, candidate) && !hasTypeDecl(f, candidate) {
+			return candidate
+		}
+	}
+}
+
+// predicateName derives an idiomatic predicate name from a boolean condition:
+// `u.Age > 18 && u.Active` -> `IsAgeOver18AndActive`.
+func predicateName(cond ast.Expr) string {
+	operands, connector := splitBoolOps(cond)
+	if len(operands) == 0 {
+		return ""
+	}
+	var parts []string
+	for _, op := range operands {
+		part := operandPredName(op)
+		if part == "" {
+			return ""
+		}
+		parts = append(parts, part)
+	}
+	sep := "And"
+	if connector == token.LOR {
+		sep = "Or"
+	}
+	return "Is" + strings.Join(parts, sep)
+}
+
+// splitBoolOps splits a boolean condition into operands and returns the
+// connecting operator (LAND or LOR).
+func splitBoolOps(cond ast.Expr) ([]ast.Expr, token.Token) {
+	bin, ok := cond.(*ast.BinaryExpr)
+	if !ok || (bin.Op != token.LAND && bin.Op != token.LOR) {
+		return []ast.Expr{cond}, token.ILLEGAL
+	}
+	left, _ := splitBoolOps(bin.X)
+	right, _ := splitBoolOps(bin.Y)
+	return append(left, right...), bin.Op
+}
+
+// operandPredName converts one boolean operand to a name fragment:
+// `u.Age > 18` -> `AgeOver18`, `u.Active` -> `Active`, `!u.Active` -> `NotActive`.
+func operandPredName(op ast.Expr) string {
+	op = specUnwrapParens(op)
+	// Negation: !u.Active -> NotActive
+	if unary, ok := op.(*ast.UnaryExpr); ok && unary.Op == token.NOT {
+		inner := operandPredName(unary.X)
+		if inner == "" {
+			return ""
+		}
+		return "Not" + inner
+	}
+	// Bare selector: u.Active -> Active
+	if field, _, ok := specBareSelector(op); ok {
+		return capitalize(field)
+	}
+	// Comparison: u.Age > 18 -> AgeOver18
+	field, opStr, base, value := specOperandParts(op, nil)
+	if field == "" {
+		return ""
+	}
+	_ = base
+	return capitalize(field) + cmpWord(opStr) + sanitizeLiteral(value)
+}
+
+// cmpWord maps a comparison operator to a name fragment.
+func cmpWord(op string) string {
+	words := map[string]string{
+		">":  "Over",
+		">=": "AtLeast",
+		"<":  "Under",
+		"<=": "AtMost",
+		"==": "Is",
+		"!=": "IsNot",
+	}
+	if w, ok := words[op]; ok {
+		return w
+	}
+	return "Cmp"
+}
+
+// sanitizeLiteral converts a literal value to a name-safe fragment:
+// "18" -> "18", `"foo"` -> "Foo", "0.60" -> "060", "nil" -> "Nil".
+func sanitizeLiteral(value string) string {
+	if value == "" || value == "nil" {
+		return capitalize(value)
+	}
+	return capitalize(stripNonAlnum(value))
+}
+
+// stripNonAlnum removes quotes and non-alphanumeric characters.
+func stripNonAlnum(value string) string {
+	var out strings.Builder
+	for _, r := range value {
+		if isAlnum(r) {
+			out.WriteRune(r)
+		}
+	}
+	return out.String()
+}
+
+// isAlnum reports whether r is an ASCII letter or digit.
+func isAlnum(r rune) bool {
+	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')
 }
 
 // specParams extracts the type name and rule key from a FixSpec.
@@ -956,12 +1083,13 @@ func specStructKey(cond ast.Expr) string {
 	operands := flattenBoolOps(cond)
 	var parts []string
 	for _, op := range operands {
-		field, opStr, base := specOperandParts(op, nil)
+		field, opStr, base, value := specOperandParts(op, nil)
 		if field == "" {
 			return ""
 		}
 		// Normalize the base variable to "v" for cross-site matching.
-		parts = append(parts, "v."+field+":"+opStr)
+		// Include the value: different literals are different rules.
+		parts = append(parts, "v."+field+":"+opStr+":"+value)
 		_ = base
 	}
 	sort.Strings(parts)
@@ -991,47 +1119,52 @@ func specKeysMatch(a, b string) bool {
 
 // specEdits builds the text edits: insert the Specification type, rewrite
 // matching conditions to IsSatisfiedBy calls.
-// specEditCtx bundles the context for building specification edits
-// (keeps fn_params within the quality gate).
-type specEditCtx struct {
-	fset     *token.FileSet
-	f        *ast.File
-	src      []byte
-	specName string
-	typeName string
-	matches  []specMatch
-}
-
-func specEdits(fset *token.FileSet, f *ast.File, src []byte, specName, typeName string, matches []specMatch) []textEdit {
-	return specEditsCtx(specEditCtx{fset: fset, f: f, src: src, specName: specName, typeName: typeName, matches: matches})
-}
-
-// specEditsCtx builds the text edits: rewrite matching conditions and
-// insert the Specification type.
-func specEditsCtx(ctx specEditCtx) []textEdit {
+// predEdits builds the text edits: rewrite matching conditions to predicate
+// calls and insert the predicate declaration.
+func predEdits(fset *token.FileSet, f *ast.File, src []byte, predName, typeName string, isLocal bool, matches []specMatch) []textEdit {
 	var edits []textEdit
 	// Rewrite each matching if condition.
-	for _, m := range ctx.matches {
-		condStart := ctx.fset.Position(m.stmt.Cond.Pos()).Offset
-		condEnd := ctx.fset.Position(m.stmt.Cond.End()).Offset
-		replacement := fmt.Sprintf("(%s{}).IsSatisfiedBy(%s)", ctx.specName, m.varName)
+	for _, m := range matches {
+		condStart := fset.Position(m.stmt.Cond.Pos()).Offset
+		condEnd := fset.Position(m.stmt.Cond.End()).Offset
+		var replacement string
+		if isLocal {
+			replacement = fmt.Sprintf("%s.%s()", m.varName, predName)
+		} else {
+			replacement = fmt.Sprintf("%s(%s)", unexported(predName), m.varName)
+		}
 		edits = append(edits, textEdit{start: condStart, end: condEnd, replacement: []byte(replacement)})
 	}
-	edits = append(edits, specDeclEdit(ctx))
+	edits = append(edits, predDeclEdit(fset, f, src, predName, typeName, isLocal, matches[0]))
 	return edits
 }
 
-// specDeclEdit builds the edit inserting the Specification type declaration.
-func specDeclEdit(ctx specEditCtx) textEdit {
-	insertPos := specInsertPos(ctx.fset, ctx.f, ctx.src)
-	first := ctx.matches[0]
-	firstCond := ctx.src[ctx.fset.Position(first.stmt.Cond.Pos()).Offset : ctx.fset.Position(first.stmt.Cond.End()).Offset]
+// unexported lowercases the first letter for a package-private function name.
+func unexported(name string) string {
+	if name == "" {
+		return ""
+	}
+	return strings.ToLower(name[:1]) + name[1:]
+}
+
+// predDeclEdit builds the edit inserting the predicate declaration: a method
+// on the local type, or a plain function for external types.
+func predDeclEdit(fset *token.FileSet, f *ast.File, src []byte, predName, typeName string, isLocal bool, first specMatch) textEdit {
+	insertPos := specInsertPos(fset, f, src)
+	firstCond := src[fset.Position(first.stmt.Cond.Pos()).Offset : fset.Position(first.stmt.Cond.End()).Offset]
 	paramName := first.varName
 	if paramName == "" {
 		paramName = "v"
 	}
 	body := specRenameVar(string(firstCond), first.varName, paramName)
-	decl := fmt.Sprintf("\n// %s encapsulates a business rule (Specification pattern).\ntype %s struct{}\n\n// IsSatisfiedBy reports whether the rule holds for v.\nfunc (%s) IsSatisfiedBy(%s %s) bool {\n\treturn %s\n}\n", ctx.specName, ctx.specName, ctx.specName, paramName, ctx.typeName, body)
+	var decl string
+	if isLocal {
+		recvName := baseTypeName(typeName)
+		decl = fmt.Sprintf("\n// %s reports whether the business rule holds.\nfunc (%s %s) %s() bool {\n\treturn %s\n}\n", predName, paramName, recvName, predName, body)
+	} else {
+		funcName := unexported(predName)
+		decl = fmt.Sprintf("\n// %s reports whether the business rule holds for %s.\nfunc %s(%s %s) bool {\n\treturn %s\n}\n", funcName, paramName, funcName, paramName, typeName, body)
+	}
 	return textEdit{start: insertPos, end: insertPos, replacement: []byte(decl)}
 }
 
