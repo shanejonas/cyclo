@@ -177,3 +177,58 @@ func TestFactsExportIncludesSelectedFunctionHelperBodies(t *testing.T) {
 		t.Fatalf("exported pure helper not resolved: %+v", report)
 	}
 }
+
+func TestWriteTextRendersFixGroups(t *testing.T) {
+	report := quality.Report{
+		Summary: quality.Summary{Functions: 3},
+		FixGroups: []quality.FixGroup{
+			{ID: 1, Stacked: true, Functions: []quality.GroupFunction{
+				{Location: quality.Location{Path: "b.go", Line: 10, Column: 1, Name: "mod.callee"}, Rules: []string{"fn_params"}},
+				{Location: quality.Location{Path: "a.go", Line: 1, Column: 1, Name: "mod.caller"}, Rules: []string{"fn_length"}},
+			}},
+			{ID: 2, Functions: []quality.GroupFunction{
+				{Location: quality.Location{Path: "c.go", Line: 5, Column: 1, Name: "mod.solo"}, Rules: []string{"side_effect_density"}},
+			}},
+		},
+	}
+	var output strings.Builder
+	if err := writeText(&output, report); err != nil {
+		t.Fatal(err)
+	}
+	text := output.String()
+	for _, want := range []string{
+		"fix groups: 2 (1 stacked, 1 independent)",
+		"group 1 (2 functions; land together or stack in this order):",
+		"b.go:10:1 mod.callee [fn_params]",
+		"a.go:1:1 mod.caller [fn_length]",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("text output missing %q\n%s", want, text)
+		}
+	}
+	if strings.Contains(text, "group 2 (") {
+		t.Errorf("independent group should be counted, not listed:\n%s", text)
+	}
+}
+
+func TestGroupingConfigTOML(t *testing.T) {
+	config, err := LoadConfig(writeTemp(t, "cyclo.toml", "[grouping]\ncaller_rules = ['fn_params', 'fn_length']\ncaller_hops = 2\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(config.Grouping.CallerRules) != 2 || config.Grouping.CallerHops != 2 {
+		t.Fatalf("grouping config: %+v", config.Grouping)
+	}
+	defaults, err := LoadConfig(writeTemp(t, "empty.toml", ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(defaults.Grouping.CallerRules) != 1 || defaults.Grouping.CallerRules[0] != "fn_params" || defaults.Grouping.CallerHops != 1 {
+		t.Fatalf("grouping defaults: %+v", defaults.Grouping)
+	}
+	for _, source := range []string{"[grouping]\ncaller_rules = ['fn_param']", "[grouping]\ncaller_hops = -1"} {
+		if _, err := LoadConfig(writeTemp(t, "bad.toml", source)); err == nil {
+			t.Fatalf("invalid grouping config accepted: %s", source)
+		}
+	}
+}

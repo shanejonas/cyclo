@@ -80,7 +80,7 @@ func checkFacts(output io.Writer, opts options, facts []quality.Function, config
 		return err
 	}
 	if opts.changed {
-		report, err = onlyChanged(opts, facts, report)
+		report, err = onlyChanged(opts, facts, report, config)
 		if err != nil {
 			return err
 		}
@@ -97,7 +97,7 @@ func checkFacts(output io.Writer, opts options, facts []quality.Function, config
 // onlyChanged filters the report to diagnostics in functions the git diff
 // touches. Facts are evaluated whole so helper summaries stay complete;
 // only the reported findings are narrowed.
-func onlyChanged(opts options, facts []quality.Function, report quality.Report) (quality.Report, error) {
+func onlyChanged(opts options, facts []quality.Function, report quality.Report, config quality.Config) (quality.Report, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return report, err
@@ -114,7 +114,7 @@ func onlyChanged(opts options, facts []quality.Function, report quality.Report) 
 	if err != nil {
 		return report, err
 	}
-	return filterChanged(report, touchedFunctions(facts, ranges, root, cwd)), nil
+	return filterChanged(report, facts, touchedFunctions(facts, ranges, root, cwd), config)
 }
 
 // rootSpecs converts CLI paths (relative to cwd) to repo-root-relative git
@@ -223,9 +223,33 @@ func writeText(output io.Writer, report quality.Report) error {
 			fmt.Fprintf(&text, "  line %d: mutation: %s.%s (%s)\n", mutation.Line, mutation.Root, mutation.FieldPath, mutation.Provenance)
 		}
 	}
+	if len(report.FixGroups) > 0 {
+		writeFixGroups(&text, report.FixGroups)
+	}
 	fmt.Fprintf(&text, "%d functions; %d findings; mean/max density %d/%d milli; %d functions with unknown effects\n", report.Summary.Functions, len(report.Diagnostics), report.Summary.MeanDensityMilli, report.Summary.MaxDensityMilli, report.Summary.IncompleteFunctions)
 	_, err := io.WriteString(output, text.String())
 	return err
+}
+
+// writeFixGroups renders the work plan: which violations must be fixed
+// together and which are independent.
+func writeFixGroups(text *strings.Builder, groups []quality.FixGroup) {
+	stacked := 0
+	for _, group := range groups {
+		if group.Stacked {
+			stacked++
+		}
+	}
+	fmt.Fprintf(text, "fix groups: %d (%d stacked, %d independent)\n", len(groups), stacked, len(groups)-stacked)
+	for _, group := range groups {
+		if !group.Stacked {
+			continue
+		}
+		fmt.Fprintf(text, "  group %d (%d functions; land together or stack in this order):\n", group.ID, len(group.Functions))
+		for _, function := range group.Functions {
+			fmt.Fprintf(text, "    %s:%d:%d %s [%s]\n", function.Path, function.Line, function.Column, function.Name, strings.Join(function.Rules, ", "))
+		}
+	}
 }
 
 func supportedFactsVersion(version int) bool { return version == 1 || version == 2 }
