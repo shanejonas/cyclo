@@ -10,11 +10,11 @@ import (
 
 func loadShapes(t *testing.T) []FuncPdg {
 	t.Helper()
-	pdgs, err := Extract(context.Background(), "testdata/shapes", []string{"."})
+	ex, err := Extract(context.Background(), "testdata/shapes", []string{"."})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return pdgs
+	return ex.Funcs
 }
 
 func findPdg(t *testing.T, pdgs []FuncPdg, name string) FuncPdg {

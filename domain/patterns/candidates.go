@@ -62,6 +62,11 @@ const (
 	// data clump: the same primitive params traveling together across
 	// functions. DDD-inspired; fixed score below guard clauses.
 	ValueObject CandidateKind = "value_object"
+	// AnemicModel proposes moving behavior into methods for a struct
+	// that holds data but has no behavior while external functions
+	// operate on its fields. DDD-inspired; fixed score below value
+	// objects (more judgment involved).
+	AnemicModel CandidateKind = "anemic_model"
 )
 
 // Site is one function that shows the pattern.

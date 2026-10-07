@@ -12,10 +12,11 @@ import (
 // extractor -> FuncFacts -> report.Run -> candidates.
 func TestMinerSmoke(t *testing.T) {
 	ctx := context.Background()
-	pdgs, err := Extract(ctx, "testdata/shapes", []string{"."})
+	ex, err := Extract(ctx, "testdata/shapes", []string{"."})
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
+	pdgs := ex.Funcs
 	if len(pdgs) == 0 {
 		t.Fatal("no PDGs extracted")
 	}
