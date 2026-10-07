@@ -71,22 +71,22 @@ type Breakdown struct {
 	// LiftMilli is the specificity of the joined signature group.
 	LiftMilli uint32
 	// Holes counts hole columns; many holes mean a weak template.
-	Holes int
+	Holes         int
 	CoverageMilli uint32
 }
 
 // Candidate is one ranked abstraction proposal.
 type Candidate struct {
-	Kind            CandidateKind
-	ScoreMilli      uint32
-	Breakdown       Breakdown
-	Observation     string
-	Inference       string
+	Kind             CandidateKind
+	ScoreMilli       uint32
+	Breakdown        Breakdown
+	Observation      string
+	Inference        string
 	PossibleRefactor string
 	// Sites is every function that shows the pattern.
 	Sites []Site
 	// Definitions are the functions that fill the method holes.
-	Definitions []Site
+	Definitions     []Site
 	CounterEvidence []string
 }
 
@@ -105,7 +105,7 @@ type Mined struct {
 
 // candidateIndex holds the lookup tables over the corpus.
 type candidateIndex struct {
-	byID map[string]*FuncFacts
+	byID   map[string]*FuncFacts
 	groups map[string]*SigGroup
 	// workspaceADTs are SelfTy values with facts in this corpus: the only
 	// types worth abstracting over.
@@ -576,15 +576,15 @@ func finish(ev *candidateEvidence) Candidate {
 	}
 	inference, refactor := traitText(ev)
 	return Candidate{
-		Kind:            ev.kind,
-		ScoreMilli:      ScoreMilli(ev.breakdown, mismatch),
-		Breakdown:       ev.breakdown,
-		Observation:     ev.summary,
-		Inference:       inference,
+		Kind:             ev.kind,
+		ScoreMilli:       ScoreMilli(ev.breakdown, mismatch),
+		Breakdown:        ev.breakdown,
+		Observation:      ev.summary,
+		Inference:        inference,
 		PossibleRefactor: refactor,
-		Sites:           sitesOfFacts(ev.sites),
-		Definitions:     definitionSites(allDefs),
-		CounterEvidence: counter,
+		Sites:            sitesOfFacts(ev.sites),
+		Definitions:      definitionSites(allDefs),
+		CounterEvidence:  counter,
 	}
 }
 
@@ -845,13 +845,13 @@ func genericFn(ix *candidateIndex, sites []*FuncFacts, cluster *Cluster) *Candid
 	holes := columnsTextOf(ix, types)
 	breakdown := breakdownOf(sites, cluster, 0)
 	return &Candidate{
-		Kind:            GenericFn,
-		ScoreMilli:      ScoreMilli(breakdown, false) / 2,
-		Breakdown:       breakdown,
-		Observation:     summaryOf(ix, sites, cluster),
-		Inference:       "the same code runs over several workspace types that differ only by type",
+		Kind:             GenericFn,
+		ScoreMilli:       ScoreMilli(breakdown, false) / 2,
+		Breakdown:        breakdown,
+		Observation:      summaryOf(ix, sites, cluster),
+		Inference:        "the same code runs over several workspace types that differ only by type",
 		PossibleRefactor: fmt.Sprintf("one generic definition over %s; keep the existing names as type aliases", holes),
-		Sites:           sitesOfFacts(sites),
+		Sites:            sitesOfFacts(sites),
 	}
 }
 
@@ -930,13 +930,13 @@ func parameterize(ix *candidateIndex, sites []*FuncFacts, cluster *Cluster) *Can
 		holes = columnsText(ix, cluster.Columns)
 	}
 	return &Candidate{
-		Kind:            Parameterize,
-		ScoreMilli:      ScoreMilli(breakdown, false) / 3,
-		Breakdown:       breakdown,
-		Observation:     summaryOf(ix, sites, cluster),
-		Inference:       "the same computation is written out once per site",
+		Kind:             Parameterize,
+		ScoreMilli:       ScoreMilli(breakdown, false) / 3,
+		Breakdown:        breakdown,
+		Observation:      summaryOf(ix, sites, cluster),
+		Inference:        "the same computation is written out once per site",
 		PossibleRefactor: fmt.Sprintf("extract one helper and pass the differing parts as parameters: %s", holes),
-		Sites:           sitesOfFacts(sites),
+		Sites:            sitesOfFacts(sites),
 	}
 }
 
