@@ -63,16 +63,6 @@ func Build(groups []SigGroup, minScoreMilli uint32, top *int) PatternsReport {
 // Run is the full pipeline over driver facts: prepare (merge duplicate
 // targets, hide implements), layer 1 (signature groups), layer 2
 // (candidates), then filter and rank.
-// mergeCandidates appends a candidate batch and re-sorts the ranking when
-// the batch is non-empty.
-func mergeCandidates(mined *Mined, batch []Candidate) {
-	if len(batch) == 0 {
-		return
-	}
-	mined.Candidates = append(mined.Candidates, batch...)
-	sortMined(mined)
-}
-
 func Run(facts []*FuncFacts, options Options) PatternsReport {
 	prepared := hideImplements(mergeFacts(facts), options.HideImplements)
 	groups := MineGroups(prepared) // layer 1: sigmine
@@ -80,24 +70,36 @@ func Run(facts []*FuncFacts, options Options) PatternsReport {
 	// contract `func Mine(facts []*FuncFacts, groups []SigGroup, params Params) Mined`,
 	// which collides with sigmine.go's `func Mine`; see the commit report.
 	mined := MineCached(prepared, groups, defaultParams(options.Params), options.WlCache)
-	// Single-function findings: guard clauses need no clustering, so they
-	// join the candidates here and flow through the same ranking/filtering.
-	mergeCandidates(&mined, guardCandidates(prepared))
 	// Type switches: same-method arms want interface dispatch, also
 	// single-pass and fixed-score.
-	mergeCandidates(&mined, typeSwitchCandidates(prepared))
+	if tss := typeSwitchCandidates(prepared); len(tss) > 0 {
+		mined.Candidates = append(mined.Candidates, tss...)
+		sortMined(&mined)
+	}
 	// Data clumps: value-object proposals from param co-occurrence, also
 	// single-pass and fixed-score.
-	mergeCandidates(&mined, valueObjectCandidates(prepared))
+	if vos := valueObjectCandidates(prepared); len(vos) > 0 {
+		mined.Candidates = append(mined.Candidates, vos...)
+		sortMined(&mined)
+	}
 	// Anemic models: methodless structs with external behavior, from the
 	// extractor's type analysis passed via Options. Fixed-score.
-	mergeCandidates(&mined, anemicModelCandidates(options.AnemicModels))
+	if ams := anemicModelCandidates(options.AnemicModels); len(ams) > 0 {
+		mined.Candidates = append(mined.Candidates, ams...)
+		sortMined(&mined)
+	}
 	// Primitive obsession: domain concepts as raw string/int params,
 	// single-param signal, fixed score.
-	mergeCandidates(&mined, primitiveObsessionCandidates(prepared))
+	if pos := primitiveObsessionCandidates(prepared); len(pos) > 0 {
+		mined.Candidates = append(mined.Candidates, pos...)
+		sortMined(&mined)
+	}
 	// Enum dispatch: value switches that want to be dispatch tables,
 	// single-pass AST findings, fixed score.
-	mergeCandidates(&mined, enumDispatchCandidates(prepared))
+	if eds := enumDispatchCandidates(prepared); len(eds) > 0 {
+		mined.Candidates = append(mined.Candidates, eds...)
+		sortMined(&mined)
+	}
 	addSingleFunctionCandidates(&mined, prepared, options)
 	report := Build(groups, options.MinScoreMilli, options.Top)
 	report.Candidates = keepCandidates(mined.Candidates, options.MinScoreMilli, options.Top)

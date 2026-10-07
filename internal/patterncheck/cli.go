@@ -100,99 +100,83 @@ func toFacts(pdgs []gopatterns.FuncPdg) []*patterns.FuncFacts {
 	facts := make([]*patterns.FuncFacts, 0, len(pdgs))
 	for _, fp := range pdgs {
 		fp := fp
-		facts = append(facts, &patterns.FuncFacts{
-			ID:                fp.Name,
-			Name:              fp.Name,
-			Path:              fp.Path,
-			Line:              fp.Line,
-			EndLine:           fp.EndLine,
-			Pdg:               &fp.Pdg,
-			SigKey:            "fn(" + strings.Join(paramTypes(fp), ",") + ")",
-			GuardClauses:      guardHits(fp),
-			EnumDispatches:    dispatchHits(fp),
-			TypeSwitches:      typeSwitchHits(fp),
-			EntityIdentities:  entityHits(fp),
-			MutableIdentities: mutableHits(fp),
-			Params:            fp.Params,
-		})
+		facts = append(facts, funcFactsOf(fp))
 	}
 	return facts
 }
 
-// paramTypes collects the type classes of a function's parameters.
-func paramTypes(fp gopatterns.FuncPdg) []string {
+// funcFactsOf converts one extracted function to miner facts.
+func funcFactsOf(fp gopatterns.FuncPdg) *patterns.FuncFacts {
 	var params []string
 	for _, node := range fp.Pdg.Nodes {
 		if node.Kind == patterns.Param {
 			params = append(params, node.TyClass)
 		}
 	}
-	return params
+	return &patterns.FuncFacts{
+		ID:                fp.Name,
+		Name:              fp.Name,
+		Path:              fp.Path,
+		Line:              fp.Line,
+		EndLine:           fp.EndLine,
+		Pdg:               &fp.Pdg,
+		SigKey:            "fn(" + strings.Join(params, ",") + ")",
+		GuardClauses:      guardHits(fp.GuardClauses),
+		EnumDispatches:    dispatchHits(fp.EnumDispatches),
+		TypeSwitches:      typeSwitchHits(fp.TypeSwitches),
+		EntityIdentities:  entityHits(fp.EntityIdentities),
+		MutableIdentities: mutableHits(fp.MutableIdentities),
+		Params:            fp.Params,
+	}
 }
 
-// guardHits converts guard-clause findings to facts.
-func guardHits(fp gopatterns.FuncPdg) []patterns.GuardClauseHit {
-	var guards []patterns.GuardClauseHit
-	for _, g := range fp.GuardClauses {
-		guards = append(guards, patterns.GuardClauseHit{
-			Line:      g.Line,
-			BodyStmts: g.BodyStmts,
+func guardHits(hits []gopatterns.GuardClauseHit) []patterns.GuardClauseHit {
+	var out []patterns.GuardClauseHit
+	for _, g := range hits {
+		out = append(out, patterns.GuardClauseHit{Line: g.Line, BodyStmts: g.BodyStmts})
+	}
+	return out
+}
+
+func dispatchHits(hits []gopatterns.EnumDispatchHit) []patterns.EnumDispatchHit {
+	var out []patterns.EnumDispatchHit
+	for _, d := range hits {
+		out = append(out, patterns.EnumDispatchHit{Line: d.Line, NumCases: d.NumCases})
+	}
+	return out
+}
+
+func typeSwitchHits(hits []gopatterns.TypeSwitchHit) []patterns.TypeSwitchHit {
+	var out []patterns.TypeSwitchHit
+	for _, t := range hits {
+		out = append(out, patterns.TypeSwitchHit{
+			Line: t.Line, Bound: t.Bound, Expr: t.Expr,
+			Method: t.Method, Types: t.Types, Args: t.Args,
 		})
 	}
-	return guards
+	return out
 }
 
-// dispatchHits converts enum-dispatch findings to facts.
-func dispatchHits(fp gopatterns.FuncPdg) []patterns.EnumDispatchHit {
-	var dispatches []patterns.EnumDispatchHit
-	for _, d := range fp.EnumDispatches {
-		dispatches = append(dispatches, patterns.EnumDispatchHit{
-			Line:     d.Line,
-			NumCases: d.NumCases,
-		})
-	}
-	return dispatches
-}
-
-// typeSwitchHits converts type-switch findings to facts.
-func typeSwitchHits(fp gopatterns.FuncPdg) []patterns.TypeSwitchHit {
-	var tss []patterns.TypeSwitchHit
-	for _, t := range fp.TypeSwitches {
-		tss = append(tss, patterns.TypeSwitchHit{
-			Line:   t.Line,
-			Bound:  t.Bound,
-			Expr:   t.Expr,
-			Method: t.Method,
-			Types:  t.Types,
-			Args:   t.Args,
-		})
-	}
-	return tss
-}
-
-// entityHits converts entity-identity findings to facts.
-func entityHits(fp gopatterns.FuncPdg) []patterns.EntityIdentityHit {
-	var entities []patterns.EntityIdentityHit
-	for _, e := range fp.EntityIdentities {
-		entities = append(entities, patterns.EntityIdentityHit{
+func entityHits(hits []patterns.EntityIdentityHit) []patterns.EntityIdentityHit {
+	var out []patterns.EntityIdentityHit
+	for _, e := range hits {
+		out = append(out, patterns.EntityIdentityHit{
 			Line: e.Line, TypeName: e.TypeName, IDField: e.IDField,
 			Fields: e.Fields, Left: e.Left, Right: e.Right,
 		})
 	}
-	return entities
+	return out
 }
 
-// mutableHits converts mutable-identity findings to facts.
-func mutableHits(fp gopatterns.FuncPdg) []patterns.MutableIdentityHit {
-	var mutables []patterns.MutableIdentityHit
-	for _, m := range fp.MutableIdentities {
-		mutables = append(mutables, patterns.MutableIdentityHit{
+func mutableHits(hits []patterns.MutableIdentityHit) []patterns.MutableIdentityHit {
+	var out []patterns.MutableIdentityHit
+	for _, m := range hits {
+		out = append(out, patterns.MutableIdentityHit{
 			Line: m.Line, Field: m.Field, FuncName: m.FuncName,
 		})
 	}
-	return mutables
+	return out
 }
-
 func parseOptions(args []string) (options, error) {
 	flags := flag.NewFlagSet("patterns", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)

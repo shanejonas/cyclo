@@ -93,7 +93,12 @@ func applyEdits(src []byte, edits []textEdit) []byte {
 // guardEdit computes the text edit that turns ifStmt into a guard clause.
 // It returns false when the transform cannot be proven safe.
 func guardEdit(fset *token.FileSet, ifStmt *ast.IfStmt, src []byte) (textEdit, GuardFix, bool) {
-	elseBlock := ifStmt.Else.(*ast.BlockStmt)
+	// Else must be a plain block: an else-if chain or missing else is not
+	// a guard-clause candidate the transform can handle.
+	elseBlock, ok := ifStmt.Else.(*ast.BlockStmt)
+	if !ok {
+		return textEdit{}, GuardFix{}, false
+	}
 
 	// Invert the condition via De Morgan's laws.
 	negated := negate(ifStmt.Cond)

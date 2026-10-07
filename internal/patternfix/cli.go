@@ -17,6 +17,7 @@ import (
 
 	"github.com/shanejonas/cyclo/adapters/gopatterns"
 	"github.com/shanejonas/cyclo/domain/patterns"
+	"github.com/shanejonas/cyclo/internal/gitchanged"
 )
 
 const usage = `Usage: cyclo fix [OPTIONS] [DIRECTORIES OR GO FILES...]
@@ -30,14 +31,18 @@ Dry-run by default (shows a diff); --apply writes the files.
                 trait_method, capability_set, enum_dispatch, generic_fn,
                 anemic_model, primitive_obsession, or all (default)
   --apply       write the fixes to disk (default: dry-run diff only)
+  --changed     only fix candidates in functions touched by the git diff
+  --base REF    git base for --changed (default: merge-base with main/master)
 
 Exit 0: always, on success (even with no fixes). Exit 2: parse or IO failure.
 `
 
 type options struct {
-	kind  string
-	apply bool
-	paths []string
+	kind    string
+	base    string
+	apply   bool
+	changed bool
+	paths   []string
 }
 
 // Run runs the miner, then applies fixes for candidates with FixSpecs.
@@ -55,20 +60,38 @@ func Run(ctx context.Context, args []string, output io.Writer) error {
 		return err
 	}
 	if !opts.apply {
-		fmt.Fprintf(output, "%d fixable candidate(s) (dry-run; use --apply to write)\n", fixed)
+		if opts.changed {
+			fmt.Fprintf(output, "%d fixable candidate(s) in changed functions (dry-run; use --apply to write)\n", fixed)
+		} else {
+			fmt.Fprintf(output, "%d fixable candidate(s) (dry-run; use --apply to write)\n", fixed)
+		}
 	}
 	return nil
 }
 
-// collectFixSpecs runs the miner and returns FixSpecs filtered by kind.
+// collectFixSpecs runs the miner and returns FixSpecs filtered by kind,
+// narrowing to diff-touched functions when --changed is set.
 func collectFixSpecs(ctx context.Context, opts options) ([]*patterns.FixSpec, error) {
+	candidates, err := mineCandidates(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	if opts.changed {
+		return onlyChangedSpecs(candidates, opts)
+	}
+	return candidateSpecs(candidates), nil
+}
+
+// mineCandidates runs the miner and keeps candidates with a FixSpec of the
+// requested kind.
+func mineCandidates(ctx context.Context, opts options) ([]patterns.Candidate, error) {
 	ext, err := gopatterns.Extract(ctx, "", opts.paths)
 	if err != nil {
 		return nil, fmt.Errorf("extract: %w", err)
 	}
 	facts, anemicHits := toFacts(ext)
 	report := patterns.Run(facts, patterns.Options{AnemicModels: anemicHits})
-	var specs []*patterns.FixSpec
+	var candidates []patterns.Candidate
 	for _, c := range report.Candidates {
 		if c.FixSpec == nil {
 			continue
@@ -76,9 +99,44 @@ func collectFixSpecs(ctx context.Context, opts options) ([]*patterns.FixSpec, er
 		if opts.kind != "all" && string(c.Kind) != opts.kind {
 			continue
 		}
+		candidates = append(candidates, c)
+	}
+	return candidates, nil
+}
+
+// candidateSpecs extracts FixSpecs from filtered candidates.
+func candidateSpecs(candidates []patterns.Candidate) []*patterns.FixSpec {
+	specs := make([]*patterns.FixSpec, 0, len(candidates))
+	for _, c := range candidates {
 		specs = append(specs, c.FixSpec)
 	}
-	return specs, nil
+	return specs
+}
+
+// onlyChangedSpecs keeps FixSpecs whose candidate site the git diff touches.
+// The miner runs whole so clustering stays complete; only the fixes that
+// land are narrowed. Filtering uses the candidate's site range (the
+// containing function) rather than the FixSpec's precise edit location.
+func onlyChangedSpecs(candidates []patterns.Candidate, opts options) ([]*patterns.FixSpec, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	diff, err := gitchanged.NewDiff(cwd, opts.paths, opts.base)
+	if err != nil {
+		return nil, err
+	}
+	var kept []*patterns.FixSpec
+	for _, c := range candidates {
+		if len(c.Sites) == 0 {
+			continue
+		}
+		site := c.Sites[0]
+		if diff.Touched(site.Path, site.Line, site.EndLine) {
+			kept = append(kept, c.FixSpec)
+		}
+	}
+	return kept, nil
 }
 
 // applyFixSpecs groups specs by file and applies them.
@@ -123,11 +181,16 @@ func fixFileWithSpecs(path string, specs []*patterns.FixSpec, opts options, outp
 	return showDiff(path, src, out, applied, output)
 }
 
-// applySpecsToSource applies each spec, skipping failures.
+// applySpecsToSource applies each spec, skipping failures. Specs run
+// bottom-up (highest line first) so an edit never shifts the line numbers
+// of specs that have not run yet.
 func applySpecsToSource(path string, specs []*patterns.FixSpec, src []byte) ([]byte, int) {
+	ordered := make([]*patterns.FixSpec, len(specs))
+	copy(ordered, specs)
+	slices.SortFunc(ordered, func(a, b *patterns.FixSpec) int { return b.Line - a.Line })
 	out := src
 	var applied int
-	for _, spec := range specs {
+	for _, spec := range ordered {
 		fixed, err := gopatterns.ApplyFix(spec, out)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "warning: %s: %v\n", path, err)
@@ -192,10 +255,12 @@ func parseOptions(args []string) (options, error) {
 	flags.SetOutput(io.Discard)
 	kind := flags.String("kind", "all", "which fixes to apply")
 	apply := flags.Bool("apply", false, "write fixes to disk")
+	changed := flags.Bool("changed", false, "only fix candidates in diff-touched functions")
+	base := flags.String("base", "", "git base for --changed")
 	if err := flags.Parse(args); err != nil {
 		return options{}, err
 	}
-	result := options{kind: *kind, apply: *apply, paths: flags.Args()}
+	result := options{kind: *kind, apply: *apply, changed: *changed, base: *base, paths: flags.Args()}
 	return result, result.validate()
 }
 
