@@ -105,10 +105,62 @@ func recordIntersection(byKey map[string]*clump, a, b funcParams) {
 	c.facts[b.fact] = true
 }
 
+// genericParamNames are placeholder names that carry no domain meaning.
+// A data clump made entirely of these is not a domain concept — it's just
+// convention (x, y for coordinates in a math helper; a, b for comparables).
+var genericParamNames = map[string]bool{
+	// Single letters.
+	"a": true, "b": true, "c": true, "d": true, "e": true,
+	"f": true, "g": true, "h": true, "i": true, "j": true,
+	"k": true, "l": true, "m": true, "n": true, "o": true,
+	"p": true, "q": true, "r": true, "s": true, "t": true,
+	"u": true, "v": true, "w": true, "x": true, "y": true,
+	"z": true,
+	// Common placeholders.
+	"foo": true, "bar": true, "baz": true, "qux": true,
+	"tmp": true, "temp": true, "val": true, "var": true,
+	"arg": true, "args": true, "param": true, "params": true,
+	"obj": true, "item": true, "elem": true, "el": true,
+	// Numbered placeholders.
+	"p1": true, "p2": true, "p3": true,
+	"a1": true, "a2": true, "a3": true,
+	"v1": true, "v2": true,
+	"x1": true, "x2": true, "y1": true, "y2": true,
+}
+
+// isGenericParamName reports whether a param name is a meaningless
+// placeholder rather than a domain concept.
+func isGenericParamName(name string) bool {
+	return genericParamNames[strings.ToLower(name)]
+}
+
+// clumpKeyName extracts the param name from a "name:type" clump key.
+func clumpKeyName(key string) string {
+	if i := strings.Index(key, ":"); i >= 0 {
+		return key[:i]
+	}
+	return key
+}
+
+// clumpHasMeaningfulName reports whether at least one param in the clump
+// has a non-generic name. A clump of pure placeholders (x, y) is not a
+// domain concept and should not propose a value object.
+func clumpHasMeaningfulName(c *clump) bool {
+	for k := range c.keys {
+		if !isGenericParamName(clumpKeyName(k)) {
+			return true
+		}
+	}
+	return false
+}
+
 // buildValueObjectCandidates renders clumps as candidates, sorted.
 func buildValueObjectCandidates(clumps []*clump) []Candidate {
 	out := make([]Candidate, 0, len(clumps))
 	for _, c := range clumps {
+		if !clumpHasMeaningfulName(c) {
+			continue
+		}
 		out = append(out, buildValueObjectCandidate(c))
 	}
 	sort.Slice(out, func(i, j int) bool {

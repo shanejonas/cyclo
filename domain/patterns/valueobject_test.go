@@ -109,3 +109,75 @@ func TestValueObjectEmpty(t *testing.T) {
 		t.Errorf("expected 0 clumps for nil, got %d", len(cands))
 	}
 }
+
+func TestValueObjectSkipsGenericNames(t *testing.T) {
+	// (x, y) are placeholders, not a domain concept.
+	facts := []*FuncFacts{
+		voFact("a.F", "a.go", 1, ParamInfo{"x", "string"}, ParamInfo{"y", "string"}),
+		voFact("b.G", "b.go", 10, ParamInfo{"x", "string"}, ParamInfo{"y", "string"}),
+		voFact("c.H", "c.go", 20, ParamInfo{"x", "string"}, ParamInfo{"y", "string"}),
+	}
+	if cands := valueObjectCandidates(facts); len(cands) != 0 {
+		t.Errorf("expected 0 clumps for generic (x, y), got %d", len(cands))
+	}
+}
+
+func TestValueObjectSkipsSingleLetters(t *testing.T) {
+	facts := []*FuncFacts{
+		voFact("a.F", "a.go", 1, ParamInfo{"a", "int"}, ParamInfo{"b", "int"}),
+		voFact("b.G", "b.go", 10, ParamInfo{"a", "int"}, ParamInfo{"b", "int"}),
+		voFact("c.H", "c.go", 20, ParamInfo{"a", "int"}, ParamInfo{"b", "int"}),
+	}
+	if cands := valueObjectCandidates(facts); len(cands) != 0 {
+		t.Errorf("expected 0 clumps for (a, b), got %d", len(cands))
+	}
+}
+
+func TestValueObjectSkipsPlaceholders(t *testing.T) {
+	facts := []*FuncFacts{
+		voFact("a.F", "a.go", 1, ParamInfo{"foo", "string"}, ParamInfo{"bar", "string"}),
+		voFact("b.G", "b.go", 10, ParamInfo{"foo", "string"}, ParamInfo{"bar", "string"}),
+		voFact("c.H", "c.go", 20, ParamInfo{"foo", "string"}, ParamInfo{"bar", "string"}),
+	}
+	if cands := valueObjectCandidates(facts); len(cands) != 0 {
+		t.Errorf("expected 0 clumps for (foo, bar), got %d", len(cands))
+	}
+}
+
+func TestValueObjectKeepsMeaningfulNames(t *testing.T) {
+	facts := []*FuncFacts{
+		voFact("a.F", "a.go", 1, ParamInfo{"start", "int"}, ParamInfo{"end", "int"}),
+		voFact("b.G", "b.go", 10, ParamInfo{"start", "int"}, ParamInfo{"end", "int"}),
+		voFact("c.H", "c.go", 20, ParamInfo{"start", "int"}, ParamInfo{"end", "int"}),
+	}
+	if cands := valueObjectCandidates(facts); len(cands) != 1 {
+		t.Errorf("expected 1 clump for (start, end), got %d", len(cands))
+	}
+}
+
+func TestValueObjectKeepsMixedGroup(t *testing.T) {
+	// One meaningful name saves the clump.
+	facts := []*FuncFacts{
+		voFact("a.F", "a.go", 1, ParamInfo{"x", "int"}, ParamInfo{"offset", "int"}),
+		voFact("b.G", "b.go", 10, ParamInfo{"x", "int"}, ParamInfo{"offset", "int"}),
+		voFact("c.H", "c.go", 20, ParamInfo{"x", "int"}, ParamInfo{"offset", "int"}),
+	}
+	if cands := valueObjectCandidates(facts); len(cands) != 1 {
+		t.Errorf("expected 1 clump for mixed (x, offset), got %d", len(cands))
+	}
+}
+
+func TestIsGenericParamName(t *testing.T) {
+	generic := []string{"x", "y", "a", "b", "i", "k", "v", "foo", "bar", "tmp", "temp", "val", "arg", "p1", "p2", "X", "Y"}
+	for _, n := range generic {
+		if !isGenericParamName(n) {
+			t.Errorf("expected %q to be generic", n)
+		}
+	}
+	meaningful := []string{"start", "end", "path", "root", "amount", "currency", "name", "email"}
+	for _, n := range meaningful {
+		if isGenericParamName(n) {
+			t.Errorf("expected %q to be meaningful", n)
+		}
+	}
+}
