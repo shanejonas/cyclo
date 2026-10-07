@@ -102,7 +102,15 @@ Quality is shared too. ` + "`cyclo.getReport`" + ` includes ` + "`quality.status
 
 Use ` + "`cyclo.setDetailsView`" + ` with ` + "`{\"view\":\"quality\"}`" + ` or ` + "`{\"view\":\"source\"}`" + ` to change the shared details pane. State includes detailsView and qualityOffset. ` + "`cyclo.revealLines`" + ` and ` + "`cyclo.scrollSource`" + ` return to source view. ` + "`cyclo.refresh`" + ` reruns complexity and typed quality analysis together.
 
-## Check quality guardrails
+## Fix patterns automatically
+
+Run ` + "`cyclo patterns [paths...]`" + ` to find mechanical code patterns: inverted guard clauses, data clumps (value objects), parameterize candidates, anemic models, primitive obsession, and more. These are structural — the fix is a deterministic AST transform.
+
+Run ` + "`cyclo fix --kind all [paths...]`" + ` to auto-fix them. Dry-run by default (shows a diff); add ` + "`--apply`" + ` to write. No LLM, no tokens — pure static analysis. Use ` + "`--kind guard_clause|value_object|parameterize|anemic_model|primitive_obsession`" + ` to fix one kind.
+
+**Workflow:** Run ` + "`cyclo patterns`" + ` first, then ` + "`cyclo fix --apply`" + ` to clear the mechanical issues. This saves tokens — don't hand-rewrite what the fixer handles.
+
+## Check quality guardrails (needs your judgment)
 
 Run ` + "`cyclo check --format json [paths...]`" + ` for typed Go mutation and side-effect diagnostics without a TUI. Directories scan packages recursively; Go file arguments report only those files after loading their enclosing packages. Run from the repository root. Use ` + "`--config PATH`" + ` for TOML policy, ` + "`--tests`" + ` to include tests, and ` + "`--tags TAGS`" + ` for build tags. Use ` + "`--changed`" + ` to report only findings in functions the git diff touches (against ` + "`--base REF`" + `, defaulting to the merge-base with main/master), so an agent loop can gate on what its own edits introduced; untracked files count as fully changed.
 
@@ -113,6 +121,8 @@ Static calls to named helpers in the same package use conservative body summarie
 Facts export uses schema_version 2 with helper summaries; version 1 remains readable and keeps absent helper information unknown. Save versioned facts with ` + "`cyclo check --format facts .`" + `, then use ` + "`cyclo check --facts-in PATH --config POLICY --format json`" + ` to reevaluate without loading Go packages. Exit 0 means no findings or successful export, 1 means guardrail findings, and 2 means an operational failure. Type errors must not be interpreted as a clean check.
 
 Suppressions use ` + "`// cyclo-allow(rule_a, rule_b): reason`" + ` above a function, with intervening doc comments allowed. Reasons are required; unknown rules fail validation. Prefer documenting a deliberate exception over hiding evidence.
+
+**Patterns vs quality:** ` + "`cyclo fix`" + ` handles mechanical patterns automatically. ` + "`cyclo check`" + ` findings (side_effect_density, mutated_targets, etc.) are design smells — they need your judgment to refactor. The check tells you *where* to look; you decide *how* to restructure. Don't try to auto-fix quality findings.
 
 ## Reduce a bug reproducer
 
