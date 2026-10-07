@@ -37,6 +37,11 @@ type FuncPdg struct {
 	// Params are the function's primitive-typed parameters. Used for
 	// data-clump detection (value object proposals).
 	Params []patterns.ParamInfo
+	// EntityIdentities are attribute-based equalities in this function
+	// that should compare by ID instead.
+	EntityIdentities []patterns.EntityIdentityHit
+	// MutableIdentities are ID field assignments outside constructors.
+	MutableIdentities []patterns.MutableIdentityHit
 }
 
 // Extraction is the full result of package analysis: per-function PDGs
@@ -46,6 +51,8 @@ type Extraction struct {
 	// AnemicModels are exported methodless structs with 3+ functions
 	// operating on their fields (DDD anemic domain model detection).
 	AnemicModels []patterns.AnemicModelHit
+	// MissingIdentities are structs used as entities without an ID field.
+	MissingIdentities []patterns.MissingIdentityHit
 }
 
 // Extract loads the packages enclosing paths and returns PDGs per
@@ -68,6 +75,7 @@ func Extract(ctx context.Context, root string, paths []string) (*Extraction, err
 	for _, pkg := range pkgs {
 		out.Funcs = append(out.Funcs, packagePdgs(pkg, abs)...)
 		out.AnemicModels = append(out.AnemicModels, findAnemicModels(pkg, abs)...)
+		out.MissingIdentities = append(out.MissingIdentities, findMissingIdentities(pkg, abs)...)
 	}
 	return out, nil
 }
@@ -179,6 +187,10 @@ func extractFunc(pkg *packages.Package, fn *ast.FuncDecl, path string) FuncPdg {
 		Pdg:          patterns.Pdg{Nodes: b.nodes, Edges: b.edges},
 		GuardClauses: findGuardClauses(fn, pkg.Fset),
 		Params:       primitiveParams(fn, pkg.TypesInfo),
+		// EntityIdentities are attribute-based equalities that should use ID.
+		EntityIdentities: findEntityIdentities(fn, pkg.Fset, pkg.TypesInfo),
+		// MutableIdentities are ID assignments outside constructors.
+		MutableIdentities: findMutableIdentities(fn, pkg.Fset),
 	}
 }
 

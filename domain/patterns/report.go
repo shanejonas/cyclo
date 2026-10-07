@@ -42,6 +42,9 @@ type Options struct {
 	// from the extractor's AST-level type analysis. Empty means the
 	// extractor did not run or found none.
 	AnemicModels []AnemicModelHit
+	// MissingIdentities are structs used as entities without an ID field,
+	// from the extractor's type analysis.
+	MissingIdentities []MissingIdentityHit
 	// WlCache memoizes WL refinements across runs for incremental mining.
 	// Nil computes every refinement fresh.
 	WlCache *WlCache
@@ -67,34 +70,33 @@ func Run(facts []*FuncFacts, options Options) PatternsReport {
 	// contract `func Mine(facts []*FuncFacts, groups []SigGroup, params Params) Mined`,
 	// which collides with sigmine.go's `func Mine`; see the commit report.
 	mined := MineCached(prepared, groups, defaultParams(options.Params), options.WlCache)
-	// Single-function findings: guard clauses need no clustering, so they
-	// join the candidates here and flow through the same ranking/filtering.
-	if guards := guardCandidates(prepared); len(guards) > 0 {
-		mined.Candidates = append(mined.Candidates, guards...)
-		sortMined(&mined)
-	}
-	// Data clumps: value-object proposals from param co-occurrence, also
-	// single-pass and fixed-score.
-	if vos := valueObjectCandidates(prepared); len(vos) > 0 {
-		mined.Candidates = append(mined.Candidates, vos...)
-		sortMined(&mined)
-	}
-	// Anemic models: methodless structs with external behavior, from the
-	// extractor's type analysis passed via Options. Fixed-score.
-	if ams := anemicModelCandidates(options.AnemicModels); len(ams) > 0 {
-		mined.Candidates = append(mined.Candidates, ams...)
-		sortMined(&mined)
-	}
-	// Primitive obsession: domain concepts as raw string/int params,
-	// single-param signal, fixed score.
-	if pos := primitiveObsessionCandidates(prepared); len(pos) > 0 {
-		mined.Candidates = append(mined.Candidates, pos...)
-		sortMined(&mined)
-	}
+	addSingleFunctionCandidates(&mined, prepared, options)
 	report := Build(groups, options.MinScoreMilli, options.Top)
 	report.Candidates = keepCandidates(mined.Candidates, options.MinScoreMilli, options.Top)
 	report.Suppressed = mined.Suppressed
 	return report
+}
+
+// addSingleFunctionCandidates appends fixed-score candidates that need no
+// clustering: guard clauses, value objects, anemic models, primitive
+// obsession, and entity identity patterns.
+func addSingleFunctionCandidates(mined *Mined, prepared []*FuncFacts, options Options) {
+	// Each builder returns candidates; empty means none found.
+	builders := []func() []Candidate{
+		func() []Candidate { return guardCandidates(prepared) },
+		func() []Candidate { return valueObjectCandidates(prepared) },
+		func() []Candidate { return anemicModelCandidates(options.AnemicModels) },
+		func() []Candidate { return primitiveObsessionCandidates(prepared) },
+		func() []Candidate { return entityIdentityCandidates(prepared) },
+		func() []Candidate { return missingIdentityCandidates(options.MissingIdentities) },
+		func() []Candidate { return mutableIdentityCandidates(prepared) },
+	}
+	for _, build := range builders {
+		if cands := build(); len(cands) > 0 {
+			mined.Candidates = append(mined.Candidates, cands...)
+			sortMined(mined)
+		}
+	}
 }
 
 // Text renders the report for humans, mirroring rstyle's text output.

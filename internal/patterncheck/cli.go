@@ -62,9 +62,10 @@ func Run(ctx context.Context, args []string, output io.Writer) error {
 	}
 	defer saveCache()
 	report := patterns.Run(toFacts(pdgs.Funcs), patterns.Options{
-		Params:       params,
-		AnemicModels: pdgs.AnemicModels,
-		WlCache:      cache,
+		Params:            params,
+		AnemicModels:      pdgs.AnemicModels,
+		MissingIdentities: pdgs.MissingIdentities,
+		WlCache:           cache,
 	})
 	if opts.format == "json" {
 		out, err := patterns.JSON(&report)
@@ -99,33 +100,65 @@ func openWlCache(enabled bool) (cache *patterns.WlCache, save func(), err error)
 func toFacts(pdgs []gopatterns.FuncPdg) []*patterns.FuncFacts {
 	facts := make([]*patterns.FuncFacts, 0, len(pdgs))
 	for _, fp := range pdgs {
-		var params []string
-		for _, node := range fp.Pdg.Nodes {
-			if node.Kind == patterns.Param {
-				params = append(params, node.TyClass)
-			}
-		}
 		fp := fp
-		var guards []patterns.GuardClauseHit
-		for _, g := range fp.GuardClauses {
-			guards = append(guards, patterns.GuardClauseHit{
-				Line:      g.Line,
-				BodyStmts: g.BodyStmts,
-			})
-		}
-		facts = append(facts, &patterns.FuncFacts{
-			ID:           fp.Name,
-			Name:         fp.Name,
-			Path:         fp.Path,
-			Line:         fp.Line,
-			EndLine:      fp.EndLine,
-			Pdg:          &fp.Pdg,
-			SigKey:       "fn(" + strings.Join(params, ",") + ")",
-			GuardClauses: guards,
-			Params:       fp.Params,
-		})
+		facts = append(facts, funcFactsFromPdg(fp))
 	}
 	return facts
+}
+
+// funcFactsFromPdg converts one FuncPdg to FuncFacts.
+func funcFactsFromPdg(fp gopatterns.FuncPdg) *patterns.FuncFacts {
+	var params []string
+	for _, node := range fp.Pdg.Nodes {
+		if node.Kind == patterns.Param {
+			params = append(params, node.TyClass)
+		}
+	}
+	return &patterns.FuncFacts{
+		ID:                fp.Name,
+		Name:              fp.Name,
+		Path:              fp.Path,
+		Line:              fp.Line,
+		EndLine:           fp.EndLine,
+		Pdg:               &fp.Pdg,
+		SigKey:            "fn(" + strings.Join(params, ",") + ")",
+		GuardClauses:      convertGuards(fp.GuardClauses),
+		Params:            fp.Params,
+		EntityIdentities:  convertEntities(fp.EntityIdentities),
+		MutableIdentities: convertMutable(fp.MutableIdentities),
+	}
+}
+
+// convertGuards converts guard clause hits.
+func convertGuards(hits []gopatterns.GuardClauseHit) []patterns.GuardClauseHit {
+	var out []patterns.GuardClauseHit
+	for _, g := range hits {
+		out = append(out, patterns.GuardClauseHit{Line: g.Line, BodyStmts: g.BodyStmts})
+	}
+	return out
+}
+
+// convertEntities converts entity identity hits.
+func convertEntities(hits []patterns.EntityIdentityHit) []patterns.EntityIdentityHit {
+	var out []patterns.EntityIdentityHit
+	for _, e := range hits {
+		out = append(out, patterns.EntityIdentityHit{
+			Line: e.Line, TypeName: e.TypeName, IDField: e.IDField,
+			Fields: e.Fields, Left: e.Left, Right: e.Right,
+		})
+	}
+	return out
+}
+
+// convertMutable converts mutable identity hits.
+func convertMutable(hits []patterns.MutableIdentityHit) []patterns.MutableIdentityHit {
+	var out []patterns.MutableIdentityHit
+	for _, m := range hits {
+		out = append(out, patterns.MutableIdentityHit{
+			Line: m.Line, Field: m.Field, FuncName: m.FuncName,
+		})
+	}
+	return out
 }
 
 func parseOptions(args []string) (options, error) {

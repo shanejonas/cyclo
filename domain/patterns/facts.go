@@ -44,6 +44,10 @@ type FuncFacts struct {
 	// be guard clauses. AST-level finding from the extractor (Go-specific
 	// extension, not in rstyle's FnFacts).
 	GuardClauses []GuardClauseHit
+	// EntityIdentities are attribute-based equalities that should use ID.
+	EntityIdentities []EntityIdentityHit
+	// MutableIdentities are ID assignments outside constructors.
+	MutableIdentities []MutableIdentityHit
 	// Params are the function's primitive-typed parameters (name and type).
 	// Used for data-clump detection (value object proposals). Empty when the
 	// function has no primitive params or params were not extracted.
@@ -57,6 +61,23 @@ type GuardClauseHit struct {
 	Line int
 	// BodyStmts counts statements in the if body (the trapped happy path).
 	BodyStmts int
+}
+
+// EntityIdentityHit is one attribute-based equality that should use identity.
+type EntityIdentityHit struct {
+	Line     int
+	TypeName string
+	IDField  string
+	Fields   []string
+	Left     string
+	Right    string
+}
+
+// MutableIdentityHit is one ID assignment outside a constructor.
+type MutableIdentityHit struct {
+	Line     int
+	Field    string
+	FuncName string
 }
 
 // EffectClass returns the observable-effect class set for the mismatch check:

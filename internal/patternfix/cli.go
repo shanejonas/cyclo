@@ -66,8 +66,8 @@ func collectFixSpecs(ctx context.Context, opts options) ([]*patterns.FixSpec, er
 	if err != nil {
 		return nil, fmt.Errorf("extract: %w", err)
 	}
-	facts, anemicHits := toFacts(ext)
-	report := patterns.Run(facts, patterns.Options{AnemicModels: anemicHits})
+	facts, anemicHits, missingHits := toFacts(ext)
+	report := patterns.Run(facts, patterns.Options{AnemicModels: anemicHits, MissingIdentities: missingHits})
 	var specs []*patterns.FixSpec
 	for _, c := range report.Candidates {
 		if c.FixSpec == nil {
@@ -200,7 +200,7 @@ func parseOptions(args []string) (options, error) {
 }
 
 func (opts options) validate() error {
-	valid := []string{"guard_clause", "value_object", "parameterize", "trait_method", "capability_set", "enum_dispatch", "generic_fn", "anemic_model", "primitive_obsession", "all"}
+	valid := []string{"guard_clause", "value_object", "parameterize", "trait_method", "capability_set", "enum_dispatch", "generic_fn", "anemic_model", "primitive_obsession", "entity_identity", "missing_identity", "mutable_identity", "all"}
 	if !slices.Contains(valid, opts.kind) {
 		return fmt.Errorf("kind must be one of %v", valid)
 	}
@@ -208,7 +208,7 @@ func (opts options) validate() error {
 }
 
 // toFacts converts extraction to FuncFacts (copied from patterncheck).
-func toFacts(ext *gopatterns.Extraction) ([]*patterns.FuncFacts, []patterns.AnemicModelHit) {
+func toFacts(ext *gopatterns.Extraction) ([]*patterns.FuncFacts, []patterns.AnemicModelHit, []patterns.MissingIdentityHit) {
 	var facts []*patterns.FuncFacts
 	for _, fp := range ext.Funcs {
 		fp := fp
@@ -226,16 +226,37 @@ func toFacts(ext *gopatterns.Extraction) ([]*patterns.FuncFacts, []patterns.Anem
 				Type: p.Type,
 			})
 		}
+		var entities []patterns.EntityIdentityHit
+		for _, e := range fp.EntityIdentities {
+			entities = append(entities, patterns.EntityIdentityHit{
+				Line:     e.Line,
+				TypeName: e.TypeName,
+				IDField:  e.IDField,
+				Fields:   e.Fields,
+				Left:     e.Left,
+				Right:    e.Right,
+			})
+		}
+		var mutable []patterns.MutableIdentityHit
+		for _, m := range fp.MutableIdentities {
+			mutable = append(mutable, patterns.MutableIdentityHit{
+				Line:     m.Line,
+				Field:    m.Field,
+				FuncName: m.FuncName,
+			})
+		}
 		facts = append(facts, &patterns.FuncFacts{
-			ID:           fp.Name,
-			Name:         fp.Name,
-			Path:         fp.Path,
-			Line:         fp.Line,
-			EndLine:      fp.EndLine,
-			Pdg:          &fp.Pdg,
-			GuardClauses: guards,
-			Params:       params,
+			ID:                fp.Name,
+			Name:              fp.Name,
+			Path:              fp.Path,
+			Line:              fp.Line,
+			EndLine:           fp.EndLine,
+			Pdg:               &fp.Pdg,
+			GuardClauses:      guards,
+			Params:            params,
+			EntityIdentities:  entities,
+			MutableIdentities: mutable,
 		})
 	}
-	return facts, ext.AnemicModels
+	return facts, ext.AnemicModels, ext.MissingIdentities
 }
