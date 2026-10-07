@@ -9,17 +9,27 @@ name: CI
 permissions:
   contents: read
 
+env:
+  GO_VERSION: "1.24"
+
 jobs:
   lint:
     runs-on: openmuse-linux-checks
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        run: |
+          git init -q .
+          git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          git -c http.extraHeader="AUTHORIZATION: bearer ${GITHUB_TOKEN}" fetch -q --depth 1 origin "${GITHUB_SHA}"
+          git checkout -q FETCH_HEAD
 
       - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
+        run: |
+          if ! command -v go >/dev/null 2>&1; then
+            curl -sL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xz -C /tmp
+            echo "/tmp/go/bin" >> "${GITHUB_PATH}"
+          fi
+          go version
 
       - name: Lint
         run: make lint
@@ -28,12 +38,19 @@ jobs:
     runs-on: openmuse-linux-checks
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        run: |
+          git init -q .
+          git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          git -c http.extraHeader="AUTHORIZATION: bearer ${GITHUB_TOKEN}" fetch -q --depth 1 origin "${GITHUB_SHA}"
+          git checkout -q FETCH_HEAD
 
       - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
+        run: |
+          if ! command -v go >/dev/null 2>&1; then
+            curl -sL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xz -C /tmp
+            echo "/tmp/go/bin" >> "${GITHUB_PATH}"
+          fi
+          go version
 
       - name: Test
         run: make test
@@ -42,12 +59,19 @@ jobs:
     runs-on: openmuse-linux-checks
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        run: |
+          git init -q .
+          git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          git -c http.extraHeader="AUTHORIZATION: bearer ${GITHUB_TOKEN}" fetch -q --depth 1 origin "${GITHUB_SHA}"
+          git checkout -q FETCH_HEAD
 
       - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
+        run: |
+          if ! command -v go >/dev/null 2>&1; then
+            curl -sL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xz -C /tmp
+            echo "/tmp/go/bin" >> "${GITHUB_PATH}"
+          fi
+          go version
 
       - name: Test with race detector
         run: make test-race
@@ -56,12 +80,19 @@ jobs:
     runs-on: openmuse-linux-checks
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        run: |
+          git init -q .
+          git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          git -c http.extraHeader="AUTHORIZATION: bearer ${GITHUB_TOKEN}" fetch -q --depth 1 origin "${GITHUB_SHA}"
+          git checkout -q FETCH_HEAD
 
       - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
+        run: |
+          if ! command -v go >/dev/null 2>&1; then
+            curl -sL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xz -C /tmp
+            echo "/tmp/go/bin" >> "${GITHUB_PATH}"
+          fi
+          go version
 
       - name: Dogfood cyclo on itself
         run: make cyclo-check
@@ -70,12 +101,19 @@ jobs:
     runs-on: openmuse-linux-checks
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        run: |
+          git init -q .
+          git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          git -c http.extraHeader="AUTHORIZATION: bearer ${GITHUB_TOKEN}" fetch -q --depth 1 origin "${GITHUB_SHA}"
+          git checkout -q FETCH_HEAD
 
       - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
+        run: |
+          if ! command -v go >/dev/null 2>&1; then
+            curl -sL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xz -C /tmp
+            echo "/tmp/go/bin" >> "${GITHUB_PATH}"
+          fi
+          go version
 
       - name: Quality gate
         run: make quality-gate
