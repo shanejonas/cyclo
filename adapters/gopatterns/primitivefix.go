@@ -307,24 +307,40 @@ func primitiveParamSafe(fn *ast.FuncDecl, paramName string, groupFns map[string]
 	if paramShadowed(fn, paramName) {
 		return false
 	}
-	safe := true
-	var parents []ast.Node
-	ast.Inspect(fn.Body, func(n ast.Node) bool {
-		if n == nil {
-			parents = parents[:len(parents)-1]
-			return true
-		}
-		parents = append(parents, n)
-		if !safe {
-			return false
-		}
-		if id, ok := n.(*ast.Ident); ok && id.Name == paramName && !paramUseSafe(parents, groupFns) {
-			safe = false
-			return false
-		}
+	c := &paramUseChecker{paramName: paramName, groupFns: groupFns, safe: true}
+	ast.Inspect(fn.Body, c.visit)
+	return c.safe
+}
+
+// paramUseChecker walks a function body and reports whether every use of the
+// named parameter stays valid after its type changes to a named type.
+type paramUseChecker struct {
+	paramName string
+	groupFns  map[string]bool
+	parents   []ast.Node
+	safe      bool
+}
+
+func (c *paramUseChecker) visit(n ast.Node) bool {
+	if n == nil {
+		c.parents = c.parents[:len(c.parents)-1]
 		return true
-	})
-	return safe
+	}
+	c.parents = append(c.parents, n)
+	if !c.safe {
+		return false
+	}
+	if id, ok := n.(*ast.Ident); ok && c.isUnsafeUse(id) {
+		c.safe = false
+		return false
+	}
+	return true
+}
+
+// isUnsafeUse reports whether one identifier use would not compile after
+// the param's type changes.
+func (c *paramUseChecker) isUnsafeUse(id *ast.Ident) bool {
+	return id.Name == c.paramName && !paramUseSafe(c.parents, c.groupFns)
 }
 
 // paramUseSafe reports whether one use of the param (the innermost node on
