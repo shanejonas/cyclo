@@ -7,6 +7,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"io"
@@ -25,7 +26,7 @@ Statically apply fixes for patterns miner candidates. No LLM, no tokens:
 pure AST rewrites that are provably behavior-preserving.
 Dry-run by default (shows a diff); --apply writes the files.
 
-  --kind KIND   which fixes to apply: guard_clause (default), or all
+  --kind KIND   which fixes to apply: guard_clause (default), parameterize, or all
   --apply       write the fixes to disk (default: dry-run diff only)
 
 Exit 0: always, on success (even with no fixes). Exit 2: parse or IO failure.
@@ -95,35 +96,86 @@ func fixFile(path string, opts options, output io.Writer) (int, error) {
 }
 
 // fixSource parses src and returns the fixed source and the fixes applied.
-func fixSource(path string, src []byte, kind string) ([]byte, []gopatterns.GuardFix, error) {
+func fixSource(path string, src []byte, kind string) ([]byte, []gopatterns.Fix, error) {
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, path, src, parser.ParseComments)
 	if err != nil {
 		return nil, nil, fmt.Errorf("parse %s: %w", path, err)
 	}
+
 	switch kind {
-	case "guard_clause", "all":
-		return gopatterns.FixInvertedGuards(fset, f, src)
+	case "guard_clause":
+		return fixGuardClause(fset, f, src)
+	case "parameterize":
+		return fixParameterizeKind(fset, f, src)
+	case "all":
+		return fixAllKinds(path, src)
 	default:
 		return nil, nil, fmt.Errorf("unknown kind %q", kind)
 	}
 }
 
+// fixGuardClause applies guard-clause fixes.
+func fixGuardClause(fset *token.FileSet, f *ast.File, src []byte) ([]byte, []gopatterns.Fix, error) {
+	fixed, guardFixes, err := gopatterns.FixInvertedGuards(fset, f, src)
+	if err != nil {
+		return nil, nil, err
+	}
+	return fixed, toFixes(guardFixes), nil
+}
+
+// fixParameterizeKind applies parameterize fixes.
+func fixParameterizeKind(fset *token.FileSet, f *ast.File, src []byte) ([]byte, []gopatterns.Fix, error) {
+	fixed, paramFixes, err := gopatterns.FixParameterize(fset, f, src, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	return fixed, toFixes(paramFixes), nil
+}
+
+// toFixes converts typed fixes to the Fix interface.
+func toFixes[T gopatterns.Fix](fixes []T) []gopatterns.Fix {
+	out := make([]gopatterns.Fix, len(fixes))
+	for i, fx := range fixes {
+		out[i] = fx
+	}
+	return out
+}
+
+// fixAllKinds applies guard_clause then parameterize.
+func fixAllKinds(path string, src []byte) ([]byte, []gopatterns.Fix, error) {
+	src1, fixes1, err := fixSource(path, src, "guard_clause")
+	if err != nil {
+		return nil, nil, err
+	}
+	src2, fixes2, err := fixSource(path, src1, "parameterize")
+	if err != nil {
+		return nil, nil, err
+	}
+	return src2, append(fixes1, fixes2...), nil
+}
+
 // applyFixes writes the fixed source and reports.
-func applyFixes(path string, out []byte, fixes []gopatterns.GuardFix, output io.Writer) (int, error) {
+func applyFixes(path string, out []byte, fixes []gopatterns.Fix, output io.Writer) (int, error) {
 	if err := os.WriteFile(path, out, 0644); err != nil {
 		return 0, err
 	}
-	fmt.Fprintf(output, "fixed %d guard_clause in %s\n", len(fixes), path)
+	byKind := map[string]int{}
+	for _, fx := range fixes {
+		byKind[fx.FixKind()]++
+	}
+	for kind, n := range byKind {
+		fmt.Fprintf(output, "fixed %d %s in %s\n", n, kind, path)
+	}
 	return len(fixes), nil
 }
 
 // showDiff prints a unified diff for dry-run.
-func showDiff(path string, src, out []byte, fixes []gopatterns.GuardFix, output io.Writer) (int, error) {
+func showDiff(path string, src, out []byte, fixes []gopatterns.Fix, output io.Writer) (int, error) {
 	diff, err := unifiedDiff(path, src, out)
 	if err != nil {
 		for _, fx := range fixes {
-			fmt.Fprintf(output, "%s:%d: would fix %s\n", path, fx.Line, fx.Kind)
+			fmt.Fprintf(output, "%s:%d: would fix %s\n", path, fx.FixLine(), fx.FixKind())
 		}
 		return len(fixes), nil
 	}
@@ -234,8 +286,8 @@ func parseOptions(args []string) (options, error) {
 }
 
 func (opts options) validate() error {
-	if !slices.Contains([]string{"guard_clause", "all"}, opts.kind) {
-		return fmt.Errorf("kind must be guard_clause or all")
+	if !slices.Contains([]string{"guard_clause", "parameterize", "all"}, opts.kind) {
+		return fmt.Errorf("kind must be guard_clause, parameterize, or all")
 	}
 	return nil
 }
