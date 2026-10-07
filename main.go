@@ -15,6 +15,7 @@ import (
 	"github.com/shanejonas/cyclo/adapters/sqlite"
 	"github.com/shanejonas/cyclo/application"
 	"github.com/shanejonas/cyclo/internal/bugreducer"
+	"github.com/shanejonas/cyclo/internal/patterncheck"
 	"github.com/shanejonas/cyclo/internal/qualitycheck"
 )
 
@@ -30,10 +31,27 @@ func main() {
 	err := run(os.Args[1:], os.Stdout)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		if len(os.Args) > 1 && os.Args[1] == "check" && !errors.Is(err, qualitycheck.ErrFindings) {
-			os.Exit(2)
+		os.Exit(commandExitCode(os.Args[1:], err))
+	}
+}
+
+// commandExitCode maps a failed subcommand to its process exit code.
+// Findings are exit 1; hard failures exit 2. patterns never reports
+// findings, so any of its errors is a hard failure.
+func commandExitCode(args []string, err error) int {
+	if len(args) == 0 {
+		return 1
+	}
+	switch args[0] {
+	case "check":
+		if errors.Is(err, qualitycheck.ErrFindings) {
+			return 1
 		}
-		os.Exit(1)
+		return 2
+	case "patterns":
+		return 2
+	default:
+		return 1
 	}
 }
 
@@ -48,16 +66,24 @@ func runCommand(args []string, output io.Writer) error {
 	if args[0] == "--skill" {
 		return writeSkill(args, output)
 	}
-	if args[0] != "check" && args[0] != "bug-reducer" {
-		return runDefault(args, output)
-	}
-
 	ctx, cancel := signal.NotifyContext(context.Background(), reducerSignals()...)
 	defer cancel()
-	if args[0] == "check" {
+	return runSubcommand(ctx, args, output)
+}
+
+// runSubcommand dispatches the headless subcommands; anything else runs
+// the default TUI.
+func runSubcommand(ctx context.Context, args []string, output io.Writer) error {
+	switch args[0] {
+	case "check":
 		return qualitycheck.Run(ctx, args[1:], output)
+	case "bug-reducer":
+		return bugreducer.Run(ctx, args[1:], output)
+	case "patterns":
+		return patterncheck.Run(ctx, args[1:], output)
+	default:
+		return runDefault(args, output)
 	}
-	return bugreducer.Run(ctx, args[1:], output)
 }
 
 func runDefault(args []string, output io.Writer) error {
