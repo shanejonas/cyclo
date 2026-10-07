@@ -222,6 +222,7 @@ func writeText(output io.Writer, report quality.Report) error {
 		for _, mutation := range diagnostic.Mutations {
 			fmt.Fprintf(&text, "  line %d: mutation: %s.%s (%s)\n", mutation.Line, mutation.Root, mutation.FieldPath, mutation.Provenance)
 		}
+		writePlan(&text, diagnostic.Plan)
 	}
 	if len(report.FixGroups) > 0 {
 		writeFixGroups(&text, report.FixGroups)
@@ -250,6 +251,45 @@ func writeFixGroups(text *strings.Builder, groups []quality.FixGroup) {
 			fmt.Fprintf(text, "    %s:%d:%d %s [%s]\n", function.Path, function.Line, function.Column, function.Name, strings.Join(function.Rules, ", "))
 		}
 	}
+}
+
+// writePlan renders a stacking plan under its fn_params diagnostic:
+// re-signed signatures first, then the callers whose call sites follow.
+func writePlan(text *strings.Builder, plan *quality.StackPlan) {
+	if plan == nil {
+		return
+	}
+	text.WriteString(planText(plan))
+}
+
+// planText formats a stacking plan without io; writeText emits it.
+func planText(plan *quality.StackPlan) string {
+	var sb strings.Builder
+	sb.WriteString("  plan:\n")
+	for i, step := range plan.Steps {
+		sb.WriteString(stepText(i+1, step))
+	}
+	for _, bundle := range plan.Bundles {
+		params := make([]string, len(bundle.Params))
+		for i, p := range bundle.Params {
+			params[i] = p.Name + ": " + p.Type
+		}
+		sb.WriteString(fmt.Sprintf("    bundle (%d sites): %s\n", bundle.Sites, strings.Join(params, ", ")))
+	}
+	return sb.String()
+}
+
+func stepText(number int, step quality.PlanStep) string {
+	kind := "call sites"
+	if step.Signature {
+		kind = "signature"
+	}
+	text := fmt.Sprintf("    %d. %s %s (%s:%d; %d incoming, %d outgoing sites",
+		number, kind, step.Name, step.Path, step.Line, step.IncomingSites, step.OutgoingSites)
+	if len(step.PassThrough) > 0 {
+		text += fmt.Sprintf("; pass-through: %s", strings.Join(step.PassThrough, ", "))
+	}
+	return text + ")\n"
 }
 
 func supportedFactsVersion(version int) bool { return version == 1 || version == 2 }
