@@ -18,7 +18,7 @@ jobs:
       - name: Checkout
         run: |
           git init -q .
-          git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          git remote add origin "https://gitea.pizzly-tarpon.ts.net/${GITHUB_REPOSITORY}.git"
           git -c http.extraHeader="AUTHORIZATION: bearer ${GITHUB_TOKEN}" fetch -q origin "${GITHUB_SHA}"
           git checkout -q FETCH_HEAD
 
@@ -47,7 +47,7 @@ jobs:
 
       - name: Create Gitea release and upload
         run: |
-          API="${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}"
+          API="https://gitea.pizzly-tarpon.ts.net/api/v1/repos/${GITHUB_REPOSITORY}"
           AUTH="Authorization: bearer ${GITHUB_TOKEN}"
           # Create the release (idempotent: reuse if it exists)
           RELEASE_ID=$(curl -s -H "$AUTH" "${API}/releases/tags/${GITHUB_REF_NAME}" | python3 -c "import json,sys; print(json.load(sys.stdin).get('id') or '')" 2>/dev/null)

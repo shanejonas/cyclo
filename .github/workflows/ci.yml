@@ -19,7 +19,7 @@ jobs:
       - name: Checkout
         run: |
           git init -q .
-          git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          git remote add origin "https://gitea.pizzly-tarpon.ts.net/${GITHUB_REPOSITORY}.git"
           git -c http.extraHeader="AUTHORIZATION: bearer ${GITHUB_TOKEN}" fetch -q --depth 1 origin "${GITHUB_SHA}"
           git checkout -q FETCH_HEAD
 
@@ -40,7 +40,7 @@ jobs:
       - name: Checkout
         run: |
           git init -q .
-          git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          git remote add origin "https://gitea.pizzly-tarpon.ts.net/${GITHUB_REPOSITORY}.git"
           git -c http.extraHeader="AUTHORIZATION: bearer ${GITHUB_TOKEN}" fetch -q --depth 1 origin "${GITHUB_SHA}"
           git checkout -q FETCH_HEAD
 
@@ -61,7 +61,7 @@ jobs:
       - name: Checkout
         run: |
           git init -q .
-          git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          git remote add origin "https://gitea.pizzly-tarpon.ts.net/${GITHUB_REPOSITORY}.git"
           git -c http.extraHeader="AUTHORIZATION: bearer ${GITHUB_TOKEN}" fetch -q --depth 1 origin "${GITHUB_SHA}"
           git checkout -q FETCH_HEAD
 
@@ -82,7 +82,7 @@ jobs:
       - name: Checkout
         run: |
           git init -q .
-          git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          git remote add origin "https://gitea.pizzly-tarpon.ts.net/${GITHUB_REPOSITORY}.git"
           git -c http.extraHeader="AUTHORIZATION: bearer ${GITHUB_TOKEN}" fetch -q --depth 1 origin "${GITHUB_SHA}"
           git checkout -q FETCH_HEAD
 
@@ -103,7 +103,7 @@ jobs:
       - name: Checkout
         run: |
           git init -q .
-          git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          git remote add origin "https://gitea.pizzly-tarpon.ts.net/${GITHUB_REPOSITORY}.git"
           git -c http.extraHeader="AUTHORIZATION: bearer ${GITHUB_TOKEN}" fetch -q --depth 1 origin "${GITHUB_SHA}"
           git checkout -q FETCH_HEAD
 
