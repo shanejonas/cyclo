@@ -332,3 +332,17 @@ func Comparable(a, b *Wl) bool {
 	}
 	return Mineable(a) && Mineable(b) && large <= small*maxScale
 }
+
+// CallClass returns the signature class of a call for blocking keys, porting
+// rstyle's wl::call_class: the normalized callee signature, or the callee id
+// without one. Unlike label(), the callee id is kept (names are fine for
+// blocking; they are excluded from WL labels, not from block keys).
+func CallClass(n PdgNode) string {
+	if n.SigClass != "" {
+		return n.SigClass
+	}
+	if n.CalleeID != "" {
+		return n.CalleeID
+	}
+	return "?"
+}
