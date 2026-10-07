@@ -14,10 +14,10 @@ import (
 	"github.com/shanejonas/cyclo/adapters/goquality"
 	"github.com/shanejonas/cyclo/adapters/sqlite"
 	"github.com/shanejonas/cyclo/application"
-	"github.com/shanejonas/cyclo/internal/bugreducer"
-	"github.com/shanejonas/cyclo/internal/patterncheck"
-	"github.com/shanejonas/cyclo/internal/patternfix"
-	"github.com/shanejonas/cyclo/internal/qualitycheck"
+	"github.com/shanejonas/cyclo/application/bugreducer"
+	"github.com/shanejonas/cyclo/application/patterncheck"
+	"github.com/shanejonas/cyclo/application/patternfix"
+	"github.com/shanejonas/cyclo/application/qualitycheck"
 )
 
 const defaultControlPort = 8197

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/xml"
-	"github.com/shanejonas/cyclo/internal/reducer"
+	"github.com/shanejonas/cyclo/adapters/reducer"
 	"go/ast"
 	"go/parser"
 	"go/token"

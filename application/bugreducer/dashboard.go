@@ -11,7 +11,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/shanejonas/cyclo/internal/reducer"
+	"github.com/shanejonas/cyclo/adapters/reducer"
 )
 
 type progressMsg struct {

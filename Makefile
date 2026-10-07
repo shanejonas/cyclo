@@ -25,14 +25,14 @@ cyclo-check:
 quality-gate:
 	go build -buildvcs=false -o /tmp/cyclo-check-bin .
 	/tmp/cyclo-check-bin check --format json . > /tmp/cyclo-facts.json || test $$? -eq 1
-	go run ./internal/qualitygate --baseline quality-baseline.json --facts /tmp/cyclo-facts.json
+	go run ./application/qualitygate --baseline quality-baseline.json --facts /tmp/cyclo-facts.json
 
 # Regenerate the checked-in baseline after a change legitimately moves the
 # numbers (usually down).
 quality-baseline:
 	go build -buildvcs=false -o /tmp/cyclo-check-bin .
 	/tmp/cyclo-check-bin check --format json . > /tmp/cyclo-facts.json || test $$? -eq 1
-	go run ./internal/qualitygate --write quality-baseline.json --facts /tmp/cyclo-facts.json
+	go run ./application/qualitygate --write quality-baseline.json --facts /tmp/cyclo-facts.json
 
 fmt:
 	go fmt ./...

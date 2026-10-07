@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/shanejonas/cyclo/domain/quality"
-	"github.com/shanejonas/cyclo/internal/gitchanged"
+	"github.com/shanejonas/cyclo/adapters/gitchanged"
 )
 
 func TestTouchedFunctions(t *testing.T) {

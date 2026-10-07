@@ -14,7 +14,7 @@ import (
 
 	"github.com/shanejonas/cyclo/adapters/goquality"
 	"github.com/shanejonas/cyclo/domain/quality"
-	"github.com/shanejonas/cyclo/internal/gitchanged"
+	"github.com/shanejonas/cyclo/adapters/gitchanged"
 )
 
 var ErrFindings = errors.New("quality guardrails exceeded")

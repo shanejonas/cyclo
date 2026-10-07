@@ -196,7 +196,7 @@ func TestSelfCheckProducesValidReport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	facts, err := (Analyzer{Root: root}).Extract(context.Background(), []string{"domain/quality", "adapters/goquality", "internal/qualitycheck"})
+	facts, err := (Analyzer{Root: root}).Extract(context.Background(), []string{"domain/quality", "adapters/goquality", "application/qualitycheck"})
 	if err != nil {
 		t.Fatal(err)
 	}
