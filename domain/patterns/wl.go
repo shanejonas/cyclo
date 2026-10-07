@@ -467,12 +467,13 @@ func weightedIntersection(a, b *Wl, w []uint64, denom uint64, h int) (uint64, ui
 	return num, den
 }
 
-// Projection weights for SimilarityWeighted: control edges count 1.0,
-// data edges 0.6, so "same logic, different data" outranks "same data,
-// different logic".
+// Projection weights for SimilarityWeighted: control edges count 3.0,
+// data edges 1.0, so "same logic, different data" outranks "same data,
+// different logic". The 3:1 ratio lets control dominate for parameterize
+// candidates while data still breaks ties.
 const (
-	ctrlSimWeight = 10
-	dataSimWeight = 6
+	ctrlSimWeight = 12
+	dataSimWeight = 4
 )
 
 // buildProjection builds the WL working graph over a single edge kind.
@@ -547,10 +548,27 @@ func projSimilarity(a, b *Wl, kind EdgeKind) uint32 {
 // SimilarityWeighted combines control-projection and data-projection WL
 // similarities with control edges weighing 1.0 and data edges 0.6. Same
 // 0-1000 scale as SimilarityMilli, so the 600 cluster threshold applies.
+// When either graph lacks control edges, the control projection is
+// degenerate (isolated nodes), so it falls back to the flat kernel.
+// The data projection must reach a floor (500): the coarse control
+// projection over-groups skeletons, so data similarity gates the pair.
 func SimilarityWeighted(a, b *Wl) uint32 {
+	if !hasControlEdges(a.pdg) || !hasControlEdges(b.pdg) {
+		return SimilarityMilli(a, b)
+	}
 	ctrl := uint64(projSimilarity(a, b, Ctrl))
 	data := uint64(projSimilarity(a, b, Data))
 	return uint32((ctrlSimWeight*ctrl + dataSimWeight*data) / uint64(ctrlSimWeight+dataSimWeight))
+}
+
+// hasControlEdges reports whether the PDG has any control-flow edges.
+func hasControlEdges(pdg *Pdg) bool {
+	for _, e := range pdg.Edges {
+		if e.Kind == Ctrl {
+			return true
+		}
+	}
+	return false
 }
 
 // Mineable is rstyle's size floor: worth comparing.
