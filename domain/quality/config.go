@@ -16,6 +16,9 @@ type Config struct {
 	MutationPerTarget Rule    `toml:"mutation_per_target"`
 	MutatedTargets    Rule    `toml:"mutated_targets"`
 	SideEffectDensity Rule    `toml:"side_effect_density"`
+	Aggregate         Rule    `toml:"aggregate"`
+	Repository        Rule    `toml:"repository"`
+	MutableIdentity   Rule    `toml:"mutable_identity"`
 	MinStatements     int     `toml:"min_statements"`
 	CountSelf         bool    `toml:"count_self"`
 	Granularity       string  `toml:"granularity"`
@@ -58,6 +61,7 @@ func DefaultConfig() Config {
 		FnLength: Rule{true, 50}, FnParams: Rule{true, 4},
 		MutationPerTarget: Rule{true, 3}, MutatedTargets: Rule{true, 3},
 		SideEffectDensity: Rule{true, 500}, MinStatements: 3, Granularity: "root",
+		Aggregate: Rule{true, 1}, Repository: Rule{true, 0}, MutableIdentity: Rule{true, 0},
 		Weights: Weights{1, 3, 3, 2, 4, 1, 1, 0, 1}, Prefixes: defaultPrefixes(),
 		Grouping: Grouping{CallerRules: []string{"fn_params"}, CallerHops: 1},
 	}

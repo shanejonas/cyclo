@@ -74,13 +74,13 @@ func UpdateUser(u *User) { u.ID = "3" }
 			}
 		}
 	}
-	if hits := findMutableIdentities(newFn, fset); len(hits) != 0 {
+	if hits := FindMutableIdentities(newFn, fset); len(hits) != 0 {
 		t.Errorf("NewUser should be skipped, got %d hits", len(hits))
 	}
-	if hits := findMutableIdentities(createFn, fset); len(hits) != 0 {
+	if hits := FindMutableIdentities(createFn, fset); len(hits) != 0 {
 		t.Errorf("CreateUser should be skipped, got %d hits", len(hits))
 	}
-	if hits := findMutableIdentities(updateFn, fset); len(hits) != 1 {
+	if hits := FindMutableIdentities(updateFn, fset); len(hits) != 1 {
 		t.Errorf("UpdateUser should have 1 hit, got %d", len(hits))
 	} else if hits[0].Field != "ID" {
 		t.Errorf("hit field = %q, want ID", hits[0].Field)
@@ -103,7 +103,7 @@ func UpdateUser(u *User) { u.Name = "x" }
 			fn = fd
 		}
 	}
-	if hits := findMutableIdentities(fn, fset); len(hits) != 0 {
+	if hits := FindMutableIdentities(fn, fset); len(hits) != 0 {
 		t.Errorf("non-ID assignment should be skipped, got %d hits", len(hits))
 	}
 }

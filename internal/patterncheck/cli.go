@@ -126,6 +126,9 @@ func funcFactsOf(fp gopatterns.FuncPdg) *patterns.FuncFacts {
 		TypeSwitches:      typeSwitchHits(fp.TypeSwitches),
 		EntityIdentities:  entityHits(fp.EntityIdentities),
 		MutableIdentities: mutableHits(fp.MutableIdentities),
+		AggregateMods:     fp.AggregateMods,
+		DbCalls:           fp.DbCalls,
+		FactoryLits:       fp.FactoryLits,
 		Params:            fp.Params,
 	}
 }

@@ -487,3 +487,333 @@ func findStructDecl(f *ast.File, typeName string) *ast.TypeSpec {
 	})
 	return target
 }
+
+// applyFactoryFix applies a factory FixSpec: extracts a NewT factory
+// function for a struct type built with 5+ fields in multiple places,
+// and rewrites full composite literals to factory calls.
+func applyFactoryFix(spec *patterns.FixSpec, src []byte) ([]byte, error) {
+	typeName := spec.Params["type"]
+	if typeName == "" {
+		return nil, fmt.Errorf("factory: FixSpec missing type")
+	}
+	fset, f, err := parseSpec(spec, src)
+	if err != nil {
+		return nil, err
+	}
+	ctx, ok := newFactoryContext(fset, f, src, typeName)
+	if !ok {
+		return src, nil
+	}
+	edits := factoryEdits(ctx)
+	out := applyEdits(src, edits)
+	formatted, err := format.Source(out)
+	if err != nil {
+		return nil, fmt.Errorf("gofmt after factory fix: %w", err)
+	}
+	return formatted, nil
+}
+
+// factoryContext carries everything the factory fix needs: the struct
+// fields, the literal rewrites, and where to insert the factory.
+type factoryContext struct {
+	fset        *token.FileSet
+	src         []byte
+	typeName    string
+	factoryName string
+	fields      []factoryField
+	rewrites    []textEdit
+	typeEnd     int
+}
+
+// newFactoryContext builds the fix context, or false when the fix should
+// be skipped.
+func newFactoryContext(fset *token.FileSet, f *ast.File, src []byte, typeName string) (factoryContext, bool) {
+	fields, typeEnd, ok := factoryStructFields(fset, f, src, typeName)
+	if !ok {
+		return factoryContext{}, false
+	}
+	factoryName := "New" + typeName
+	if hasFuncDecl(f, factoryName) {
+		return factoryContext{}, false
+	}
+	rewrites := factoryLitRewrites(fset, f, src, typeName, factoryName, fields)
+	if len(rewrites) == 0 {
+		return factoryContext{}, false
+	}
+	return factoryContext{
+		fset: fset, src: src, typeName: typeName,
+		factoryName: factoryName, fields: fields,
+		rewrites: rewrites, typeEnd: typeEnd,
+	}, true
+}
+
+// litRewriteCtx carries the parameters for literal rewrite helpers.
+type litRewriteCtx struct {
+	fset        *token.FileSet
+	src         []byte
+	typeName    string
+	factoryName string
+	fields      []factoryField
+}
+
+// factoryEdits combines the literal rewrites with the factory insertion.
+func factoryEdits(ctx factoryContext) []textEdit {
+	edits := make([]textEdit, 0, len(ctx.rewrites)+1)
+	edits = append(edits, ctx.rewrites...)
+	edits = append(edits, textEdit{
+		start:       ctx.typeEnd,
+		end:         ctx.typeEnd,
+		replacement: []byte("\n" + factoryFuncText(ctx.factoryName, ctx.typeName, ctx.fields)),
+	})
+	return edits
+}
+
+// factoryField is one struct field in declaration order.
+type factoryField struct {
+	name     string
+	typeText string
+}
+
+// factoryStructFields returns the struct's fields in declaration order and
+// the end offset of the type declaration. It skips generic structs,
+// embedded fields, and multi-name field lines.
+func factoryStructFields(fset *token.FileSet, f *ast.File, src []byte, typeName string) ([]factoryField, int, bool) {
+	for _, decl := range f.Decls {
+		if fields, end, ok := typeDeclFields(fset, decl, src, typeName); ok {
+			return fields, end, true
+		}
+	}
+	return nil, 0, false
+}
+
+// typeDeclFields extracts struct fields from a type declaration if it
+// declares typeName as a non-generic struct with named fields.
+func typeDeclFields(fset *token.FileSet, decl ast.Decl, src []byte, typeName string) ([]factoryField, int, bool) {
+	gen, ok := decl.(*ast.GenDecl)
+	if !ok || gen.Tok != token.TYPE {
+		return nil, 0, false
+	}
+	for _, s := range gen.Specs {
+		if fields, end, ok := typeSpecFields(fset, gen, s, src, typeName); ok {
+			return fields, end, true
+		}
+	}
+	return nil, 0, false
+}
+
+// typeSpecFields extracts fields from one type spec.
+func typeSpecFields(fset *token.FileSet, gen *ast.GenDecl, s ast.Spec, src []byte, typeName string) ([]factoryField, int, bool) {
+	ts, ok := matchingTypeSpec(s, typeName)
+	if !ok {
+		return nil, 0, false
+	}
+	fields := structFieldList(fset, src, ts)
+	if len(fields) == 0 {
+		return nil, 0, false
+	}
+	return fields, fset.Position(gen.End()).Offset, true
+}
+
+// matchingTypeSpec returns the type spec if it declares typeName as a
+// non-generic struct.
+func matchingTypeSpec(s ast.Spec, typeName string) (*ast.StructType, bool) {
+	ts, ok := s.(*ast.TypeSpec)
+	if !ok || ts.Name.Name != typeName || ts.TypeParams != nil {
+		return nil, false
+	}
+	st, ok := ts.Type.(*ast.StructType)
+	if !ok || st.Fields == nil {
+		return nil, false
+	}
+	return st, true
+}
+
+// structFieldList converts struct field AST to factoryFields, skipping
+// embedded or multi-name fields.
+func structFieldList(fset *token.FileSet, src []byte, st *ast.StructType) []factoryField {
+	var fields []factoryField
+	for _, fld := range st.Fields.List {
+		if len(fld.Names) != 1 {
+			return nil
+		}
+		start := fset.Position(fld.Type.Pos()).Offset
+		end := fset.Position(fld.Type.End()).Offset
+		fields = append(fields, factoryField{
+			name:     fld.Names[0].Name,
+			typeText: string(src[start:end]),
+		})
+	}
+	return fields
+}
+
+// hasFuncDecl reports whether f declares a function with the given name.
+func hasFuncDecl(f *ast.File, name string) bool {
+	found := false
+	ast.Inspect(f, func(n ast.Node) bool {
+		if fd, ok := n.(*ast.FuncDecl); ok && fd.Name.Name == name {
+			found = true
+			return false
+		}
+		return true
+	})
+	return found
+}
+
+// factoryLitRewrites finds composite literals of typeName that set every
+// field and returns text edits rewriting them to factory calls.
+func factoryLitRewrites(fset *token.FileSet, f *ast.File, src []byte, typeName, factoryName string, fields []factoryField) []textEdit {
+	rc := litRewriteCtx{fset: fset, src: src, typeName: typeName, factoryName: factoryName, fields: fields}
+	var edits []textEdit
+	ast.Inspect(f, func(n ast.Node) bool {
+		if edit, ok, skip := unaryLitEdit(rc, n); ok || skip {
+			if ok {
+				edits = append(edits, edit)
+			}
+			return !skip
+		}
+		if edit, ok := plainLitEdit(rc, n); ok {
+			edits = append(edits, edit)
+		}
+		return true
+	})
+	return edits
+}
+
+// unaryLitEdit rewrites &T{...} to &NewT(...). skip is true when n was a
+// &T{...} unary (handled or not) so the walker does not descend into it.
+func unaryLitEdit(rc litRewriteCtx, n ast.Node) (textEdit, bool, bool) {
+	ue, ok := n.(*ast.UnaryExpr)
+	if !ok || ue.Op != token.AND {
+		return textEdit{}, false, false
+	}
+	lit, ok := ue.X.(*ast.CompositeLit)
+	if !ok || !isTargetLit(lit, rc.typeName) {
+		return textEdit{}, false, false
+	}
+	args, ok := litArgs(rc.fset, rc.src, lit, rc.fields)
+	if !ok {
+		return textEdit{}, false, true
+	}
+	return textEdit{
+		start:       rc.fset.Position(ue.Pos()).Offset,
+		end:         rc.fset.Position(ue.End()).Offset,
+		replacement: []byte("&" + rc.factoryName + "(" + args + ")"),
+	}, true, true
+}
+
+// plainLitEdit rewrites T{...} to NewT(...).
+func plainLitEdit(rc litRewriteCtx, n ast.Node) (textEdit, bool) {
+	lit, ok := n.(*ast.CompositeLit)
+	if !ok || !isTargetLit(lit, rc.typeName) {
+		return textEdit{}, false
+	}
+	args, ok := litArgs(rc.fset, rc.src, lit, rc.fields)
+	if !ok {
+		return textEdit{}, false
+	}
+	return textEdit{
+		start:       rc.fset.Position(lit.Pos()).Offset,
+		end:         rc.fset.Position(lit.End()).Offset,
+		replacement: []byte(rc.factoryName + "(" + args + ")"),
+	}, true
+}
+
+// isTargetLit reports whether lit is a composite literal of typeName.
+// Only unqualified identifiers match: the type is declared in this file.
+func isTargetLit(lit *ast.CompositeLit, typeName string) bool {
+	id, ok := lit.Type.(*ast.Ident)
+	return ok && id.Name == typeName
+}
+
+// litArgs builds the factory call arguments in field-declaration order.
+// It returns false unless the literal sets every field.
+func litArgs(fset *token.FileSet, src []byte, lit *ast.CompositeLit, fields []factoryField) (string, bool) {
+	if isKeyedLit(lit) {
+		return keyedLitArgs(fset, src, lit, fields)
+	}
+	if len(lit.Elts) != len(fields) {
+		return "", false
+	}
+	parts := make([]string, 0, len(lit.Elts))
+	for _, e := range lit.Elts {
+		parts = append(parts, srcText(fset, e, src))
+	}
+	return strings.Join(parts, ", "), true
+}
+
+// isKeyedLit reports whether the literal uses field: value form.
+func isKeyedLit(lit *ast.CompositeLit) bool {
+	for _, e := range lit.Elts {
+		if _, ok := e.(*ast.KeyValueExpr); ok {
+			return true
+		}
+	}
+	return false
+}
+
+// keyedLitArgs builds args from a keyed literal; all fields must be set.
+func keyedLitArgs(fset *token.FileSet, src []byte, lit *ast.CompositeLit, fields []factoryField) (string, bool) {
+	vals := map[string]string{}
+	for _, e := range lit.Elts {
+		kv, ok := e.(*ast.KeyValueExpr)
+		if !ok {
+			return "", false
+		}
+		key, ok := kv.Key.(*ast.Ident)
+		if !ok {
+			return "", false
+		}
+		vals[key.Name] = srcText(fset, kv.Value, src)
+	}
+	parts := make([]string, 0, len(fields))
+	for _, fld := range fields {
+		v, ok := vals[fld.name]
+		if !ok {
+			return "", false
+		}
+		parts = append(parts, v)
+	}
+	return strings.Join(parts, ", "), true
+}
+
+// factoryFuncText builds the factory function source.
+func factoryFuncText(factoryName, typeName string, fields []factoryField) string {
+	params := make([]string, 0, len(fields))
+	assigns := make([]string, 0, len(fields))
+	used := map[string]bool{}
+	for _, fld := range fields {
+		pn := paramName(fld.name, used)
+		used[pn] = true
+		params = append(params, pn+" "+fld.typeText)
+		assigns = append(assigns, fld.name+": "+pn)
+	}
+	return fmt.Sprintf("func %s(%s) %s {\n\treturn %s{%s}\n}\n",
+		factoryName, strings.Join(params, ", "), typeName,
+		typeName, strings.Join(assigns, ", "))
+}
+
+// paramName converts a field name to a parameter name, avoiding keywords
+// and collisions.
+func paramName(field string, used map[string]bool) string {
+	base := lowerFirst(field)
+	if isGoKeyword(base) {
+		base += "Arg"
+	}
+	name := base
+	for i := 2; used[name]; i++ {
+		name = fmt.Sprintf("%s%d", base, i)
+	}
+	return name
+}
+
+// isGoKeyword reports whether s is a Go keyword.
+func isGoKeyword(s string) bool {
+	switch s {
+	case "break", "case", "chan", "const", "continue", "default",
+		"defer", "else", "fallthrough", "for", "func", "go", "goto",
+		"if", "import", "interface", "map", "package", "range",
+		"return", "select", "struct", "switch", "type", "var":
+		return true
+	}
+	return false
+}

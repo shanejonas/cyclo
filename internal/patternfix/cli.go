@@ -89,8 +89,8 @@ func mineCandidates(ctx context.Context, opts options) ([]patterns.Candidate, er
 	if err != nil {
 		return nil, fmt.Errorf("extract: %w", err)
 	}
-	facts, anemicHits := toFacts(ext)
-	report := patterns.Run(facts, patterns.Options{AnemicModels: anemicHits})
+	facts, anemicHits, missingHits := toFacts(ext)
+	report := patterns.Run(facts, patterns.Options{AnemicModels: anemicHits, MissingIdentities: missingHits})
 	var candidates []patterns.Candidate
 	for _, c := range report.Candidates {
 		if c.FixSpec == nil {
@@ -265,7 +265,7 @@ func parseOptions(args []string) (options, error) {
 }
 
 func (opts options) validate() error {
-	valid := []string{"guard_clause", "value_object", "parameterize", "trait_method", "capability_set", "enum_dispatch", "generic_fn", "anemic_model", "primitive_obsession", "all"}
+	valid := []string{"guard_clause", "value_object", "parameterize", "trait_method", "capability_set", "enum_dispatch", "generic_fn", "anemic_model", "primitive_obsession", "type_switch", "entity_identity", "missing_identity", "mutable_identity", "aggregate", "repository", "factory", "all"}
 	if !slices.Contains(valid, opts.kind) {
 		return fmt.Errorf("kind must be one of %v", valid)
 	}
@@ -273,7 +273,7 @@ func (opts options) validate() error {
 }
 
 // toFacts converts extraction to FuncFacts (copied from patterncheck).
-func toFacts(ext *gopatterns.Extraction) ([]*patterns.FuncFacts, []patterns.AnemicModelHit) {
+func toFacts(ext *gopatterns.Extraction) ([]*patterns.FuncFacts, []patterns.AnemicModelHit, []patterns.MissingIdentityHit) {
 	var facts []*patterns.FuncFacts
 	for _, fp := range ext.Funcs {
 		fp := fp
@@ -310,17 +310,22 @@ func toFacts(ext *gopatterns.Extraction) ([]*patterns.FuncFacts, []patterns.Anem
 			})
 		}
 		facts = append(facts, &patterns.FuncFacts{
-			ID:             fp.Name,
-			Name:           fp.Name,
-			Path:           fp.Path,
-			Line:           fp.Line,
-			EndLine:        fp.EndLine,
-			Pdg:            &fp.Pdg,
-			GuardClauses:   guards,
-			EnumDispatches: dispatches,
-			TypeSwitches:   tss,
-			Params:         params,
+			ID:               fp.Name,
+			Name:             fp.Name,
+			Path:             fp.Path,
+			Line:             fp.Line,
+			EndLine:          fp.EndLine,
+			Pdg:              &fp.Pdg,
+			GuardClauses:     guards,
+			EnumDispatches:   dispatches,
+			TypeSwitches:     tss,
+			EntityIdentities: fp.EntityIdentities,
+			MutableIdentities: fp.MutableIdentities,
+			AggregateMods:    fp.AggregateMods,
+			DbCalls:          fp.DbCalls,
+			FactoryLits:      fp.FactoryLits,
+			Params:           params,
 		})
 	}
-	return facts, ext.AnemicModels
+	return facts, ext.AnemicModels, ext.MissingIdentities
 }

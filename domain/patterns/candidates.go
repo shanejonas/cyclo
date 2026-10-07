@@ -87,6 +87,18 @@ const (
 	// MutableIdentity flags ID assignments outside constructors.
 	// Detection-only: no safe mechanical fix exists.
 	MutableIdentity CandidateKind = "mutable_identity"
+	// Aggregate proposes an aggregate boundary: when two or more entity
+	// types are always modified together, they likely belong under one
+	// aggregate root (Evans). Detection-only: choosing the root is design.
+	Aggregate CandidateKind = "aggregate"
+	// Repository flags direct database calls in business logic. A
+	// Repository should provide the illusion of an in-memory collection
+	// (Evans). Detection-only: extraction is design.
+	Repository CandidateKind = "repository"
+	// Factory proposes extracting a factory function for a complex struct
+	// literal (5+ fields) created in multiple functions. DDD-inspired;
+	// the transform is mechanical.
+	Factory CandidateKind = "factory"
 )
 
 // Site is one function that shows the pattern.

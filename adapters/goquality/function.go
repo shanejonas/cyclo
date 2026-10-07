@@ -1,6 +1,7 @@
 package goquality
 
 import (
+	"fmt"
 	"go/ast"
 	"go/scanner"
 	"go/token"
@@ -8,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/shanejonas/cyclo/adapters/gopatterns"
 	"github.com/shanejonas/cyclo/domain/quality"
 	"golang.org/x/tools/go/packages"
 )
@@ -43,7 +45,41 @@ func extractFunction(pkg *packages.Package, fn *ast.FuncDecl, path string, sourc
 	x.addParameters(fn.Recv)
 	x.collectBindings(fn.Body)
 	ast.Inspect(fn.Body, x.visit)
+	x.fact.DDD = dddViolations(pkg, fn, path)
 	return x.fact
+}
+
+// dddViolations runs the DDD detectors (Evans) for the quality gate:
+// aggregate boundaries, repository bypasses, and mutable identities.
+func dddViolations(pkg *packages.Package, fn *ast.FuncDecl, path string) []quality.DDDViolation {
+	var out []quality.DDDViolation
+	// Aggregate: mutating 2+ struct types in one function crosses an
+	// aggregate boundary. One violation per type; the gate fires when
+	// the distinct count exceeds the limit.
+	for _, m := range gopatterns.FindAggregateMods(fn, pkg.TypesInfo) {
+		out = append(out, quality.DDDViolation{
+			RuleID: "aggregate",
+			Line:   pkg.Fset.Position(fn.Pos()).Line,
+			Detail: m.TypeName,
+		})
+	}
+	// Repository: direct db calls outside repository files.
+	for _, d := range gopatterns.FindDbCalls(fn, pkg.Fset, pkg.TypesInfo, path) {
+		out = append(out, quality.DDDViolation{
+			RuleID: "repository",
+			Line:   d.Line,
+			Detail: fmt.Sprintf("direct db call %s in business logic", d.Call),
+		})
+	}
+	// Mutable identity: ID assignments outside constructors.
+	for _, m := range gopatterns.FindMutableIdentities(fn, pkg.Fset) {
+		out = append(out, quality.DDDViolation{
+			RuleID: "mutable_identity",
+			Line:   m.Line,
+			Detail: fmt.Sprintf("assigns .%s outside a constructor", m.Field),
+		})
+	}
+	return out
 }
 
 func parameterCount(fields *ast.FieldList) int {

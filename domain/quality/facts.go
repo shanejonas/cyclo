@@ -32,6 +32,17 @@ type Function struct {
 	// ParamList describes each parameter (receiver excluded, matching
 	// Params); used for parameter refactor plans.
 	ParamList []ParamFacts `json:"param_list,omitempty"`
+	// DDD lists DDD violations in this function (Evans): aggregate
+	// boundary crossings, repository bypasses, and mutable identities.
+	DDD []DDDViolation `json:"ddd,omitempty"`
+}
+
+// DDDViolation is one DDD rule violation: the rule ID, the line, and a
+// human-readable detail.
+type DDDViolation struct {
+	RuleID string `json:"rule_id"`
+	Line   int    `json:"line"`
+	Detail string `json:"detail"`
 }
 
 // Provenance concerns observable state, not allocation on the Go heap.

@@ -302,7 +302,9 @@ func derefStruct(t types.Type) (*types.Struct, bool) {
 
 // findMutableIdentities scans fn for assignments to ID-like fields outside
 // constructors (functions named New* or Create*).
-func findMutableIdentities(fn *ast.FuncDecl, fset *token.FileSet) []patterns.MutableIdentityHit {
+// FindMutableIdentities is exported for the quality gate: it scans fn
+// for assignments to ID-like fields outside constructors.
+func FindMutableIdentities(fn *ast.FuncDecl, fset *token.FileSet) []patterns.MutableIdentityHit {
 	name := fn.Name.Name
 	if isConstructorName(name) {
 		return nil

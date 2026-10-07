@@ -48,6 +48,13 @@ type FuncPdg struct {
 	EntityIdentities []patterns.EntityIdentityHit
 	// MutableIdentities are ID field assignments outside constructors.
 	MutableIdentities []patterns.MutableIdentityHit
+	// AggregateMods are named struct types whose fields this function
+	// mutates. Co-modified types suggest an aggregate boundary.
+	AggregateMods []patterns.AggregateModHit
+	// DbCalls are direct database calls in this function.
+	DbCalls []patterns.DbCallHit
+	// FactoryLits are complex struct literals in this function.
+	FactoryLits []patterns.FactoryHit
 }
 
 // Extraction is the full result of package analysis: per-function PDGs
@@ -198,7 +205,13 @@ func extractFunc(pkg *packages.Package, fn *ast.FuncDecl, path string) FuncPdg {
 		// EntityIdentities are attribute-based equalities that should use ID.
 		EntityIdentities: findEntityIdentities(fn, pkg.Fset, pkg.TypesInfo),
 		// MutableIdentities are ID assignments outside constructors.
-		MutableIdentities: findMutableIdentities(fn, pkg.Fset),
+		MutableIdentities: FindMutableIdentities(fn, pkg.Fset),
+		// AggregateMods are struct types whose fields this function mutates.
+		AggregateMods: FindAggregateMods(fn, pkg.TypesInfo),
+		// DbCalls are direct database calls (skipped in repository files).
+		DbCalls: FindDbCalls(fn, pkg.Fset, pkg.TypesInfo, path),
+		// FactoryLits are complex struct literals.
+		FactoryLits: findFactoryLits(fn, pkg.Fset, pkg.TypesInfo, pkg.Types),
 	}
 }
 
