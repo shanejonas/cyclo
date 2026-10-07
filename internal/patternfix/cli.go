@@ -219,6 +219,13 @@ func toFacts(ext *gopatterns.Extraction) ([]*patterns.FuncFacts, []patterns.Anem
 				BodyStmts: g.BodyStmts,
 			})
 		}
+		var dispatches []patterns.EnumDispatchHit
+		for _, d := range fp.EnumDispatches {
+			dispatches = append(dispatches, patterns.EnumDispatchHit{
+				Line:     d.Line,
+				NumCases: d.NumCases,
+			})
+		}
 		var params []patterns.ParamInfo
 		for _, p := range fp.Params {
 			params = append(params, patterns.ParamInfo{
@@ -227,14 +234,15 @@ func toFacts(ext *gopatterns.Extraction) ([]*patterns.FuncFacts, []patterns.Anem
 			})
 		}
 		facts = append(facts, &patterns.FuncFacts{
-			ID:           fp.Name,
-			Name:         fp.Name,
-			Path:         fp.Path,
-			Line:         fp.Line,
-			EndLine:      fp.EndLine,
-			Pdg:          &fp.Pdg,
-			GuardClauses: guards,
-			Params:       params,
+			ID:             fp.Name,
+			Name:           fp.Name,
+			Path:           fp.Path,
+			Line:           fp.Line,
+			EndLine:        fp.EndLine,
+			Pdg:            &fp.Pdg,
+			GuardClauses:   guards,
+			EnumDispatches: dispatches,
+			Params:         params,
 		})
 	}
 	return facts, ext.AnemicModels

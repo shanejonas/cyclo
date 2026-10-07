@@ -577,26 +577,35 @@ func TestCommonSignatureScoresBelowRareOne(t *testing.T) {
 	}
 }
 
-func TestEnumDispatchProposesInterface(t *testing.T) {
-	dispatcher := candSample("emit")
-	dispatcher.Pdg = typeSwitch("example.com/p.Cat.Meow", "fn() -> string")
-	dispatcher.Path = "src/emit.go"
-	facts := []*FuncFacts{
-		{ID: "example.com/p.Dog.Bark", Name: "Dog.Bark", Path: "src/dog.go", Line: 1,
-			SigKey: "fn(_) -> string", SelfTy: "Dog"},
-		{ID: "example.com/p.Cat.Meow", Name: "Cat.Meow", Path: "src/cat.go", Line: 1,
-			SigKey: "fn(_) -> string", SelfTy: "Cat"},
-		dispatcher,
+func TestEnumDispatchProposesDispatchTable(t *testing.T) {
+	dispatcher := candSample("process")
+	dispatcher.Path = "src/process.go"
+	dispatcher.Line = 10
+	dispatcher.EndLine = 30
+	dispatcher.EnumDispatches = []EnumDispatchHit{{Line: 15, NumCases: 3}}
+	facts := []*FuncFacts{dispatcher}
+	report := Run(facts, Options{})
+	var found *Candidate
+	for i, c := range report.Candidates {
+		if c.Kind == EnumDispatch {
+			found = &report.Candidates[i]
+		}
 	}
-	mined := runCandidates(facts)
-	if len(mined.Candidates) != 1 {
-		t.Fatalf("candidates = %+v, want 1", candidateKinds(mined))
+	if found == nil {
+		t.Fatalf("candidates = %+v, want enum_dispatch", candidateKindsFromReport(report))
 	}
-	c := mined.Candidates[0]
-	if c.Kind != EnumDispatch {
-		t.Errorf("kind = %q, want enum_dispatch", c.Kind)
+	if !strings.Contains(found.Observation, "15") {
+		t.Errorf("observation = %q, want switch line", found.Observation)
 	}
-	if !strings.Contains(c.Observation, "M0 = Dog.Bark | Cat.Meow") {
-		t.Errorf("observation = %q", c.Observation)
+	if found.FixSpec == nil || found.FixSpec.Line != 15 {
+		t.Errorf("FixSpec should point at the switch line 15, got %+v", found.FixSpec)
 	}
+}
+
+func candidateKindsFromReport(report PatternsReport) []CandidateKind {
+	kinds := make([]CandidateKind, len(report.Candidates))
+	for i, c := range report.Candidates {
+		kinds[i] = c.Kind
+	}
+	return kinds
 }
