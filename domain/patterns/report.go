@@ -157,14 +157,15 @@ func defaultParams(p Params) Params {
 	return p
 }
 
-// keepGroups keeps groups at or above minScoreMilli, then the first top.
-func keepGroups(groups []SigGroup, minScoreMilli uint32, top *int) []SigGroup {
-	kept := []SigGroup{}
-	for _, g := range groups {
-		if g.ScoreMilli < minScoreMilli {
+// keepTop keeps items at or above minScoreMilli, then the first top.
+// It generalizes keepGroups and keepCandidates, which shared one body.
+func keepTop[T any](items []T, score func(T) uint32, minScoreMilli uint32, top *int) []T {
+	kept := []T{}
+	for _, item := range items {
+		if score(item) < minScoreMilli {
 			continue
 		}
-		kept = append(kept, g)
+		kept = append(kept, item)
 		if top != nil && len(kept) >= *top {
 			break
 		}
@@ -172,19 +173,14 @@ func keepGroups(groups []SigGroup, minScoreMilli uint32, top *int) []SigGroup {
 	return kept
 }
 
+// keepGroups keeps groups at or above minScoreMilli, then the first top.
+func keepGroups(groups []SigGroup, minScoreMilli uint32, top *int) []SigGroup {
+	return keepTop(groups, func(g SigGroup) uint32 { return g.ScoreMilli }, minScoreMilli, top)
+}
+
 // keepCandidates keeps candidates at or above minScoreMilli, then the first top.
 func keepCandidates(candidates []Candidate, minScoreMilli uint32, top *int) []Candidate {
-	kept := []Candidate{}
-	for _, c := range candidates {
-		if c.ScoreMilli < minScoreMilli {
-			continue
-		}
-		kept = append(kept, c)
-		if top != nil && len(kept) >= *top {
-			break
-		}
-	}
-	return kept
+	return keepTop(candidates, func(c Candidate) uint32 { return c.ScoreMilli }, minScoreMilli, top)
 }
 
 func milli(value uint32) string {

@@ -110,10 +110,10 @@ type scoredSet struct {
 }
 
 func compareBundleKey(a, b bundleKey) int {
-	if a.name != b.name {
-		return strings.Compare(a.name, b.name)
-	}
-	return strings.Compare(a.typ, b.typ)
+	return cmp.Or(
+		strings.Compare(a.name, b.name),
+		strings.Compare(a.typ, b.typ),
+	)
 }
 
 func setKey(s map[bundleKey]bool) string {
@@ -269,10 +269,10 @@ func makeBundle(sc scoredSet, sites []callSite, perSite []map[bundleKey]bool, fu
 }
 
 func compareParamRef(a, b ParamRef) int {
-	if a.Name != b.Name {
-		return strings.Compare(a.Name, b.Name)
-	}
-	return strings.Compare(a.Type, b.Type)
+	return cmp.Or(
+		strings.Compare(a.Name, b.Name),
+		strings.Compare(a.Type, b.Type),
+	)
 }
 
 func sortBundles(out []Bundle) {

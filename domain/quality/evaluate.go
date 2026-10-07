@@ -64,13 +64,11 @@ func canonicalFacts(facts []Function) ([]Function, error) {
 }
 
 func compareLocation(a, b Location) int {
-	if order := cmp.Compare(a.Path, b.Path); order != 0 {
-		return order
-	}
-	if order := cmp.Compare(a.Line, b.Line); order != 0 {
-		return order
-	}
-	return cmp.Compare(a.Column, b.Column)
+	return cmp.Or(
+		cmp.Compare(a.Path, b.Path),
+		cmp.Compare(a.Line, b.Line),
+		cmp.Compare(a.Column, b.Column),
+	)
 }
 
 func compareFunction(a, b Location) int {
@@ -260,13 +258,11 @@ func mutationEffects(mutations []Mutation) []Effect {
 }
 
 func compareEffects(a, b Effect) int {
-	if order := cmp.Compare(a.Line, b.Line); order != 0 {
-		return order
-	}
-	if order := cmp.Compare(a.Kind, b.Kind); order != 0 {
-		return order
-	}
-	return cmp.Compare(a.Detail, b.Detail)
+	return cmp.Or(
+		cmp.Compare(a.Line, b.Line),
+		cmp.Compare(a.Kind, b.Kind),
+		cmp.Compare(a.Detail, b.Detail),
+	)
 }
 
 func effectWeight(effects []Effect, weights Weights) (int64, bool) {
