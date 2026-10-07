@@ -16,6 +16,7 @@ import (
 	"github.com/shanejonas/cyclo/application"
 	"github.com/shanejonas/cyclo/internal/bugreducer"
 	"github.com/shanejonas/cyclo/internal/patterncheck"
+	"github.com/shanejonas/cyclo/internal/patternfix"
 	"github.com/shanejonas/cyclo/internal/qualitycheck"
 )
 
@@ -50,6 +51,8 @@ func commandExitCode(args []string, err error) int {
 		return 2
 	case "patterns":
 		return 2
+	case "fix":
+		return 2
 	default:
 		return 1
 	}
@@ -81,6 +84,8 @@ func runSubcommand(ctx context.Context, args []string, output io.Writer) error {
 		return bugreducer.Run(ctx, args[1:], output)
 	case "patterns":
 		return patterncheck.Run(ctx, args[1:], output)
+	case "fix":
+		return patternfix.Run(ctx, args[1:], output)
 	default:
 		return runDefault(args, output)
 	}
