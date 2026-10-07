@@ -587,7 +587,7 @@ func parseOptions(args []string) (options, error) {
 }
 
 func (opts options) validate() error {
-	valid := []string{"guard_clause", "value_object", "parameterize", "trait_method", "capability_set", "enum_dispatch", "generic_fn", "anemic_model", "primitive_obsession", "type_switch", "entity_identity", "missing_identity", "mutable_identity", "aggregate", "repository", "factory", "all"}
+	valid := []string{"guard_clause", "value_object", "parameterize", "trait_method", "capability_set", "enum_dispatch", "generic_fn", "anemic_model", "primitive_obsession", "type_switch", "entity_identity", "missing_identity", "mutable_identity", "aggregate", "repository", "factory", "specification", "all"}
 	if !slices.Contains(valid, opts.kind) {
 		return fmt.Errorf("kind must be one of %v", valid)
 	}
@@ -646,6 +646,7 @@ func toFacts(ext *gopatterns.Extraction) ([]*patterns.FuncFacts, []patterns.Anem
 			AggregateMods:    fp.AggregateMods,
 			DbCalls:          fp.DbCalls,
 			FactoryLits:      fp.FactoryLits,
+			SpecRules:        fp.SpecRules,
 			Params:           params,
 		})
 	}

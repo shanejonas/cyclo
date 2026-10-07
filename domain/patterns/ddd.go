@@ -271,13 +271,13 @@ const specificationScoreMilli = 450
 // repeated in 2+ functions. Such rules want a Specification type with
 // IsSatisfiedBy (Evans).
 func specificationCandidates(facts []*FuncFacts) []Candidate {
-	byRule, first := groupSpecRules(facts)
+	byRule, first, fileOf := groupSpecRules(facts)
 	var out []Candidate
 	for k, funcs := range byRule {
 		if len(funcs) < 2 {
 			continue
 		}
-		out = append(out, specificationCandidate(k, facts, funcs, first[k]))
+		out = append(out, specificationCandidate(k, facts, funcs, first[k], fileOf[k]))
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Breakdown.Support != out[j].Breakdown.Support {
@@ -296,9 +296,10 @@ type specRuleKey struct {
 
 // groupSpecRules groups specification hits by rule key, tracking the
 // functions containing each rule and the first hit for fixer context.
-func groupSpecRules(facts []*FuncFacts) (map[specRuleKey]map[string]bool, map[specRuleKey]SpecificationHit) {
+func groupSpecRules(facts []*FuncFacts) (map[specRuleKey]map[string]bool, map[specRuleKey]SpecificationHit, map[specRuleKey]string) {
 	byRule := map[specRuleKey]map[string]bool{}
 	first := map[specRuleKey]SpecificationHit{}
+	fileOf := map[specRuleKey]string{}
 	for _, f := range facts {
 		for _, h := range f.SpecRules {
 			if h.RuleKey == "" || h.TypeName == "" {
@@ -308,15 +309,16 @@ func groupSpecRules(facts []*FuncFacts) (map[specRuleKey]map[string]bool, map[sp
 			if byRule[k] == nil {
 				byRule[k] = map[string]bool{}
 				first[k] = h
+				fileOf[k] = f.Path
 			}
 			byRule[k][f.ID] = true
 		}
 	}
-	return byRule, first
+	return byRule, first, fileOf
 }
 
 // specificationCandidate builds the fixable candidate for a business rule.
-func specificationCandidate(k specRuleKey, facts []*FuncFacts, funcs map[string]bool, hit SpecificationHit) Candidate {
+func specificationCandidate(k specRuleKey, facts []*FuncFacts, funcs map[string]bool, hit SpecificationHit, file string) Candidate {
 	names := make([]string, 0, len(funcs))
 	for id := range funcs {
 		names = append(names, id)
@@ -336,7 +338,7 @@ func specificationCandidate(k specRuleKey, facts []*FuncFacts, funcs map[string]
 		Sites:            candidateSites(facts, names),
 		FixSpec: &FixSpec{
 			Kind:    Specification,
-			File:    "",
+			File:    file,
 			Line:    hit.Line,
 			EndLine: hit.Line,
 			Params: map[string]string{
