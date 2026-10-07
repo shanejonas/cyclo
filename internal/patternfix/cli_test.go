@@ -106,3 +106,50 @@ func TestFixBadKind(t *testing.T) {
 		t.Error("expected error for bad kind")
 	}
 }
+
+func TestFixAnemicModelKind(t *testing.T) {
+	path := writeTempGo(t, `package p
+
+type Order struct{ Total int }
+
+func calcTotal(o *Order) int { return o.Total }
+
+func discTotal(o *Order, pct int) int { return o.Total * pct / 100 }
+
+func validTotal(o *Order) bool { return o.Total >= 0 }
+
+func use(o *Order) int { return calcTotal(o) + discTotal(o, 10) }
+`)
+	var out bytes.Buffer
+	err := Run(context.Background(), []string{"--kind", "anemic_model", path}, &out)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if !strings.Contains(out.String(), "3 fixable anemic_model") {
+		t.Errorf("expected 3 anemic_model fixes, got:\n%s", out.String())
+	}
+	if !strings.Contains(out.String(), "func (o *Order) calcTotal()") {
+		t.Errorf("expected method conversion in diff, got:\n%s", out.String())
+	}
+}
+
+func TestFixAllIncludesAnemicModel(t *testing.T) {
+	path := writeTempGo(t, `package p
+
+type Order struct{ Total int }
+
+func calcTotal(o *Order) int { return o.Total }
+
+func discTotal(o *Order, pct int) int { return o.Total * pct / 100 }
+
+func validTotal(o *Order) bool { return o.Total >= 0 }
+`)
+	var out bytes.Buffer
+	err := Run(context.Background(), []string{"--kind", "all", path}, &out)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if !strings.Contains(out.String(), "func (o *Order) calcTotal()") {
+		t.Errorf("expected anemic_model conversion in --kind all output, got:\n%s", out.String())
+	}
+}

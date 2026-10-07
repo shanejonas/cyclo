@@ -26,7 +26,7 @@ Statically apply fixes for patterns miner candidates. No LLM, no tokens:
 pure AST rewrites that are provably behavior-preserving.
 Dry-run by default (shows a diff); --apply writes the files.
 
-  --kind KIND   which fixes to apply: guard_clause (default), value_object, parameterize, or all
+  --kind KIND   which fixes to apply: guard_clause (default), value_object, parameterize, anemic_model, or all
   --apply       write the fixes to disk (default: dry-run diff only)
 
 Exit 0: always, on success (even with no fixes). Exit 2: parse or IO failure.
@@ -95,26 +95,30 @@ func fixFile(path string, opts options, output io.Writer) (int, error) {
 	return showDiff(path, src, out, fixes, output)
 }
 
+// kindFixers maps fix kinds to their implementations. Adding a new kind
+// is a new entry here plus its fixer function.
+var kindFixers = map[string]func(*token.FileSet, *ast.File, []byte) ([]byte, []gopatterns.Fix, error){
+	"guard_clause": fixGuardClause,
+	"value_object": fixValueObjectKind,
+	"parameterize": fixParameterizeKind,
+	"anemic_model": fixAnemicModelKind,
+}
+
 // fixSource parses src and returns the fixed source and the fixes applied.
 func fixSource(path string, src []byte, kind string) ([]byte, []gopatterns.Fix, error) {
+	if kind == "all" {
+		return fixAllKinds(path, src)
+	}
+	fix, ok := kindFixers[kind]
+	if !ok {
+		return nil, nil, fmt.Errorf("unknown kind %q", kind)
+	}
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, path, src, parser.ParseComments)
 	if err != nil {
 		return nil, nil, fmt.Errorf("parse %s: %w", path, err)
 	}
-
-	switch kind {
-	case "guard_clause":
-		return fixGuardClause(fset, f, src)
-	case "value_object":
-		return fixValueObjectKind(fset, f, src)
-	case "parameterize":
-		return fixParameterizeKind(fset, f, src)
-	case "all":
-		return fixAllKinds(path, src)
-	default:
-		return nil, nil, fmt.Errorf("unknown kind %q", kind)
-	}
+	return fix(fset, f, src)
 }
 
 // fixValueObjectKind applies value-object fixes.
@@ -126,8 +130,8 @@ func fixValueObjectKind(fset *token.FileSet, f *ast.File, src []byte) ([]byte, [
 	return fixed, toFixes(valueFixes), nil
 }
 
-// fixAllKinds applies guard_clause, value_object, then parameterize,
-// re-parsing between kinds so positions stay valid.
+// fixAllKinds applies guard_clause, value_object, parameterize, then
+// anemic_model, re-parsing between kinds so positions stay valid.
 // fixGuardClause applies guard-clause fixes.
 func fixGuardClause(fset *token.FileSet, f *ast.File, src []byte) ([]byte, []gopatterns.Fix, error) {
 	fixed, guardFixes, err := gopatterns.FixInvertedGuards(fset, f, src)
@@ -144,6 +148,15 @@ func fixParameterizeKind(fset *token.FileSet, f *ast.File, src []byte) ([]byte, 
 		return nil, nil, err
 	}
 	return fixed, toFixes(paramFixes), nil
+}
+
+// fixAnemicModelKind applies anemic-model fixes.
+func fixAnemicModelKind(fset *token.FileSet, f *ast.File, src []byte) ([]byte, []gopatterns.Fix, error) {
+	fixed, anemicFixes, err := gopatterns.FixAnemicModels(fset, f, src)
+	if err != nil {
+		return nil, nil, err
+	}
+	return fixed, toFixes(anemicFixes), nil
 }
 
 // toFixes converts typed fixes to the Fix interface.
@@ -168,7 +181,11 @@ func fixAllKinds(path string, src []byte) ([]byte, []gopatterns.Fix, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	return src3, append(append(fixes1, fixes2...), fixes3...), nil
+	src4, fixes4, err := fixSource(path, src3, "anemic_model")
+	if err != nil {
+		return nil, nil, err
+	}
+	return src4, append(append(append(fixes1, fixes2...), fixes3...), fixes4...), nil
 }
 
 // applyFixes writes the fixed source and reports.
@@ -302,8 +319,8 @@ func parseOptions(args []string) (options, error) {
 }
 
 func (opts options) validate() error {
-	if !slices.Contains([]string{"guard_clause", "value_object", "parameterize", "all"}, opts.kind) {
-		return fmt.Errorf("kind must be guard_clause, value_object, parameterize, or all")
+	if !slices.Contains([]string{"guard_clause", "value_object", "parameterize", "anemic_model", "all"}, opts.kind) {
+		return fmt.Errorf("kind must be guard_clause, value_object, parameterize, anemic_model, or all")
 	}
 	return nil
 }
