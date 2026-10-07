@@ -213,7 +213,11 @@ func writeText(output io.Writer, report quality.Report) error {
 	for _, diagnostic := range report.Diagnostics {
 		fmt.Fprintf(&text, "%s:%d:%d: %s: %s\n", diagnostic.Path, diagnostic.Line, diagnostic.Column, diagnostic.Name, diagnostic.Message)
 		for _, effect := range diagnostic.Effects {
-			fmt.Fprintf(&text, "  line %d: %s: %s\n", effect.Line, effect.Kind, effect.Detail)
+			via := ""
+			if effect.Via != "" {
+				via = " (via " + effect.Via + ")"
+			}
+			fmt.Fprintf(&text, "  line %d: %s: %s%s\n", effect.Line, effect.Kind, effect.Detail, via)
 		}
 		for _, mutation := range diagnostic.Mutations {
 			fmt.Fprintf(&text, "  line %d: mutation: %s.%s (%s)\n", mutation.Line, mutation.Root, mutation.FieldPath, mutation.Provenance)
