@@ -263,3 +263,58 @@ func TestFixAnemicModelsParses(t *testing.T) {
 		t.Fatalf("output does not parse: %v", err)
 	}
 }
+
+const anemicServiceSrc = `package p
+
+type Account struct {
+	Balance int
+}
+
+type Money struct {
+	Amount int
+}
+
+func getBalance(a *Account) int {
+	return a.Balance
+}
+
+func setBalance(a *Account, v int) {
+	a.Balance = v
+}
+
+func clearBalance(a *Account) {
+	a.Balance = 0
+}
+
+// deposit touches two struct types: a domain service, not anemic.
+func deposit(a *Account, m Money) {
+	a.Balance += m.Amount
+}
+
+// transfer touches two struct types: a domain service, not anemic.
+func transfer(from *Account, to *Account, m Money) {
+	from.Balance -= m.Amount
+	to.Balance += m.Amount
+}
+`
+
+func TestFixAnemicModelsSkipsServiceLike(t *testing.T) {
+	fset, f := mustParseAnemicFile(t, anemicServiceSrc)
+	out, fixes, err := FixAnemicModels(fset, f, []byte(anemicServiceSrc))
+	if err != nil {
+		t.Fatalf("fix: %v", err)
+	}
+	for _, fx := range fixes {
+		if fx.FuncName == "transfer" {
+			t.Fatalf("transfer is a domain service and must not be converted: %+v", fixes)
+		}
+	}
+	s := string(out)
+	if strings.Contains(s, "func (from *Account) transfer") {
+		t.Fatalf("transfer should not become a method\n%s", s)
+	}
+	// The single-type funcs should still convert.
+	if !strings.Contains(s, "func (a *Account) getBalance() int") {
+		t.Fatalf("getBalance should still convert\n%s", s)
+	}
+}

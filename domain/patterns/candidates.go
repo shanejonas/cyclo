@@ -99,6 +99,13 @@ const (
 	// literal (5+ fields) created in multiple functions. DDD-inspired;
 	// the transform is mechanical.
 	Factory CandidateKind = "factory"
+	// DomainService identifies a free function operating on two or more
+	// domain types without belonging to any of them. Per Evans, such
+	// stateless coordination is a Domain Service, not misplaced behavior:
+	// it complements anemic_model by suppressing the "move into a method"
+	// suggestion for functions that cannot be methods. Detection-only:
+	// choosing the service name and home is design.
+	DomainService CandidateKind = "domain_service"
 )
 
 // FixKindOrder defines the order in which pattern fixes are applied when
@@ -126,6 +133,12 @@ var FixKindOrder = []CandidateKind{
 	Factory,
 	MissingIdentity,
 	EntityIdentity,
+	// DomainService runs before AnemicModel: it identifies legitimate
+	// stateless services so the anemic detector can suppress the
+	// "move into a method" suggestion for them. Detection-only, but
+	// ordered here (not with the other detection-only kinds) because
+	// the suppression depends on it.
+	DomainService,
 	AnemicModel,
 	TypeSwitch,
 	EnumDispatch,

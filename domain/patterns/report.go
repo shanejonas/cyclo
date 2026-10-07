@@ -45,6 +45,10 @@ type Options struct {
 	// MissingIdentities are structs used as entities without an ID field,
 	// from the extractor's type analysis.
 	MissingIdentities []MissingIdentityHit
+	// DomainServices are free functions operating on two or more domain
+	// types, from the extractor's type analysis. The anemic-model
+	// builder uses them to suppress false positives.
+	DomainServices []DomainServiceHit
 	// WlCache memoizes WL refinements across runs for incremental mining.
 	// Nil computes every refinement fresh.
 	WlCache *WlCache
@@ -106,7 +110,8 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 	{Factory, func(prepared []*FuncFacts, options Options) []Candidate { return factoryCandidates(prepared) }},
 	{MissingIdentity, func(prepared []*FuncFacts, options Options) []Candidate { return missingIdentityCandidates(options.MissingIdentities) }},
 	{EntityIdentity, func(prepared []*FuncFacts, options Options) []Candidate { return entityIdentityCandidates(prepared) }},
-	{AnemicModel, func(prepared []*FuncFacts, options Options) []Candidate { return anemicModelCandidates(options.AnemicModels) }},
+	{DomainService, func(prepared []*FuncFacts, options Options) []Candidate { return domainServiceCandidates(options.DomainServices) }},
+	{AnemicModel, func(prepared []*FuncFacts, options Options) []Candidate { return anemicModelCandidates(options.AnemicModels, options.DomainServices) }},
 	{MutableIdentity, func(prepared []*FuncFacts, options Options) []Candidate { return mutableIdentityCandidates(prepared) }},
 	{Aggregate, func(prepared []*FuncFacts, options Options) []Candidate { return aggregateCandidates(prepared) }},
 	{Repository, func(prepared []*FuncFacts, options Options) []Candidate { return repositoryCandidates(prepared) }},
