@@ -181,11 +181,15 @@ func sortGroups(groups []SigGroup) {
 	})
 }
 
-// Mine groups methods of ADTs by normalized signature key, returning the
+// MineGroups groups methods of ADTs by normalized signature key, returning the
 // groups with two or more distinct self types, best first (score, then key)
 // so output is independent of input order. Methods without a SigKey or with
 // no receiver (free functions) are ignored, as are nil facts.
-func Mine(facts []*FuncFacts) []SigGroup {
+//
+// (Renamed from Mine: candidates.go's layer-2 main entry takes the name Mine
+// per its contract `func Mine(facts, groups, params) Mined`, and Go has no
+// overloading.)
+func MineGroups(facts []*FuncFacts) []SigGroup {
 	buckets, total := buckets(facts)
 	groups := mineGroups(buckets, total)
 	sortGroups(groups)

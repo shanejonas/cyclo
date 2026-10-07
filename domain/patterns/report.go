@@ -55,7 +55,7 @@ func Build(groups []SigGroup, minScoreMilli uint32, top *int) PatternsReport {
 // (candidates), then filter and rank.
 func Run(facts []*FuncFacts, options Options) PatternsReport {
 	prepared := hideImplements(mergeFacts(facts), options.HideImplements)
-	groups := Mine(prepared) // layer 1: sigmine
+	groups := MineGroups(prepared) // layer 1: sigmine
 	// Layer 2: candidates. NOTE: candidates.go is ported in parallel with the
 	// contract `func Mine(facts []*FuncFacts, groups []SigGroup, params Params) Mined`,
 	// which collides with sigmine.go's `func Mine`; see the commit report.
