@@ -58,6 +58,10 @@ const (
 	// happy path flows at top level. Single-function finding: no
 	// clustering, fixed score.
 	GuardClause CandidateKind = "guard_clause"
+	// ValueObject proposes extracting an immutable value object from a
+	// data clump: the same primitive params traveling together across
+	// functions. DDD-inspired; fixed score below guard clauses.
+	ValueObject CandidateKind = "value_object"
 )
 
 // Site is one function that shows the pattern.

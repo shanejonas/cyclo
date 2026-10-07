@@ -66,6 +66,12 @@ func Run(facts []*FuncFacts, options Options) PatternsReport {
 		mined.Candidates = append(mined.Candidates, guards...)
 		sortMined(&mined)
 	}
+	// Data clumps: value-object proposals from param co-occurrence, also
+	// single-pass and fixed-score.
+	if vos := valueObjectCandidates(prepared); len(vos) > 0 {
+		mined.Candidates = append(mined.Candidates, vos...)
+		sortMined(&mined)
+	}
 	report := Build(groups, options.MinScoreMilli, options.Top)
 	report.Candidates = keepCandidates(mined.Candidates, options.MinScoreMilli, options.Top)
 	report.Suppressed = mined.Suppressed

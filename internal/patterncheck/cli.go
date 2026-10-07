@@ -90,6 +90,7 @@ func toFacts(pdgs []gopatterns.FuncPdg) []*patterns.FuncFacts {
 			Pdg:          &fp.Pdg,
 			SigKey:       "fn(" + strings.Join(params, ",") + ")",
 			GuardClauses: guards,
+			Params:       fp.Params,
 		})
 	}
 	return facts

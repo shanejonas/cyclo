@@ -34,6 +34,9 @@ type FuncPdg struct {
 	// GuardClauses are inverted conditionals in this function that want
 	// to be guard clauses (AST-level finding, not PDG-derived).
 	GuardClauses []GuardClauseHit
+	// Params are the function's primitive-typed parameters. Used for
+	// data-clump detection (value object proposals).
+	Params []patterns.ParamInfo
 }
 
 // Extract loads the packages enclosing paths and returns a PDG per function.
@@ -164,7 +167,28 @@ func extractFunc(pkg *packages.Package, fn *ast.FuncDecl, path string) FuncPdg {
 		EndLine:      end.Line,
 		Pdg:          patterns.Pdg{Nodes: b.nodes, Edges: b.edges},
 		GuardClauses: findGuardClauses(fn, pkg.Fset),
+		Params:       primitiveParams(fn, pkg.TypesInfo),
 	}
+}
+
+// primitiveParams returns the function's basic-typed parameters as
+// (name, type) pairs. Named types are excluded: they are already domain
+// types and need no value-object proposal.
+func primitiveParams(fn *ast.FuncDecl, info *types.Info) []patterns.ParamInfo {
+	if fn.Type.Params == nil {
+		return nil
+	}
+	var out []patterns.ParamInfo
+	for _, field := range fn.Type.Params.List {
+		basic, ok := info.TypeOf(field.Type).(*types.Basic)
+		if !ok {
+			continue
+		}
+		for _, name := range field.Names {
+			out = append(out, patterns.ParamInfo{Name: name.Name, Type: basic.Name()})
+		}
+	}
+	return out
 }
 
 // ctrlFrame is one level of the control stack: nodes lowered inside it gain a
