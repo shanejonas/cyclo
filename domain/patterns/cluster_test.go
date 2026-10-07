@@ -124,9 +124,8 @@ func TestClusterEmptyInput(t *testing.T) {
 	}
 }
 
-// The coverage floor rejects members: with the Align stub every alignment
-// reports coverage 0, so a floor of 1 dissolves the cluster. Once align.go
-// lands this becomes a real alignment-coverage check.
+// The coverage floor rejects members: the pair aligns at coverage 1000,
+// so a floor above that dissolves the cluster.
 func TestCoverageFloor(t *testing.T) {
 	graphs := windowGraphs()
 	pair := []*Pdg{graphs[0], graphs[1]}
@@ -136,9 +135,9 @@ func TestCoverageFloor(t *testing.T) {
 		t.Fatalf("floor 0: got %d clusters, want 1", len(clusters))
 	}
 	strict := clusterParams()
-	strict.MinCoverageMilli = 1
+	strict.MinCoverageMilli = 1001
 	if clusters := ClusterPdgs(pair, strict); len(clusters) != 0 {
-		t.Fatalf("floor 1: got %d clusters, want 0", len(clusters))
+		t.Fatalf("floor 1001: got %d clusters, want 0", len(clusters))
 	}
 }
 
