@@ -317,12 +317,4 @@ func packageEndOffset(fset *token.FileSet, f *ast.File, src []byte) int {
 	return offset + 1
 }
 
-// applyEnumDispatchFix converts a type switch to an interface method call.
-func applyEnumDispatchFix(spec *patterns.FixSpec, src []byte) ([]byte, error) {
-	return nil, fmt.Errorf("enum_dispatch fixer not yet implemented")
-}
 
-// applyGenericFnFix generates a generic function.
-func applyGenericFnFix(spec *patterns.FixSpec, src []byte) ([]byte, error) {
-	return nil, fmt.Errorf("generic_fn fixer not yet implemented")
-}
