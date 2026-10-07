@@ -38,6 +38,15 @@ func guardCandidates(facts []*FuncFacts) []Candidate {
 					ID:      f.ID,
 					Name:    f.Name,
 				}},
+				FixSpec: &FixSpec{
+					Kind:    GuardClause,
+					File:    f.Path,
+					Line:    hit.Line,
+					EndLine: hit.Line,
+					Params: map[string]string{
+						"if_line": fmt.Sprintf("%d", hit.Line),
+					},
+				},
 			})
 		}
 	}

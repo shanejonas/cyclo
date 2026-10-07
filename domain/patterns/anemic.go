@@ -68,6 +68,15 @@ func anemicModelCandidates(hits []AnemicModelHit) []Candidate {
 				ID:      hit.TypeName,
 				Name:    hit.TypeName,
 			}},
+			FixSpec: &FixSpec{
+				Kind:    AnemicModel,
+				File:    hit.Path,
+				Line:    hit.Line,
+				EndLine: hit.EndLine,
+				Params: map[string]string{
+					"type_name": hit.TypeName,
+				},
+			},
 		})
 	}
 	return out
