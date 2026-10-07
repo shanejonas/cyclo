@@ -12,7 +12,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/shanejonas/cyclo/internal/reducer"
+	"github.com/shanejonas/cyclo/adapters/reducer"
 )
 
 // testDashboard builds a dashboard model the way reduction.newDashboard does,

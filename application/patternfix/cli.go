@@ -18,7 +18,7 @@ import (
 
 	"github.com/shanejonas/cyclo/adapters/gopatterns"
 	"github.com/shanejonas/cyclo/domain/patterns"
-	"github.com/shanejonas/cyclo/internal/gitchanged"
+	"github.com/shanejonas/cyclo/adapters/gitchanged"
 )
 
 const usage = `Usage: cyclo fix [OPTIONS] [DIRECTORIES OR GO FILES...]

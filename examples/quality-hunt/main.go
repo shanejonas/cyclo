@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/shanejonas/cyclo/adapters/treesitter"
-	"github.com/shanejonas/cyclo/internal/reducer"
+	"github.com/shanejonas/cyclo/adapters/reducer"
 )
 
 type options struct {

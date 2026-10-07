@@ -11,7 +11,7 @@ import (
 
 	"github.com/charmbracelet/x/term"
 	"github.com/shanejonas/cyclo/adapters/treesitter"
-	"github.com/shanejonas/cyclo/internal/reducer"
+	"github.com/shanejonas/cyclo/adapters/reducer"
 )
 
 const usage = `Usage: cyclo bug-reducer [--language lines|go] [--go-parser PATH] [--tui=false] [--output PATH] [--timeout 10s] INPUT -- CHECKER [ARGS...]
