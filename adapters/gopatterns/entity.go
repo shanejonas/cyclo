@@ -63,6 +63,138 @@ func boolExpr(n ast.Node) ast.Expr {
 	return nil
 }
 
+// structLoc is a struct definition's file and line.
+type structLoc struct {
+	path string
+	line int
+}
+
+// noIDScanCtx carries the per-package context for no-ID entity detection.
+type noIDScanCtx struct {
+	fset       *token.FileSet
+	info       *types.Info
+	structLocs map[string]structLoc
+	mutated    map[string]bool
+}
+
+// findEntityIdentitiesNoID finds attribute-based equality on struct types
+// WITHOUT an ID field. These pair with missing_identity (the first gate):
+// the entity_identity fixer adds the ID, then a later phase rewrites the
+// comparison. Only fires for mutated structs (entities with lifecycle);
+// value objects (never mutated) correctly compare by attributes.
+func findEntityIdentitiesNoID(fn *ast.FuncDecl, ctx noIDScanCtx) []patterns.EntityIdentityHit {
+	var out []patterns.EntityIdentityHit
+	seen := map[int]bool{}
+	if fn.Body == nil {
+		return out
+	}
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		cond := boolExpr(n)
+		if cond == nil {
+			return true
+		}
+		if hit, ok := checkAttrEqualityNoID(cond, ctx); ok {
+			addUniqueHit(&out, seen, hit, ctx.fset, cond)
+		}
+		return true
+	})
+	return out
+}
+
+// checkAttrEqualityNoID checks for 2+ field comparisons on the same struct
+// type and var pair, WITHOUT requiring an ID field. Only fires for mutated
+// structs: value objects (never mutated) correctly compare by attributes.
+func checkAttrEqualityNoID(cond ast.Expr, ctx noIDScanCtx) (patterns.EntityIdentityHit, bool) {
+	var comps []fieldComparison
+	collectComparisonsNoID(cond, &comps, ctx.info)
+	first, ok := uniformComparisons(comps)
+	if !ok {
+		return patterns.EntityIdentityHit{}, false
+	}
+	// Skip if the type already has an ID (that's the standard case).
+	if hasIDFieldForType(first.typeName, ctx.info) {
+		return patterns.EntityIdentityHit{}, false
+	}
+	// Mutation gate: only entities (mutated, have lifecycle) need identity.
+	// Value objects correctly compare by attributes.
+	if !ctx.mutated[first.typeName] {
+		return patterns.EntityIdentityHit{}, false
+	}
+	if _, ok := ctx.structLocs[first.typeName]; !ok {
+		return patterns.EntityIdentityHit{}, false
+	}
+	return buildNoIDHit(comps, ctx, cond), true
+}
+
+// uniformComparisons returns the first comparison if all are on the same
+// struct type and variable pair, with at least 2 comparisons.
+func uniformComparisons(comps []fieldComparison) (fieldComparison, bool) {
+	if len(comps) < 2 {
+		return fieldComparison{}, false
+	}
+	first := comps[0]
+	for _, c := range comps[1:] {
+		if c.typeName != first.typeName || c.left != first.left || c.right != first.right {
+			return fieldComparison{}, false
+		}
+	}
+	return first, true
+}
+
+// buildNoIDHit constructs the hit for attribute equality without an ID.
+func buildNoIDHit(comps []fieldComparison, ctx noIDScanCtx, cond ast.Expr) patterns.EntityIdentityHit {
+	first := comps[0]
+	loc := ctx.structLocs[first.typeName]
+	var fields []string
+	for _, c := range comps {
+		fields = append(fields, c.field)
+	}
+	pos := ctx.fset.PositionFor(cond.Pos(), false)
+	return patterns.EntityIdentityHit{
+		Line:       pos.Line,
+		TypeName:   first.typeName,
+		IDField:    "", // No ID yet; fixer will add it.
+		Fields:     fields,
+		Left:       first.left,
+		Right:      first.right,
+		StructPath: loc.path,
+		StructLine: loc.line,
+	}
+}
+
+// hasIDFieldForType checks if the named type has an ID field, using type info.
+func hasIDFieldForType(typeName string, info *types.Info) bool {
+	for _, obj := range info.Defs {
+		if structHasID(typeName, obj) {
+			return true
+		}
+	}
+	return false
+}
+
+// structHasID checks if obj is the named type with an ID field.
+func structHasID(typeName string, obj types.Object) bool {
+	typeNameObj, ok := obj.(*types.TypeName)
+	if !ok || typeNameObj.Name() != typeName {
+		return false
+	}
+	st, ok := typeNameObj.Type().Underlying().(*types.Struct)
+	if !ok {
+		return false
+	}
+	return structFieldsHaveID(st)
+}
+
+// structFieldsHaveID checks if any struct field is ID-like.
+func structFieldsHaveID(st *types.Struct) bool {
+	for i := 0; i < st.NumFields(); i++ {
+		if isIDField(st.Field(i).Name()) {
+			return true
+		}
+	}
+	return false
+}
+
 // addUniqueHit appends a hit if its line hasn't been seen.
 func addUniqueHit(out *[]patterns.EntityIdentityHit, seen map[int]bool, hit patterns.EntityIdentityHit, fset *token.FileSet, cond ast.Expr) {
 	pos := fset.PositionFor(cond.Pos(), false)
@@ -233,15 +365,15 @@ func identPair(leftSel, rightSel *ast.SelectorExpr) (*ast.Ident, *ast.Ident, boo
 // structTypeWithID checks that both idents are the same named struct type
 // with an ID field. Returns the type name and ID field name.
 func structTypeWithID(leftIdent, rightIdent *ast.Ident, info *types.Info) (string, string, bool) {
-	leftType, rightType, ok := identTypes(leftIdent, rightIdent, info)
+	typeName, ok := structTypeName(leftIdent, rightIdent, info)
+	if !ok {
+		return "", "", false
+	}
+	leftType, _, ok := identTypes(leftIdent, rightIdent, info)
 	if !ok {
 		return "", "", false
 	}
 	leftStruct, ok := derefStruct(leftType)
-	if !ok || !isStructType(rightType) {
-		return "", "", false
-	}
-	typeName, ok := sameNamedType(leftType, rightType)
 	if !ok {
 		return "", "", false
 	}
@@ -250,6 +382,118 @@ func structTypeWithID(leftIdent, rightIdent *ast.Ident, info *types.Info) (strin
 		return "", "", false
 	}
 	return typeName, idField, true
+}
+
+// structTypeName checks that both idents are the same named struct type,
+// without requiring an ID field. Used to pair missing_identity with
+// attribute equality: the ID doesn't exist yet, that's the point.
+func structTypeName(leftIdent, rightIdent *ast.Ident, info *types.Info) (string, bool) {
+	leftType, rightType, ok := identTypes(leftIdent, rightIdent, info)
+	if !ok {
+		return "", false
+	}
+	if _, ok := derefStruct(leftType); !ok || !isStructType(rightType) {
+		return "", false
+	}
+	return sameNamedType(leftType, rightType)
+}
+
+// attrEqualityTypes scans fn for attribute-based equality (a.F == b.F && ...)
+// on the same struct type, WITHOUT requiring an ID field. Returns the type
+// names found. This pairs missing_identity with the problem it solves:
+// only suggest adding an ID when something compares by attributes.
+func attrEqualityTypes(fn *ast.FuncDecl, fset *token.FileSet, info *types.Info) map[string]bool {
+	out := map[string]bool{}
+	if fn.Body == nil {
+		return out
+	}
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		cond := boolExpr(n)
+		if cond == nil {
+			return true
+		}
+		if typeName, ok := attrEqualityType(cond, info); ok {
+			out[typeName] = true
+		}
+		return true
+	})
+	return out
+}
+
+// attrEqualityType checks if cond is 2+ field comparisons on the same struct
+// type and var pair, without requiring an ID field.
+func attrEqualityType(cond ast.Expr, info *types.Info) (string, bool) {
+	var comps []fieldComparison
+	collectComparisonsNoID(cond, &comps, info)
+	if len(comps) < 2 {
+		return "", false
+	}
+	first := comps[0]
+	for _, c := range comps[1:] {
+		if c.typeName != first.typeName || c.left != first.left || c.right != first.right {
+			return "", false
+		}
+	}
+	return first.typeName, true
+}
+
+// collectComparisonsNoID gathers `x.Field == y.Field` comparisons from an
+// &&-chain, without requiring an ID field on the struct type.
+func collectComparisonsNoID(expr ast.Expr, out *[]fieldComparison, info *types.Info) {
+	if bin, ok := expr.(*ast.BinaryExpr); ok && bin.Op == token.LAND {
+		collectComparisonsNoID(bin.X, out, info)
+		collectComparisonsNoID(bin.Y, out, info)
+		return
+	}
+	if comp, ok := fieldEqualComparisonNoID(expr, info); ok {
+		*out = append(*out, comp)
+	}
+}
+
+// fieldEqualComparisonNoID checks if expr is `a.Field == b.Field` where a and
+// b are the same struct type, without requiring an ID field.
+func fieldEqualComparisonNoID(expr ast.Expr, info *types.Info) (fieldComparison, bool) {
+	bin, ok := expr.(*ast.BinaryExpr)
+	if !ok || bin.Op != token.EQL {
+		return fieldComparison{}, false
+	}
+	leftSel, rightSel, leftIdent, rightIdent, ok := comparisonOperands(bin)
+	if !ok {
+		return fieldComparison{}, false
+	}
+	if leftSel.Sel.Name != rightSel.Sel.Name {
+		return fieldComparison{}, false
+	}
+	typeName, ok := structTypeName(leftIdent, rightIdent, info)
+	if !ok {
+		return fieldComparison{}, false
+	}
+	return fieldComparison{
+		left:     leftIdent.Name,
+		right:    rightIdent.Name,
+		field:    leftSel.Sel.Name,
+		typeName: typeName,
+	}, true
+}
+
+// collectAttrEqualityTypes returns the set of struct type names with
+// attribute-based equality anywhere in pkg. missing_identity only fires for
+// these types: no attribute comparison means the ID would be unused noise.
+func collectAttrEqualityTypes(pkg *packages.Package) map[string]bool {
+	out := map[string]bool{}
+	fset := token.NewFileSet()
+	for _, file := range pkg.Syntax {
+		for _, decl := range file.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok {
+				continue
+			}
+			for t := range attrEqualityTypes(fn, fset, pkg.TypesInfo) {
+				out[t] = true
+			}
+		}
+	}
+	return out
 }
 
 // identTypes returns the types of two identifiers.
@@ -346,24 +590,28 @@ func idAssignments(assign *ast.AssignStmt, fset *token.FileSet, funcName string)
 
 // identityScan carries the per-package facts missingIdentityFor needs.
 type identityScan struct {
-	uses    map[string]int
-	mutated map[string]bool
-	pkg     *packages.Package
+	uses         map[string]int
+	mutated      map[string]bool
+	attrEquality map[string]bool
+	pkg          *packages.Package
 }
 
 // findMissingIdentities scans pkg for struct types used as entities (in
 // maps, slices, or as function parameters 3+ times) that lack an ID field.
 // Value objects (never mutated) are skipped: in DDD they are immutable and
 // identified by their attributes, not by identity.
+// Paired with entity_identity: only fires when the type has attribute-based
+// equality somewhere. An ID nobody compares by is noise.
 func findMissingIdentities(pkg *packages.Package, root string) []patterns.MissingIdentityHit {
 	structs := collectStructs(pkg, root)
 	if len(structs) == 0 {
 		return nil
 	}
 	scan := identityScan{
-		uses:    countEntityUses(pkg),
-		mutated: collectMutatedStructs(pkg),
-		pkg:     pkg,
+		uses:         countEntityUses(pkg),
+		mutated:      collectMutatedStructs(pkg),
+		attrEquality: collectAttrEqualityTypes(pkg),
+		pkg:          pkg,
 	}
 	var out []patterns.MissingIdentityHit
 	for _, sd := range structs {
@@ -468,6 +716,8 @@ func countParamUses(fn *ast.FuncDecl, uses map[string]int) {
 // 3+ times without an ID field. Value objects (never mutated) are skipped:
 // in DDD they are immutable and identified by their attributes, not by
 // identity. Methods don't matter — value objects can have behavior.
+// Paired with entity_identity: only fires when the type has attribute-based
+// equality somewhere. An ID nobody compares by is noise.
 func missingIdentityFor(sd structDef, scan identityScan) (patterns.MissingIdentityHit, bool) {
 	if scan.uses[sd.name] < 3 {
 		return patterns.MissingIdentityHit{}, false
@@ -476,6 +726,9 @@ func missingIdentityFor(sd structDef, scan identityScan) (patterns.MissingIdenti
 		return patterns.MissingIdentityHit{}, false
 	}
 	if hasIDField(scan.pkg, sd.name) {
+		return patterns.MissingIdentityHit{}, false
+	}
+	if !scan.attrEquality[sd.name] {
 		return patterns.MissingIdentityHit{}, false
 	}
 	return patterns.MissingIdentityHit{

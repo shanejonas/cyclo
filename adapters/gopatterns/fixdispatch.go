@@ -25,11 +25,11 @@ var appliers = map[patterns.CandidateKind]fixApplier{
 	patterns.PrimitiveObsession:  applyPrimitiveObsessionFix,
 	patterns.TypeSwitch:          applyTypeSwitchFix,
 	patterns.EntityIdentity:      applyEntityIdentityFix,
-	patterns.MissingIdentity:     applyMissingIdentityFix,
 	patterns.Factory:             applyFactoryFix,
 	// MutableIdentity is detection-only: no safe mechanical fix exists.
 	// Aggregate is detection-only: choosing the root is design.
 	// Repository is detection-only: extraction is design.
+	// MissingIdentity is detection-only first gate: entity_identity fixes.
 }
 
 // ApplyFix applies the transform for a candidate's FixSpec to src.

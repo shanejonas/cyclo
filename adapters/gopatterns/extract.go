@@ -124,6 +124,7 @@ func loadPatternPackages(ctx context.Context, dir string, query []string) ([]*pa
 
 func packagePdgs(pkg *packages.Package, root string) []FuncPdg {
 	out := []FuncPdg{}
+	ctx := newExtractCtx(pkg, root)
 	for _, file := range pkg.Syntax {
 		filename := pkg.Fset.PositionFor(file.Pos(), false).Filename
 		rel, err := filepath.Rel(root, filename)
@@ -135,10 +136,31 @@ func packagePdgs(pkg *packages.Package, root string) []FuncPdg {
 			if !ok || fn.Body == nil {
 				continue
 			}
-			out = append(out, extractFunc(pkg, fn, filepath.ToSlash(rel)))
+			out = append(out, extractFunc(pkg, fn, filepath.ToSlash(rel), ctx))
 		}
 	}
 	return out
+}
+
+// extractCtx carries per-package maps for entity pairing.
+type extractCtx struct {
+	structLocs map[string]structLoc
+	mutated    map[string]bool
+}
+
+// newExtractCtx builds the struct location and mutation maps for pairing
+// missing_identity with entity_identity.
+func newExtractCtx(pkg *packages.Package, root string) extractCtx {
+	structLocs := map[string]structLoc{}
+	for _, sd := range collectStructs(pkg, root) {
+		if _, ok := structLocs[sd.name]; !ok {
+			structLocs[sd.name] = structLoc{path: sd.path, line: sd.line}
+		}
+	}
+	return extractCtx{
+		structLocs: structLocs,
+		mutated:    collectMutatedStructs(pkg),
+	}
 }
 
 func patternsQuery(root string, paths []string) ([]string, error) {
@@ -178,7 +200,7 @@ func patternInput(root, input string) (string, error) {
 	return "file=" + abs, nil
 }
 
-func extractFunc(pkg *packages.Package, fn *ast.FuncDecl, path string) FuncPdg {
+func extractFunc(pkg *packages.Package, fn *ast.FuncDecl, path string, ctx extractCtx) FuncPdg {
 	name := fn.Name.Name
 	if object, ok := pkg.TypesInfo.Defs[fn.Name].(*types.Func); ok {
 		name = patterns.FuncID(object)
@@ -203,7 +225,17 @@ func extractFunc(pkg *packages.Package, fn *ast.FuncDecl, path string) FuncPdg {
 		TypeSwitches:   findTypeSwitches(fn, pkg.Fset),
 		Params:       primitiveParams(fn, pkg.TypesInfo),
 		// EntityIdentities are attribute-based equalities that should use ID.
-		EntityIdentities: findEntityIdentities(fn, pkg.Fset, pkg.TypesInfo),
+		// Includes no-ID cases (paired with missing_identity): the fixer
+		// adds the ID, then a later phase rewrites the comparison.
+		EntityIdentities: append(
+			findEntityIdentities(fn, pkg.Fset, pkg.TypesInfo),
+			findEntityIdentitiesNoID(fn, noIDScanCtx{
+				fset:       pkg.Fset,
+				info:       pkg.TypesInfo,
+				structLocs: ctx.structLocs,
+				mutated:    ctx.mutated,
+			})...,
+		),
 		// MutableIdentities are ID assignments outside constructors.
 		MutableIdentities: FindMutableIdentities(fn, pkg.Fset),
 		// AggregateMods are struct types whose fields this function mutates.

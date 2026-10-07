@@ -167,18 +167,21 @@ func use3(w Weights) int { return int(w.Mutation + w.IO) }
 
 func TestMissingIdentityFlagsEntities(t *testing.T) {
 	src := `package p
-// Order is entity-like: it is mutated.
+// Order is entity-like: it is mutated and compared by attributes.
 type Order struct {
+	Name  string
+	Email string
 	Total int
 }
 func (o *Order) ApplyDiscount(d int) { o.Total -= d }
 func use1(o Order) int { return o.Total }
 func use2(o Order) int { return o.Total }
 func use3(o *Order) { o.ApplyDiscount(1) }
+func same(a, b Order) bool { return a.Name == b.Name && a.Email == b.Email }
 `
 	names := missingIdentityNames(t, src)
 	if !names["Order"] {
-		t.Errorf("Order is mutated with 3+ uses: want missing_identity hit, got %v", names)
+		t.Errorf("Order is mutated with 3+ uses and attribute equality: want missing_identity hit, got %v", names)
 	}
 }
 
@@ -202,16 +205,74 @@ func use3(w Weights) int64 { return w.IO }
 
 func TestMissingIdentityFlagsMutatedStructs(t *testing.T) {
 	src := `package p
-// Counter has no methods but is mutated: entity-like, not a value object.
+// Counter has no methods but is mutated and compared by attributes.
 type Counter struct {
-	N int
+	N    int
+	Name string
 }
 func use1(c *Counter) { c.N++ }
 func use2(c Counter) int { return c.N }
 func use3(c Counter) int { return c.N * 2 }
+func same(a, b Counter) bool { return a.N == b.N && a.Name == b.Name }
 `
 	names := missingIdentityNames(t, src)
 	if !names["Counter"] {
-		t.Errorf("Counter is mutated with 3+ uses: want missing_identity hit, got %v", names)
+		t.Errorf("Counter is mutated with 3+ uses and attribute equality: want missing_identity hit, got %v", names)
+	}
+}
+
+func TestMissingIdentitySkipsWithoutAttrEquality(t *testing.T) {
+	src := `package p
+// Order is mutated with 3+ uses but never compared by attributes:
+// adding an ID would be noise, so it is skipped.
+type Order struct {
+	Total int
+}
+func (o *Order) ApplyDiscount(d int) { o.Total -= d }
+func use1(o Order) int { return o.Total }
+func use2(o Order) int { return o.Total }
+func use3(o *Order) { o.ApplyDiscount(1) }
+`
+	names := missingIdentityNames(t, src)
+	if names["Order"] {
+		t.Errorf("Order has no attribute equality: missing_identity should be skipped (paired with entity_identity), got %v", names)
+	}
+}
+
+func TestEntityIdentityNoIDFiresWhenPaired(t *testing.T) {
+	// Order: mutated, compared by attributes, no ID.
+	// missing_identity (first gate) flags it; entity_identity fixes it.
+	src := `package p
+type Order struct {
+	Name  string
+	Email string
+	Total int
+}
+func (o *Order) ApplyDiscount(d int) { o.Total -= d }
+func same(a Order, b Order) bool { return a.Name == b.Name && a.Email == b.Email }
+func use(o Order) int { return o.Total }
+`
+	names := missingIdentityNames(t, src)
+	if !names["Order"] {
+		t.Errorf("Order: want missing_identity hit (first gate), got %v", names)
+	}
+}
+
+func TestEntityIdentityNoIDSkipsValueObjects(t *testing.T) {
+	// Money: compared by attributes but never mutated (value object).
+	// Attribute comparison is CORRECT for value objects; do not fire.
+	src := `package p
+type Money struct {
+	Amount   int
+	Currency string
+}
+func same(a, b Money) bool { return a.Amount == b.Amount && a.Currency == b.Currency }
+func use1(m Money) int { return m.Amount }
+func use2(m Money) int { return m.Amount }
+func use3(m Money) int { return m.Amount }
+`
+	names := missingIdentityNames(t, src)
+	if names["Money"] {
+		t.Errorf("Money is a value object (never mutated): should be skipped, got %v", names)
 	}
 }

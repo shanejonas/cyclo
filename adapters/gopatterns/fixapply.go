@@ -351,10 +351,17 @@ func applyPrimitiveObsessionFix(spec *patterns.FixSpec, src []byte) ([]byte, err
 	return out, nil
 }
 
-// applyEntityIdentityFix applies an entity_identity FixSpec: replaces
-// attribute-based equality (a.Name == b.Name && a.Email == b.Email) with
-// identity comparison (a.ID == b.ID).
+// applyEntityIdentityFix applies an entity_identity FixSpec.
+// Two modes:
+// - Standard: replaces attribute-based equality (a.Name == b.Name &&
+//   a.Email == b.Email) with identity comparison (a.ID == b.ID).
+// - Add-ID (paired with missing_identity): adds an ID field to a struct
+//   that is compared by attributes but has no identity. After re-mining,
+//   the standard rewrite fires.
 func applyEntityIdentityFix(spec *patterns.FixSpec, src []byte) ([]byte, error) {
+	if spec.Params["add_id"] == "true" {
+		return applyEntityAddIDFix(spec, src)
+	}
 	fset, f, err := parseSpec(spec, src)
 	if err != nil {
 		return nil, err
@@ -375,6 +382,35 @@ func applyEntityIdentityFix(spec *patterns.FixSpec, src []byte) ([]byte, error) 
 	formatted, err := format.Source(out)
 	if err != nil {
 		return nil, fmt.Errorf("gofmt after entity_identity fix: %w", err)
+	}
+	return formatted, nil
+}
+
+// applyEntityAddIDFix adds an ID field to the struct. This is the first
+// step of the paired fix: missing_identity (detection) flags the problem,
+// entity_identity adds the ID, then a later phase rewrites the comparison.
+func applyEntityAddIDFix(spec *patterns.FixSpec, src []byte) ([]byte, error) {
+	fset, f, err := parseSpec(spec, src)
+	if err != nil {
+		return nil, err
+	}
+	typeName := spec.Params["type"]
+	if typeName == "" {
+		return nil, fmt.Errorf("entity_identity FixSpec missing type for add_id")
+	}
+	insertPos, err := structInsertPos(fset, f, typeName)
+	if err != nil {
+		return nil, err
+	}
+	edit := textEdit{
+		start:       insertPos,
+		end:         insertPos,
+		replacement: []byte("\n\tID string `json:\"id\"`"),
+	}
+	out := applyEdits(src, []textEdit{edit})
+	formatted, err := format.Source(out)
+	if err != nil {
+		return nil, fmt.Errorf("gofmt after entity_identity add_id fix: %w", err)
 	}
 	return formatted, nil
 }
@@ -426,33 +462,6 @@ func findComparisonAtLine(fset *token.FileSet, f *ast.File, line int) ast.Expr {
 	return target
 }
 
-// applyMissingIdentityFix applies a missing_identity FixSpec: adds an
-// ID field to the struct.
-func applyMissingIdentityFix(spec *patterns.FixSpec, src []byte) ([]byte, error) {
-	fset, f, err := parseSpec(spec, src)
-	if err != nil {
-		return nil, err
-	}
-	typeName := spec.Params["type"]
-	if typeName == "" {
-		return nil, fmt.Errorf("missing_identity FixSpec missing type")
-	}
-	insertPos, err := structInsertPos(fset, f, typeName)
-	if err != nil {
-		return nil, err
-	}
-	edit := textEdit{
-		start:       insertPos,
-		end:         insertPos,
-		replacement: []byte("\n\tID string `json:\"id\"`"),
-	}
-	out := applyEdits(src, []textEdit{edit})
-	formatted, err := format.Source(out)
-	if err != nil {
-		return nil, fmt.Errorf("gofmt after missing_identity fix: %w", err)
-	}
-	return formatted, nil
-}
 
 // structInsertPos finds the byte offset after the last field of a struct.
 func structInsertPos(fset *token.FileSet, f *ast.File, typeName string) (int, error) {
