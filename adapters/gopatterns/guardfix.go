@@ -16,6 +16,12 @@ type GuardFix struct {
 	Kind string
 }
 
+// FixLine implements Fix.
+func (g GuardFix) FixLine() int { return g.Line }
+
+// FixKind implements Fix.
+func (g GuardFix) FixKind() string { return g.Kind }
+
 // FixInvertedGuards rewrites inverted conditionals in f into guard clauses.
 // It returns the rewritten source (gofmt-clean) and the fixes applied.
 // The transform is behavior-preserving: ifStmt of the form

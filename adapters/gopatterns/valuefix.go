@@ -759,3 +759,9 @@ func spliceStructArg(args []ast.Expr, positions []int, lit *ast.CompositeLit) []
 
 // rewriteBodyIdents replaces param uses with struct field accesses.
 // E.g. `amount` becomes `amountCurrency.Amount`.
+
+// FixLine implements gopatterns.Fix.
+func (v ValueFix) FixLine() int { return v.Line }
+
+// FixKind implements gopatterns.Fix.
+func (v ValueFix) FixKind() string { return v.Kind }

@@ -7,6 +7,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"io"
@@ -25,7 +26,7 @@ Statically apply fixes for patterns miner candidates. No LLM, no tokens:
 pure AST rewrites that are provably behavior-preserving.
 Dry-run by default (shows a diff); --apply writes the files.
 
-  --kind KIND   which fixes to apply: guard_clause (default), value_object, or all
+  --kind KIND   which fixes to apply: guard_clause (default), value_object, parameterize, or all
   --apply       write the fixes to disk (default: dry-run diff only)
 
 Exit 0: always, on success (even with no fixes). Exit 2: parse or IO failure.
@@ -94,26 +95,21 @@ func fixFile(path string, opts options, output io.Writer) (int, error) {
 	return showDiff(path, src, out, fixes, output)
 }
 
-// fixInfo is one applied fix, regardless of kind.
-type fixInfo struct {
-	line int
-	kind string
-}
-
 // fixSource parses src and returns the fixed source and the fixes applied.
-func fixSource(path string, src []byte, kind string) ([]byte, []fixInfo, error) {
+func fixSource(path string, src []byte, kind string) ([]byte, []gopatterns.Fix, error) {
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, path, src, parser.ParseComments)
 	if err != nil {
 		return nil, nil, fmt.Errorf("parse %s: %w", path, err)
 	}
+
 	switch kind {
 	case "guard_clause":
-		out, fixes, err := gopatterns.FixInvertedGuards(fset, f, src)
-		return out, guardFixes(fixes), err
+		return fixGuardClause(fset, f, src)
 	case "value_object":
-		out, fixes, err := gopatterns.FixValueObjects(fset, f, src)
-		return out, valueFixes(fixes), err
+		return fixValueObjectKind(fset, f, src)
+	case "parameterize":
+		return fixParameterizeKind(fset, f, src)
 	case "all":
 		return fixAllKinds(path, src)
 	default:
@@ -121,86 +117,81 @@ func fixSource(path string, src []byte, kind string) ([]byte, []fixInfo, error) 
 	}
 }
 
-// fixAllKinds applies guard fixes then value-object fixes, re-parsing
-// between kinds so positions stay valid.
-func fixAllKinds(path string, src []byte) ([]byte, []fixInfo, error) {
-	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, path, src, parser.ParseComments)
-	if err != nil {
-		return nil, nil, fmt.Errorf("parse %s: %w", path, err)
-	}
-	out, gfixes, err := gopatterns.FixInvertedGuards(fset, f, src)
+// fixValueObjectKind applies value-object fixes.
+func fixValueObjectKind(fset *token.FileSet, f *ast.File, src []byte) ([]byte, []gopatterns.Fix, error) {
+	fixed, valueFixes, err := gopatterns.FixValueObjects(fset, f, src)
 	if err != nil {
 		return nil, nil, err
 	}
-	infos := guardFixes(gfixes)
-	out, vfixes, err := fixValuesAfterGuards(path, out, len(gfixes) > 0)
+	return fixed, toFixes(valueFixes), nil
+}
+
+// fixAllKinds applies guard_clause, value_object, then parameterize,
+// re-parsing between kinds so positions stay valid.
+// fixGuardClause applies guard-clause fixes.
+func fixGuardClause(fset *token.FileSet, f *ast.File, src []byte) ([]byte, []gopatterns.Fix, error) {
+	fixed, guardFixes, err := gopatterns.FixInvertedGuards(fset, f, src)
 	if err != nil {
 		return nil, nil, err
 	}
-	return out, append(infos, valueFixes(vfixes)...), nil
+	return fixed, toFixes(guardFixes), nil
 }
 
-// fixValuesAfterGuards parses src and applies value-object fixes.
-// The reparse flag only changes the error message (parse vs re-parse).
-func fixValuesAfterGuards(path string, src []byte, reparse bool) ([]byte, []gopatterns.ValueFix, error) {
-	what := "parse"
-	if reparse {
-		what = "re-parse"
-	}
-	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, path, src, parser.ParseComments)
+// fixParameterizeKind applies parameterize fixes.
+func fixParameterizeKind(fset *token.FileSet, f *ast.File, src []byte) ([]byte, []gopatterns.Fix, error) {
+	fixed, paramFixes, err := gopatterns.FixParameterize(fset, f, src, nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("%s %s: %w", what, path, err)
+		return nil, nil, err
 	}
-	return gopatterns.FixValueObjects(fset, f, src)
+	return fixed, toFixes(paramFixes), nil
 }
 
-// guardFixes converts guard fixes to fixInfo.
-func guardFixes(fixes []gopatterns.GuardFix) []fixInfo {
-	out := make([]fixInfo, 0, len(fixes))
-	for _, fx := range fixes {
-		out = append(out, fixInfo{line: fx.Line, kind: fx.Kind})
+// toFixes converts typed fixes to the Fix interface.
+func toFixes[T gopatterns.Fix](fixes []T) []gopatterns.Fix {
+	out := make([]gopatterns.Fix, len(fixes))
+	for i, fx := range fixes {
+		out[i] = fx
 	}
 	return out
 }
 
-// valueFixes converts value-object fixes to fixInfo.
-func valueFixes(fixes []gopatterns.ValueFix) []fixInfo {
-	out := make([]fixInfo, 0, len(fixes))
-	for _, fx := range fixes {
-		out = append(out, fixInfo{line: fx.Line, kind: fx.Kind})
+func fixAllKinds(path string, src []byte) ([]byte, []gopatterns.Fix, error) {
+	src1, fixes1, err := fixSource(path, src, "guard_clause")
+	if err != nil {
+		return nil, nil, err
 	}
-	return out
+	src2, fixes2, err := fixSource(path, src1, "value_object")
+	if err != nil {
+		return nil, nil, err
+	}
+	src3, fixes3, err := fixSource(path, src2, "parameterize")
+	if err != nil {
+		return nil, nil, err
+	}
+	return src3, append(append(fixes1, fixes2...), fixes3...), nil
 }
 
 // applyFixes writes the fixed source and reports.
-func applyFixes(path string, out []byte, fixes []fixInfo, output io.Writer) (int, error) {
+func applyFixes(path string, out []byte, fixes []gopatterns.Fix, output io.Writer) (int, error) {
 	if err := os.WriteFile(path, out, 0644); err != nil {
 		return 0, err
 	}
-	fmt.Fprintf(output, "fixed %d %s in %s\n", len(fixes), fixKinds(fixes), path)
+	byKind := map[string]int{}
+	for _, fx := range fixes {
+		byKind[fx.FixKind()]++
+	}
+	for kind, n := range byKind {
+		fmt.Fprintf(output, "fixed %d %s in %s\n", n, kind, path)
+	}
 	return len(fixes), nil
 }
 
-// fixKinds summarizes the kinds fixed, e.g. "guard_clause" or "2 kinds".
-func fixKinds(fixes []fixInfo) string {
-	kinds := make(map[string]bool, len(fixes))
-	for _, fx := range fixes {
-		kinds[fx.kind] = true
-	}
-	if len(kinds) == 1 {
-		return fixes[0].kind
-	}
-	return fmt.Sprintf("%d kinds", len(kinds))
-}
-
 // showDiff prints a unified diff for dry-run.
-func showDiff(path string, src, out []byte, fixes []fixInfo, output io.Writer) (int, error) {
+func showDiff(path string, src, out []byte, fixes []gopatterns.Fix, output io.Writer) (int, error) {
 	diff, err := unifiedDiff(path, src, out)
 	if err != nil {
 		for _, fx := range fixes {
-			fmt.Fprintf(output, "%s:%d: would fix %s\n", path, fx.line, fx.kind)
+			fmt.Fprintf(output, "%s:%d: would fix %s\n", path, fx.FixLine(), fx.FixKind())
 		}
 		return len(fixes), nil
 	}
@@ -311,8 +302,8 @@ func parseOptions(args []string) (options, error) {
 }
 
 func (opts options) validate() error {
-	if !slices.Contains([]string{"guard_clause", "value_object", "all"}, opts.kind) {
-		return fmt.Errorf("kind must be guard_clause, value_object, or all")
+	if !slices.Contains([]string{"guard_clause", "value_object", "parameterize", "all"}, opts.kind) {
+		return fmt.Errorf("kind must be guard_clause, value_object, parameterize, or all")
 	}
 	return nil
 }
