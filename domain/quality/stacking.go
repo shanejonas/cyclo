@@ -49,14 +49,6 @@ func stackSites(functions []Function) []callSite {
 	return sites
 }
 
-func nameIndex(functions []Function) map[string]int {
-	index := map[string]int{}
-	for i, f := range functions {
-		index[NormalizeCallee(f.Name)] = i
-	}
-	return index
-}
-
 func resolveSite(caller int, c Call, index map[string]int) (callSite, bool) {
 	if !c.Local || c.Dynamic {
 		return callSite{}, false
