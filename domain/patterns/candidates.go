@@ -150,21 +150,26 @@ func newCandidateIndex(facts []*FuncFacts, groups []SigGroup, params Params) *ca
 // keeps no callee signatures, so the owner is derived from the callee id:
 // "pkgpath.Type.Method" -> "Type" (see hasReceiver in align.go). Free
 // functions have no owner.
+// indexCalleeOwners records owners for every callee id in one PDG.
+func indexCalleeOwners(out map[string]string, pdg *Pdg) {
+	for _, n := range pdg.Nodes {
+		id := n.CalleeID
+		if id == "" {
+			continue
+		}
+		if owner, ok := calleeOwner(id); ok {
+			out[id] = owner
+		}
+	}
+}
+
 func calleeOwners(facts []*FuncFacts) map[string]string {
 	out := map[string]string{}
 	for _, f := range facts {
 		if f == nil || f.Pdg == nil {
 			continue
 		}
-		for _, n := range f.Pdg.Nodes {
-			id := n.CalleeID
-			if id == "" {
-				continue
-			}
-			if owner, ok := calleeOwner(id); ok {
-				out[id] = owner
-			}
-		}
+		indexCalleeOwners(out, f.Pdg)
 	}
 	return out
 }
@@ -210,25 +215,31 @@ func lastTwo(id string) string {
 // shortGoPaths drops module paths inside a rendered owner: "a.W[b.X]" ->
 // "W[X]". Port of Rust's short_paths ("a::W<b::X>" -> "W<X>"), with '.'
 // as the Go path separator.
+// shortWord strips the package path from a dotted word, keeping the last segment.
+func shortWord(s string) string {
+	if i := strings.LastIndexByte(s, '.'); i >= 0 {
+		return s[i+1:]
+	}
+	return s
+}
+
+// isWordChar reports whether r continues an identifier-like word.
+func isWordChar(r rune) bool {
+	return r == '_' || r == '.' || unicode.IsLetter(r) || unicode.IsDigit(r)
+}
+
 func shortGoPaths(owner string) string {
 	var out, word strings.Builder
-	flush := func() {
-		s := word.String()
-		if i := strings.LastIndexByte(s, '.'); i >= 0 {
-			s = s[i+1:]
-		}
-		out.WriteString(s)
-		word.Reset()
-	}
 	for _, c := range owner {
-		if c == '_' || c == '.' || unicode.IsLetter(c) || unicode.IsDigit(c) {
+		if isWordChar(c) {
 			word.WriteRune(c)
 		} else {
-			flush()
+			out.WriteString(shortWord(word.String()))
+			word.Reset()
 			out.WriteRune(c)
 		}
 	}
-	flush()
+	out.WriteString(shortWord(word.String()))
 	return out.String()
 }
 
@@ -674,6 +685,16 @@ const minGenericCalls = 2
 
 // forwardsParams reports whether every call in f is fed by parameters alone:
 // a delegation shim.
+// callArgsAllParams reports whether every data input to a call is a parameter.
+func callArgsAllParams(pdg *Pdg, call int) bool {
+	for _, e := range pdg.Edges {
+		if e.To == call && e.Kind == Data && pdg.Nodes[e.From].Kind != Param {
+			return false
+		}
+	}
+	return true
+}
+
 func forwardsParams(f *FuncFacts) bool {
 	pdg := f.Pdg
 	if pdg == nil {
@@ -683,10 +704,8 @@ func forwardsParams(f *FuncFacts) bool {
 		if n.Kind != Call {
 			continue
 		}
-		for _, e := range pdg.Edges {
-			if e.To == call && e.Kind == Data && pdg.Nodes[e.From].Kind != Param {
-				return false
-			}
+		if !callArgsAllParams(pdg, call) {
+			return false
 		}
 	}
 	return true
@@ -743,7 +762,33 @@ func breakdownOf(sites []*FuncFacts, cluster *Cluster, liftMilli uint32) Breakdo
 // genericColumns splits a cluster's columns into type holes and the rest,
 // checking the generic_fn preconditions: some type column over workspace
 // types only, and every other column an external callee hole.
-func genericColumns(ix *candidateIndex, cluster *Cluster) (types, others []*Column, ok bool) {
+// allWorkspaceADTs reports whether every hole value is a workspace ADT.
+func allWorkspaceADTs(ix *candidateIndex, c *Column) bool {
+	for _, v := range c.Values {
+		if !ix.workspaceADTs[v] {
+			return false
+		}
+	}
+	return true
+}
+
+// externalCallee reports whether a method-like hole refers only to external
+// callees: a workspace callee that differs per type is behaviour, not just
+// a type parameter.
+func externalCallee(ix *candidateIndex, c *Column) bool {
+	if !methodLike(c.Kind) {
+		return false
+	}
+	for _, v := range c.Values {
+		if _, known := ix.byID[v]; known {
+			return false
+		}
+	}
+	return true
+}
+
+// splitColumns partitions hole columns into type holes and the rest.
+func splitColumns(cluster *Cluster) (types, others []*Column) {
 	for i := range cluster.Columns {
 		c := &cluster.Columns[i]
 		if c.Kind == HoleType {
@@ -752,35 +797,24 @@ func genericColumns(ix *candidateIndex, cluster *Cluster) (types, others []*Colu
 			others = append(others, c)
 		}
 	}
-	own := func(c *Column) bool {
-		for _, v := range c.Values {
-			if !ix.workspaceADTs[v] {
-				return false
-			}
-		}
-		return true
-	}
-	// Callee holes must be external: a workspace callee that differs per
-	// type is behaviour, not just a type parameter.
-	external := func(c *Column) bool {
-		if !methodLike(c.Kind) {
-			return false
-		}
-		for _, v := range c.Values {
-			if _, known := ix.byID[v]; known {
-				return false
-			}
-		}
-		return true
-	}
-	anyOwn := false
+	return types, others
+}
+
+// anyAllWorkspaceADTs reports whether some type hole is all workspace ADTs.
+func anyAllWorkspaceADTs(ix *candidateIndex, types []*Column) bool {
 	for _, c := range types {
-		if own(c) {
-			anyOwn = true
+		if allWorkspaceADTs(ix, c) {
+			return true
 		}
 	}
+	return false
+}
+
+func genericColumns(ix *candidateIndex, cluster *Cluster) (types, others []*Column, ok bool) {
+	types, others = splitColumns(cluster)
+	anyOwn := anyAllWorkspaceADTs(ix, types)
 	for _, c := range others {
-		if !external(c) {
+		if !externalCallee(ix, c) {
 			return nil, nil, false
 		}
 	}
@@ -824,23 +858,33 @@ func genericFn(ix *candidateIndex, sites []*FuncFacts, cluster *Cluster) *Candid
 // isBoilerplate reports code whose repetition is not a refactoring target:
 // tests repeat arrange/act on purpose, `main` is per-binary boilerplate,
 // `ffi`/`raw` modules and `bindgen_*` items are thin shims over C.
+// hasSegment reports whether any path segment matches.
+func hasSegment(segs []string, match func(string) bool) bool {
+	for _, s := range segs {
+		if match(s) {
+			return true
+		}
+	}
+	return false
+}
+
+// inTestPath reports whether the function lives under a tests directory.
+func inTestPath(f *FuncFacts, segs []string) bool {
+	return hasSegment(segs, func(s string) bool { return s == "tests" }) ||
+		strings.HasPrefix(f.Path, "tests/") || strings.Contains(f.Path, "/tests/")
+}
+
+// isFFIModule reports whether the function is in an ffi/raw/bindgen module.
+func isFFIModule(segs []string) bool {
+	return hasSegment(segs, func(s string) bool {
+		return s == "ffi" || s == "raw" || strings.HasPrefix(s, "bindgen")
+	})
+}
+
 func isBoilerplate(f *FuncFacts) bool {
 	segs := strings.FieldsFunc(f.ID, func(r rune) bool { return r == '.' || r == '/' })
-	inTests := false
-	for _, s := range segs {
-		if s == "tests" {
-			inTests = true
-		}
-	}
-	inTests = inTests || strings.HasPrefix(f.Path, "tests/") || strings.Contains(f.Path, "/tests/")
-	ffi := false
-	for _, s := range segs {
-		if s == "ffi" || s == "raw" || strings.HasPrefix(s, "bindgen") {
-			ffi = true
-		}
-	}
 	main := len(segs) > 0 && segs[len(segs)-1] == "main"
-	return inTests || ffi || main
+	return inTestPath(f, segs) || isFFIModule(segs) || main
 }
 
 // parameterizable reports whether a cluster is worth a parameterize
@@ -1041,18 +1085,8 @@ func compareSites(a, b []Site) int {
 
 // collectOutcomes folds outcomes into a Mined, best first; ties by site, so
 // output never depends on input order.
-func collectOutcomes(outcomes []outcome) Mined {
-	mined := Mined{}
-	for _, o := range outcomes {
-		switch o.kind {
-		case outcomeFound:
-			mined.Candidates = append(mined.Candidates, finish(o.ev))
-		case outcomeReady:
-			mined.Candidates = append(mined.Candidates, *o.candidate)
-		case outcomeHidden:
-			mined.Suppressed = append(mined.Suppressed, *o.suppressed)
-		}
-	}
+// sortMined orders candidates by score then sites, suppressed by sites then reason.
+func sortMined(mined *Mined) {
 	sort.SliceStable(mined.Candidates, func(i, j int) bool {
 		a, b := mined.Candidates[i], mined.Candidates[j]
 		if a.ScoreMilli != b.ScoreMilli {
@@ -1067,6 +1101,21 @@ func collectOutcomes(outcomes []outcome) Mined {
 		}
 		return a.Reason < b.Reason
 	})
+}
+
+func collectOutcomes(outcomes []outcome) Mined {
+	mined := Mined{}
+	for _, o := range outcomes {
+		switch o.kind {
+		case outcomeFound:
+			mined.Candidates = append(mined.Candidates, finish(o.ev))
+		case outcomeReady:
+			mined.Candidates = append(mined.Candidates, *o.candidate)
+		case outcomeHidden:
+			mined.Suppressed = append(mined.Suppressed, *o.suppressed)
+		}
+	}
+	sortMined(&mined)
 	return mined
 }
 
