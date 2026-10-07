@@ -70,12 +70,6 @@ func Run(facts []*FuncFacts, options Options) PatternsReport {
 	// contract `func Mine(facts []*FuncFacts, groups []SigGroup, params Params) Mined`,
 	// which collides with sigmine.go's `func Mine`; see the commit report.
 	mined := MineCached(prepared, groups, defaultParams(options.Params), options.WlCache)
-	// Single-function findings: guard clauses need no clustering, so they
-	// join the candidates here and flow through the same ranking/filtering.
-	if guards := guardCandidates(prepared); len(guards) > 0 {
-		mined.Candidates = append(mined.Candidates, guards...)
-		sortMined(&mined)
-	}
 	// Type switches: same-method arms want interface dispatch, also
 	// single-pass and fixed-score.
 	if tss := typeSwitchCandidates(prepared); len(tss) > 0 {

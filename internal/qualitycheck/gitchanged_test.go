@@ -10,67 +10,8 @@ import (
 	"testing"
 
 	"github.com/shanejonas/cyclo/domain/quality"
+	"github.com/shanejonas/cyclo/internal/gitchanged"
 )
-
-func TestParseFileRanges(t *testing.T) {
-	output := `diff --git a/foo.go b/foo.go
-index 123..456 100644
---- a/foo.go
-+++ b/foo.go
-@@ -10,3 +20,4 @@ func foo() {
- context
--old
-+new
-+extra
- context
-diff --git a/bar.go b/bar.go
-index 123..456 100644
---- a/bar.go
-+++ b/bar.go
-@@ -4 +3,0 @@ func bar() {
--removed
-`
-	ranges := parseFileRanges(output)
-	if len(ranges) != 2 {
-		t.Fatalf("files = %v", ranges)
-	}
-	if len(ranges["foo.go"]) != 1 || ranges["foo.go"][0] != (lineRange{20, 23}) {
-		t.Fatalf("foo.go ranges = %v", ranges["foo.go"])
-	}
-	// Pure deletion hunk touches the single new-side line it precedes.
-	if len(ranges["bar.go"]) != 1 || ranges["bar.go"][0] != (lineRange{3, 3}) {
-		t.Fatalf("bar.go ranges = %v", ranges["bar.go"])
-	}
-}
-
-func TestParseFileRangesQuotedPath(t *testing.T) {
-	output := "diff --git \"a/my dir/f.go\" \"b/my dir/f.go\"\n@@ -1 +1 @@\n-a\n+b\n"
-	ranges := parseFileRanges(output)
-	if len(ranges["my dir/f.go"]) != 1 {
-		t.Fatalf("quoted path ranges = %v", ranges)
-	}
-}
-
-func TestParseHunkRange(t *testing.T) {
-	for _, test := range []struct {
-		line   string
-		want   lineRange
-		wantOK bool
-	}{
-		{"@@ -10,3 +20,4 @@", lineRange{20, 23}, true},
-		{"@@ -1 +1 @@", lineRange{1, 1}, true},
-		{"@@ -4 +3,0 @@", lineRange{3, 3}, true},
-		{" context", lineRange{}, false},
-		{"\\ No newline at end of file", lineRange{}, false},
-	} {
-		t.Run(test.line, func(t *testing.T) {
-			got, ok := parseHunkRange(test.line)
-			if ok != test.wantOK || got != test.want {
-				t.Fatalf("parseHunkRange(%q) = %v, %v", test.line, got, ok)
-			}
-		})
-	}
-}
 
 func TestTouchedFunctions(t *testing.T) {
 	facts := []quality.Function{
@@ -78,22 +19,14 @@ func TestTouchedFunctions(t *testing.T) {
 		{Location: quality.Location{Path: "a.go", Line: 20, Name: "pkg.untouched"}, Source: "func untouched() {\n}\n"},
 		{Location: quality.Location{Path: "b.go", Line: 5, Name: "pkg.other"}, Source: "func other() {\n}\n"},
 	}
-	ranges := map[string][]lineRange{"a.go": {{11, 11}}}
-	touched := touchedFunctions(facts, ranges, "/root", "/root")
+	ranges := map[string][]gitchanged.LineRange{"a.go": {{Start: 11, End: 11}}}
+	diff := &gitchanged.Diff{Root: "/root", Cwd: "/root", Ranges: ranges}
+	touched := touchedFunctions(facts, diff)
 	if !touched["a.go\x00pkg.touched"] {
 		t.Fatal("touched function not detected")
 	}
 	if touched["a.go\x00pkg.untouched"] || touched["b.go\x00pkg.other"] {
 		t.Fatal("untouched function reported as touched")
-	}
-}
-
-func TestRootRelative(t *testing.T) {
-	if got := rootRelative("a.go", "/root", "/root"); got != "a.go" {
-		t.Fatalf("same dir: %q", got)
-	}
-	if got := rootRelative("a.go", "/root", "/root/sub"); got != "sub/a.go" {
-		t.Fatalf("subdir: %q", got)
 	}
 }
 

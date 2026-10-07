@@ -99,70 +99,84 @@ func openWlCache(enabled bool) (cache *patterns.WlCache, save func(), err error)
 func toFacts(pdgs []gopatterns.FuncPdg) []*patterns.FuncFacts {
 	facts := make([]*patterns.FuncFacts, 0, len(pdgs))
 	for _, fp := range pdgs {
-		var params []string
-		for _, node := range fp.Pdg.Nodes {
-			if node.Kind == patterns.Param {
-				params = append(params, node.TyClass)
-			}
-		}
 		fp := fp
-		var guards []patterns.GuardClauseHit
-		for _, g := range fp.GuardClauses {
-			guards = append(guards, patterns.GuardClauseHit{
-				Line:      g.Line,
-				BodyStmts: g.BodyStmts,
-			})
-		}
-		var dispatches []patterns.EnumDispatchHit
-		for _, d := range fp.EnumDispatches {
-			dispatches = append(dispatches, patterns.EnumDispatchHit{
-				Line:     d.Line,
-				NumCases: d.NumCases,
-			})
-		}
-		var tss []patterns.TypeSwitchHit
-		for _, t := range fp.TypeSwitches {
-			tss = append(tss, patterns.TypeSwitchHit{
-				Line:   t.Line,
-				Bound:  t.Bound,
-				Expr:   t.Expr,
-				Method: t.Method,
-				Types:  t.Types,
-				Args:   t.Args,
-			})
-		}
-		var entities []patterns.EntityIdentityHit
-		for _, e := range fp.EntityIdentities {
-			entities = append(entities, patterns.EntityIdentityHit{
-				Line: e.Line, TypeName: e.TypeName, IDField: e.IDField,
-				Fields: e.Fields, Left: e.Left, Right: e.Right,
-			})
-		}
-		var mutables []patterns.MutableIdentityHit
-		for _, m := range fp.MutableIdentities {
-			mutables = append(mutables, patterns.MutableIdentityHit{
-				Line: m.Line, Field: m.Field, FuncName: m.FuncName,
-			})
-		}
-		facts = append(facts, &patterns.FuncFacts{
-			ID:             fp.Name,
-			Name:           fp.Name,
-			Path:           fp.Path,
-			Line:           fp.Line,
-			EndLine:        fp.EndLine,
-			Pdg:            &fp.Pdg,
-			SigKey:         "fn(" + strings.Join(params, ",") + ")",
-			GuardClauses:    guards,
-			EnumDispatches:  dispatches,
-			TypeSwitches:    tss,
-			EntityIdentities: entities,
-			MutableIdentities: mutables,
-			Params:          fp.Params,
-		})
+		facts = append(facts, funcFactsOf(fp))
 	}
 	return facts
 }
 
+// funcFactsOf converts one extracted function to miner facts.
+func funcFactsOf(fp gopatterns.FuncPdg) *patterns.FuncFacts {
+	var params []string
+	for _, node := range fp.Pdg.Nodes {
+		if node.Kind == patterns.Param {
+			params = append(params, node.TyClass)
+		}
+	}
+	return &patterns.FuncFacts{
+		ID:                fp.Name,
+		Name:              fp.Name,
+		Path:              fp.Path,
+		Line:              fp.Line,
+		EndLine:           fp.EndLine,
+		Pdg:               &fp.Pdg,
+		SigKey:            "fn(" + strings.Join(params, ",") + ")",
+		GuardClauses:      guardHits(fp.GuardClauses),
+		EnumDispatches:    dispatchHits(fp.EnumDispatches),
+		TypeSwitches:      typeSwitchHits(fp.TypeSwitches),
+		EntityIdentities:  entityHits(fp.EntityIdentities),
+		MutableIdentities: mutableHits(fp.MutableIdentities),
+		Params:            fp.Params,
+	}
+}
+
+func guardHits(hits []gopatterns.GuardClauseHit) []patterns.GuardClauseHit {
+	var out []patterns.GuardClauseHit
+	for _, g := range hits {
+		out = append(out, patterns.GuardClauseHit{Line: g.Line, BodyStmts: g.BodyStmts})
+	}
+	return out
+}
+
+func dispatchHits(hits []gopatterns.EnumDispatchHit) []patterns.EnumDispatchHit {
+	var out []patterns.EnumDispatchHit
+	for _, d := range hits {
+		out = append(out, patterns.EnumDispatchHit{Line: d.Line, NumCases: d.NumCases})
+	}
+	return out
+}
+
+func typeSwitchHits(hits []gopatterns.TypeSwitchHit) []patterns.TypeSwitchHit {
+	var out []patterns.TypeSwitchHit
+	for _, t := range hits {
+		out = append(out, patterns.TypeSwitchHit{
+			Line: t.Line, Bound: t.Bound, Expr: t.Expr,
+			Method: t.Method, Types: t.Types, Args: t.Args,
+		})
+	}
+	return out
+}
+
+func entityHits(hits []patterns.EntityIdentityHit) []patterns.EntityIdentityHit {
+	var out []patterns.EntityIdentityHit
+	for _, e := range hits {
+		out = append(out, patterns.EntityIdentityHit{
+			Line: e.Line, TypeName: e.TypeName, IDField: e.IDField,
+			Fields: e.Fields, Left: e.Left, Right: e.Right,
+		})
+	}
+	return out
+}
+
+func mutableHits(hits []patterns.MutableIdentityHit) []patterns.MutableIdentityHit {
+	var out []patterns.MutableIdentityHit
+	for _, m := range hits {
+		out = append(out, patterns.MutableIdentityHit{
+			Line: m.Line, Field: m.Field, FuncName: m.FuncName,
+		})
+	}
+	return out
+}
 func parseOptions(args []string) (options, error) {
 	flags := flag.NewFlagSet("patterns", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)

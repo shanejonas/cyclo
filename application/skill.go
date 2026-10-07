@@ -108,7 +108,7 @@ Run ` + "`cyclo patterns [paths...]`" + ` to find mechanical code patterns: inve
 
 Run ` + "`cyclo fix --kind all [paths...]`" + ` to auto-fix them. Dry-run by default (shows a diff); add ` + "`--apply`" + ` to write. No LLM, no tokens — pure static analysis. Use ` + "`--kind guard_clause|value_object|parameterize|anemic_model|primitive_obsession|type_switch`" + ` to fix one kind.
 
-**Workflow:** Run ` + "`cyclo patterns`" + ` first, then ` + "`cyclo fix --apply`" + ` to clear the mechanical issues. This saves tokens — don't hand-rewrite what the fixer handles.
+**Workflow:** Run ` + "`cyclo patterns`" + ` first, then ` + "`cyclo fix --apply`" + ` to clear the mechanical issues. This saves tokens — don't hand-rewrite what the fixer handles. In an agent loop, use ` + "`cyclo fix --changed --apply`" + ` to fix only candidates in functions your diff touched (against ` + "`--base REF`" + `, defaulting to the merge-base with main/master).
 
 ## Check quality guardrails (needs your judgment)
 
