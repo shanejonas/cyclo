@@ -479,6 +479,40 @@ func ownerSet(defs []*FuncFacts) map[string]bool {
 	return types
 }
 
+// sameOwnerPackage reports whether every owner type lives in the same Go
+// package. SelfTy is "pkgpath.Type"; a trait spanning packages (e.g. two
+// unrelated `options` structs in different CLIs that both have `validate()`)
+// is never extracted in practice, so cross-package groups are skipped.
+// Bare type names without a package path can't be distinguished, so they're
+// allowed through.
+func sameOwnerPackage(defs []*FuncFacts) bool {
+	pkg := ""
+	for _, d := range defs {
+		if d.SelfTy == "" {
+			continue
+		}
+		p := ownerPkg(d.SelfTy)
+		if p == "" {
+			continue
+		}
+		if pkg == "" {
+			pkg = p
+		} else if pkg != p {
+			return false
+		}
+	}
+	return true
+}
+
+// ownerPkg extracts the package path from a "pkgpath.Type" SelfTy.
+// Returns "" when there's no package path to extract.
+func ownerPkg(selfTy string) string {
+	if i := strings.LastIndex(selfTy, "."); i >= 0 {
+		return selfTy[:i]
+	}
+	return ""
+}
+
 // noReceiver reports whether no def has a receiver type. Go adaptation:
 // rstyle checks receiver == None (associated function without self); the Go
 // schema records only SelfTy, so a receiver-less function is one with no
@@ -514,6 +548,11 @@ func judge(ix *candidateIndex, values []string) verdict {
 	defs := lookupDefs(ix, wanted)
 	// Constructors are not a capability callers use polymorphically.
 	if noReceiver(defs) || len(defs) != len(wanted) || len(ownerSet(defs)) < 2 {
+		return verdict{kind: verdictSkip}
+	}
+	// A trait is only extractable when the types live together; cross-package
+	// method-name collisions are not interchangeable use.
+	if !sameOwnerPackage(defs) {
 		return verdict{kind: verdictSkip}
 	}
 	if sameTraitMethod(defs) {

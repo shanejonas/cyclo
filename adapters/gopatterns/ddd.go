@@ -543,6 +543,9 @@ func specBareSelector(op ast.Expr) (field, base string, ok bool) {
 }
 
 // specComparisonParts extracts field, operator, and base from `user.Age > 18`.
+// Reports empty when the comparison isn't a single-subject rule: both sides
+// must resolve to the same base variable (or a literal), otherwise a rule
+// like `c.x != first.x` would extract with a dangling `first` reference.
 func specComparisonParts(op ast.Expr) (field, opStr, base string) {
 	bin, ok := op.(*ast.BinaryExpr)
 	if !ok {
@@ -553,7 +556,38 @@ func specComparisonParts(op ast.Expr) (field, opStr, base string) {
 		return "", "", ""
 	}
 	id := sel.X.(*ast.Ident)
-	return sel.Sel.Name, bin.Op.String(), id.Name
+	base = id.Name
+	// The other side must be the same variable or a non-variable expression.
+	var other ast.Expr
+	if isSelectorOfIdent(bin.X) && bin.X.(*ast.SelectorExpr) == sel {
+		other = bin.Y
+	} else {
+		other = bin.X
+	}
+	if !specSideIsSameOrLiteral(other, base) {
+		return "", "", ""
+	}
+	return sel.Sel.Name, bin.Op.String(), base
+}
+
+// specSideIsSameOrLiteral reports whether e is a selector on the same base
+// variable, or an expression that doesn't reference a different variable
+// (literal, call, etc.).
+func specSideIsSameOrLiteral(e ast.Expr, base string) bool {
+	e = specUnwrapParens(e)
+	if sel, ok := e.(*ast.SelectorExpr); ok {
+		if id, ok := sel.X.(*ast.Ident); ok {
+			return id.Name == base
+		}
+		return false
+	}
+	if id, ok := e.(*ast.Ident); ok {
+		// A bare identifier: same variable is fine (e.g. `c != nil`
+		// handled elsewhere); a different variable is not.
+		return id.Name == base || id.Name == "nil"
+	}
+	// Literals, calls, conversions: no variable reference to leak.
+	return true
 }
 
 // specSideSelector returns the `ident.Field` selector on either side of a

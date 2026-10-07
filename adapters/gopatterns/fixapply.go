@@ -1036,22 +1036,31 @@ func specDeclEdit(ctx specEditCtx) textEdit {
 }
 
 // specInsertPos finds where to insert the Specification type: after imports.
+// Uses the end of the import declaration, not the last import spec: for
+// parenthesized imports the spec ends before the closing paren.
 func specInsertPos(fset *token.FileSet, f *ast.File, src []byte) int {
-	if len(f.Imports) > 0 {
-		last := f.Imports[len(f.Imports)-1]
-		end := fset.Position(last.End()).Offset
-		// Skip to end of line.
-		for end < len(src) && src[end] != '\n' {
-			end++
+	if gen := importDecl(f); gen != nil {
+		return lineEnd(src, fset.Position(gen.End()).Offset)
+	}
+	return lineEnd(src, fset.Position(f.Name.End()).Offset)
+}
+
+// importDecl returns the file's import declaration, or nil.
+func importDecl(f *ast.File) *ast.GenDecl {
+	for _, decl := range f.Decls {
+		if gen, ok := decl.(*ast.GenDecl); ok && gen.Tok == token.IMPORT {
+			return gen
 		}
-		return end + 1
 	}
-	// After package clause.
-	end := fset.Position(f.Name.End()).Offset
-	for end < len(src) && src[end] != '\n' {
-		end++
+	return nil
+}
+
+// lineEnd returns the offset just past the newline at or after pos.
+func lineEnd(src []byte, pos int) int {
+	for pos < len(src) && src[pos] != '\n' {
+		pos++
 	}
-	return end + 1
+	return pos + 1
 }
 
 // specRenameVar renames variable occurrences in a condition string.

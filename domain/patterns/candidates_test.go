@@ -125,6 +125,22 @@ func TestTraitMethodFromParallelMethods(t *testing.T) {
 	}
 }
 
+func TestTraitMethodSkipsCrossPackage(t *testing.T) {
+	// Two `validate()` methods on same-named types in different packages:
+	// not interchangeable use, so no trait_method candidate.
+	facts := candCorpus()
+	facts[0].SelfTy = "example.com/pkgA.options"
+	facts[1].SelfTy = "example.com/pkgB.options"
+	facts[0].Name = "options.validate"
+	facts[1].Name = "options.validate"
+	mined := runCandidates(facts)
+	for _, c := range mined.Candidates {
+		if c.Kind == TraitMethod {
+			t.Errorf("cross-package method collision should not propose trait_method, got %v", c)
+		}
+	}
+}
+
 func TestEffectMismatchHalvesScore(t *testing.T) {
 	clean := runCandidates(candCorpus())
 	facts := candCorpus()
