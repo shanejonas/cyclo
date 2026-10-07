@@ -131,6 +131,19 @@ func toFacts(pdgs []gopatterns.FuncPdg) []*patterns.FuncFacts {
 				Args:   t.Args,
 			})
 		}
+		var entities []patterns.EntityIdentityHit
+		for _, e := range fp.EntityIdentities {
+			entities = append(entities, patterns.EntityIdentityHit{
+				Line: e.Line, TypeName: e.TypeName, IDField: e.IDField,
+				Fields: e.Fields, Left: e.Left, Right: e.Right,
+			})
+		}
+		var mutables []patterns.MutableIdentityHit
+		for _, m := range fp.MutableIdentities {
+			mutables = append(mutables, patterns.MutableIdentityHit{
+				Line: m.Line, Field: m.Field, FuncName: m.FuncName,
+			})
+		}
 		facts = append(facts, &patterns.FuncFacts{
 			ID:             fp.Name,
 			Name:           fp.Name,
@@ -139,10 +152,12 @@ func toFacts(pdgs []gopatterns.FuncPdg) []*patterns.FuncFacts {
 			EndLine:        fp.EndLine,
 			Pdg:            &fp.Pdg,
 			SigKey:         "fn(" + strings.Join(params, ",") + ")",
-			GuardClauses:   guards,
-			EnumDispatches: dispatches,
-			TypeSwitches:   tss,
-			Params:         fp.Params,
+			GuardClauses:    guards,
+			EnumDispatches:  dispatches,
+			TypeSwitches:    tss,
+			EntityIdentities: entities,
+			MutableIdentities: mutables,
+			Params:          fp.Params,
 		})
 	}
 	return facts

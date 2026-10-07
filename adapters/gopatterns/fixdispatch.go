@@ -17,13 +17,16 @@ var appliers = map[patterns.CandidateKind]fixApplier{
 	patterns.GuardClause:        applyGuardFix,
 	patterns.ValueObject:        applyValueObjectFix,
 	patterns.Parameterize:       applyParameterizeFix,
-	patterns.TraitMethod:        applyInterfaceFix,
-	patterns.CapabilitySet:      applyInterfaceFix,
-	patterns.EnumDispatch:       applyEnumDispatchFix,
-	patterns.GenericFn:          applyGenericFnFix,
-	patterns.AnemicModel:        applyAnemicModelFix,
-	patterns.PrimitiveObsession: applyPrimitiveObsessionFix,
-	patterns.TypeSwitch:         applyTypeSwitchFix,
+	patterns.TraitMethod:         applyInterfaceFix,
+	patterns.CapabilitySet:       applyInterfaceFix,
+	patterns.EnumDispatch:        applyEnumDispatchFix,
+	patterns.GenericFn:           applyGenericFnFix,
+	patterns.AnemicModel:         applyAnemicModelFix,
+	patterns.PrimitiveObsession:  applyPrimitiveObsessionFix,
+	patterns.TypeSwitch:          applyTypeSwitchFix,
+	patterns.EntityIdentity:      applyEntityIdentityFix,
+	patterns.MissingIdentity:     applyMissingIdentityFix,
+	// MutableIdentity is detection-only: no safe mechanical fix exists.
 }
 
 // ApplyFix applies the transform for a candidate's FixSpec to src.

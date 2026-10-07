@@ -42,6 +42,9 @@ type Options struct {
 	// from the extractor's AST-level type analysis. Empty means the
 	// extractor did not run or found none.
 	AnemicModels []AnemicModelHit
+	// MissingIdentities are structs used as entities without an ID field,
+	// from the extractor's type analysis.
+	MissingIdentities []MissingIdentityHit
 	// WlCache memoizes WL refinements across runs for incremental mining.
 	// Nil computes every refinement fresh.
 	WlCache *WlCache
@@ -103,10 +106,33 @@ func Run(facts []*FuncFacts, options Options) PatternsReport {
 		mined.Candidates = append(mined.Candidates, eds...)
 		sortMined(&mined)
 	}
+	addSingleFunctionCandidates(&mined, prepared, options)
 	report := Build(groups, options.MinScoreMilli, options.Top)
 	report.Candidates = keepCandidates(mined.Candidates, options.MinScoreMilli, options.Top)
 	report.Suppressed = mined.Suppressed
 	return report
+}
+
+// addSingleFunctionCandidates appends fixed-score candidates that need no
+// clustering: guard clauses, value objects, anemic models, primitive
+// obsession, and entity identity patterns.
+func addSingleFunctionCandidates(mined *Mined, prepared []*FuncFacts, options Options) {
+	// Each builder returns candidates; empty means none found.
+	builders := []func() []Candidate{
+		func() []Candidate { return guardCandidates(prepared) },
+		func() []Candidate { return valueObjectCandidates(prepared) },
+		func() []Candidate { return anemicModelCandidates(options.AnemicModels) },
+		func() []Candidate { return primitiveObsessionCandidates(prepared) },
+		func() []Candidate { return entityIdentityCandidates(prepared) },
+		func() []Candidate { return missingIdentityCandidates(options.MissingIdentities) },
+		func() []Candidate { return mutableIdentityCandidates(prepared) },
+	}
+	for _, build := range builders {
+		if cands := build(); len(cands) > 0 {
+			mined.Candidates = append(mined.Candidates, cands...)
+			sortMined(mined)
+		}
+	}
 }
 
 // Text renders the report for humans, mirroring rstyle's text output.

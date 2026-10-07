@@ -350,3 +350,140 @@ func applyPrimitiveObsessionFix(spec *patterns.FixSpec, src []byte) ([]byte, err
 	}
 	return out, nil
 }
+
+// applyEntityIdentityFix applies an entity_identity FixSpec: replaces
+// attribute-based equality (a.Name == b.Name && a.Email == b.Email) with
+// identity comparison (a.ID == b.ID).
+func applyEntityIdentityFix(spec *patterns.FixSpec, src []byte) ([]byte, error) {
+	fset, f, err := parseSpec(spec, src)
+	if err != nil {
+		return nil, err
+	}
+	params, err := parseEntityFixParams(spec)
+	if err != nil {
+		return nil, err
+	}
+	target := findComparisonAtLine(fset, f, params.line)
+	if target == nil {
+		return nil, fmt.Errorf("entity_identity: no comparison at line %d", params.line)
+	}
+	replacement := []byte(fmt.Sprintf("%s.%s == %s.%s", params.left, params.idField, params.right, params.idField))
+	start := fset.Position(target.Pos()).Offset
+	end := fset.Position(target.End()).Offset
+	edit := textEdit{start: start, end: end, replacement: replacement}
+	out := applyEdits(src, []textEdit{edit})
+	formatted, err := format.Source(out)
+	if err != nil {
+		return nil, fmt.Errorf("gofmt after entity_identity fix: %w", err)
+	}
+	return formatted, nil
+}
+
+// entityFixParams extracts and validates entity_identity FixSpec params.
+type entityFixParams struct {
+	line    int
+	idField string
+	left    string
+	right   string
+}
+
+func parseEntityFixParams(spec *patterns.FixSpec) (entityFixParams, error) {
+	line, err := strconv.Atoi(spec.Params["line"])
+	if err != nil {
+		return entityFixParams{}, fmt.Errorf("entity_identity FixSpec missing line: %w", err)
+	}
+	idField := spec.Params["id_field"]
+	left := spec.Params["left"]
+	right := spec.Params["right"]
+	if idField == "" || left == "" || right == "" {
+		return entityFixParams{}, fmt.Errorf("entity_identity FixSpec missing params")
+	}
+	return entityFixParams{line: line, idField: idField, left: left, right: right}, nil
+}
+
+// findComparisonAtLine locates a boolean comparison expression at the given line.
+func findComparisonAtLine(fset *token.FileSet, f *ast.File, line int) ast.Expr {
+	var target ast.Expr
+	ast.Inspect(f, func(n ast.Node) bool {
+		var expr ast.Expr
+		switch node := n.(type) {
+		case *ast.IfStmt:
+			expr = node.Cond
+		case *ast.ReturnStmt:
+			if len(node.Results) == 1 {
+				expr = node.Results[0]
+			}
+		}
+		if expr == nil {
+			return true
+		}
+		if fset.Position(expr.Pos()).Line == line {
+			target = expr
+			return false
+		}
+		return true
+	})
+	return target
+}
+
+// applyMissingIdentityFix applies a missing_identity FixSpec: adds an
+// ID field to the struct.
+func applyMissingIdentityFix(spec *patterns.FixSpec, src []byte) ([]byte, error) {
+	fset, f, err := parseSpec(spec, src)
+	if err != nil {
+		return nil, err
+	}
+	typeName := spec.Params["type"]
+	if typeName == "" {
+		return nil, fmt.Errorf("missing_identity FixSpec missing type")
+	}
+	insertPos, err := structInsertPos(fset, f, typeName)
+	if err != nil {
+		return nil, err
+	}
+	edit := textEdit{
+		start:       insertPos,
+		end:         insertPos,
+		replacement: []byte("\n\tID string `json:\"id\"`"),
+	}
+	out := applyEdits(src, []textEdit{edit})
+	formatted, err := format.Source(out)
+	if err != nil {
+		return nil, fmt.Errorf("gofmt after missing_identity fix: %w", err)
+	}
+	return formatted, nil
+}
+
+// structInsertPos finds the byte offset after the last field of a struct.
+func structInsertPos(fset *token.FileSet, f *ast.File, typeName string) (int, error) {
+	target := findStructDecl(f, typeName)
+	if target == nil {
+		return 0, fmt.Errorf("missing_identity: no struct %q found", typeName)
+	}
+	st, ok := target.Type.(*ast.StructType)
+	if !ok {
+		return 0, fmt.Errorf("missing_identity: %q is not a struct", typeName)
+	}
+	if st.Fields == nil || len(st.Fields.List) == 0 {
+		return 0, fmt.Errorf("missing_identity: struct %q has no fields", typeName)
+	}
+	lastField := st.Fields.List[len(st.Fields.List)-1]
+	return fset.Position(lastField.End()).Offset, nil
+}
+
+// findStructDecl locates the type declaration for the named struct.
+func findStructDecl(f *ast.File, typeName string) *ast.TypeSpec {
+	var target *ast.TypeSpec
+	ast.Inspect(f, func(n ast.Node) bool {
+		ts, ok := n.(*ast.TypeSpec)
+		if !ok {
+			return true
+		}
+		if ts.Name.Name == typeName {
+			target = ts
+			return false
+		}
+		return true
+	})
+	return target
+}

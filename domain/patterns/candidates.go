@@ -77,6 +77,16 @@ const (
 	// same method on the case-bound value with a direct interface method
 	// call. Single-function finding: no clustering, fixed score.
 	TypeSwitch CandidateKind = "type_switch"
+	// EntityIdentity proposes replacing attribute-based equality with
+	// identity comparison. DDD Entities are defined by identity, not
+	// attributes (Evans).
+	EntityIdentity CandidateKind = "entity_identity"
+	// MissingIdentity proposes adding an ID field to a struct used as an
+	// entity. DDD-inspired; the fix is mechanical.
+	MissingIdentity CandidateKind = "missing_identity"
+	// MutableIdentity flags ID assignments outside constructors.
+	// Detection-only: no safe mechanical fix exists.
+	MutableIdentity CandidateKind = "mutable_identity"
 )
 
 // Site is one function that shows the pattern.

@@ -40,6 +40,21 @@ type AnemicModelHit struct {
 	Funcs []string
 }
 
+// MissingIdentityHit is a struct used as an entity (stored, compared,
+// passed around) that has no identity field.
+type MissingIdentityHit struct {
+	// TypeName is the struct type name.
+	TypeName string
+	// Path is the source file with the struct definition.
+	Path string
+	// Line is the struct definition's first line.
+	Line int
+	// EndLine is the struct definition's last line.
+	EndLine int
+	// UseCount is how many entity-like uses were found.
+	UseCount int
+}
+
 // anemicModelCandidates proposes moving behavior into methods for every
 // anemic struct the extractor found. Each candidate names the struct
 // definition as its site (full range, so --changed filtering works);

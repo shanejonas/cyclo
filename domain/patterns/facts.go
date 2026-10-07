@@ -51,6 +51,10 @@ type FuncFacts struct {
 	// the same method on the case-bound value. AST-level finding from the
 	// extractor.
 	TypeSwitches []TypeSwitchHit
+	// EntityIdentities are attribute-based equalities that should use ID.
+	EntityIdentities []EntityIdentityHit
+	// MutableIdentities are ID assignments outside constructors.
+	MutableIdentities []MutableIdentityHit
 	// Params are the function's primitive-typed parameters (name and type).
 	// Used for data-clump detection (value object proposals). Empty when the
 	// function has no primitive params or params were not extracted.
@@ -91,6 +95,23 @@ type TypeSwitchHit struct {
 	Types []string
 	// Args is the source text of the call arguments, identical in every arm.
 	Args string
+}
+
+// EntityIdentityHit is one attribute-based equality that should use identity.
+type EntityIdentityHit struct {
+	Line     int
+	TypeName string
+	IDField  string
+	Fields   []string
+	Left     string
+	Right    string
+}
+
+// MutableIdentityHit is one ID assignment outside a constructor.
+type MutableIdentityHit struct {
+	Line     int
+	Field    string
+	FuncName string
 }
 
 // EffectClass returns the observable-effect class set for the mismatch check:
