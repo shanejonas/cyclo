@@ -137,10 +137,16 @@ var dbPackages = map[string]bool{
 
 // isRepositoryFile reports whether path looks like a repository file:
 // the db calls there are the repository itself, not a violation.
+// Per Shane's convention, repositories live in adapters/ — any file
+// under an adapters/ directory is infrastructure, not business logic.
 func isRepositoryFile(path string) bool {
 	lower := strings.ToLower(filepath.ToSlash(path))
 	for _, seg := range strings.Split(lower, "/") {
-		if isRepoSegment(strings.TrimSuffix(seg, ".go")) {
+		seg = strings.TrimSuffix(seg, ".go")
+		if seg == "adapters" {
+			return true
+		}
+		if isRepoSegment(seg) {
 			return true
 		}
 	}
