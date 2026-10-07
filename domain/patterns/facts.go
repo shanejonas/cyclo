@@ -137,11 +137,14 @@ type DbCallHit struct {
 
 // FactoryHit is one complex struct literal: the literal line, the struct
 // type name, the field count, and the file declaring the struct type.
+// HasLogic is true when the enclosing function has construction logic
+// (validation, defaults, or error handling) that a factory could encapsulate.
 type FactoryHit struct {
 	Line      int
 	TypeName  string
 	NumFields int
 	DeclFile  string
+	HasLogic  bool
 }
 
 // EffectClass returns the observable-effect class set for the mismatch check:

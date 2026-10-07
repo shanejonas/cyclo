@@ -168,7 +168,9 @@ func repositoryCandidates(facts []*FuncFacts) []Candidate {
 }
 
 // factoryCandidates finds struct types with complex literals (5+ fields)
-// built in 2+ functions. The factory extraction is mechanical.
+// built with construction logic in 2+ functions. Plain field assignment
+// doesn't qualify — the factory must encapsulate validation, defaults,
+// or error handling to be worth the indirection.
 func factoryCandidates(facts []*FuncFacts) []Candidate {
 	byType, firstLine := groupFactoryLits(facts)
 	var out []Candidate
@@ -194,13 +196,14 @@ type factoryTypeKey struct {
 }
 
 // groupFactoryLits groups factory hits by struct type, tracking the
-// functions that build each type and the first literal line.
+// functions that build each type and the first literal line. Only hits
+// with construction logic are counted — plain field assignment is skipped.
 func groupFactoryLits(facts []*FuncFacts) (map[factoryTypeKey]map[string]bool, map[factoryTypeKey]int) {
 	byType := map[factoryTypeKey]map[string]bool{}
 	firstLine := map[factoryTypeKey]int{}
 	for _, f := range facts {
 		for _, h := range f.FactoryLits {
-			if h.TypeName == "" || h.NumFields < factoryMinFields {
+			if !factoryHitQualifies(h) {
 				continue
 			}
 			k := factoryTypeKey{h.TypeName, h.DeclFile}
@@ -212,6 +215,12 @@ func groupFactoryLits(facts []*FuncFacts) (map[factoryTypeKey]map[string]bool, m
 		}
 	}
 	return byType, firstLine
+}
+
+// factoryHitQualifies reports whether a factory hit has the field count
+// and construction logic to warrant a factory.
+func factoryHitQualifies(h FactoryHit) bool {
+	return h.TypeName != "" && h.NumFields >= factoryMinFields && h.HasLogic
 }
 
 // factoryCandidate builds the fixable candidate for a struct type.
@@ -228,8 +237,8 @@ func factoryCandidate(k factoryTypeKey, facts []*FuncFacts, funcs map[string]boo
 			Support:       len(funcs),
 			CoverageMilli: 1000,
 		},
-		Observation:      fmt.Sprintf("type %s is built with %d+ fields in %d functions", k.name, factoryMinFields, len(funcs)),
-		Inference:        "complex object creation scattered across callers wants a factory",
+		Observation:      fmt.Sprintf("type %s is built with %d+ fields and construction logic in %d functions", k.name, factoryMinFields, len(funcs)),
+		Inference:        "complex construction with validation/defaults scattered across callers wants a factory",
 		PossibleRefactor: fmt.Sprintf("extract a New%s factory function", k.name),
 		Sites:            candidateSites(facts, names),
 		FixSpec: &FixSpec{
