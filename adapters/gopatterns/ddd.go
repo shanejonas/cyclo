@@ -487,14 +487,15 @@ func specRuleKey(cond ast.Expr, info *types.Info) (key, varName, typeName string
 
 // specKeyParts extracts the normalized parts, base variable, and type from
 // boolean operands. Reports false when operands don't form a single-subject
-// rule.
+// rule. The key includes literal values so `x < 0.60` and `x < 0.90` are
+// different rules (merging them would change behavior).
 func specKeyParts(operands []ast.Expr, info *types.Info) (parts []string, seenVar, seenType string, ok bool) {
 	for _, op := range operands {
-		field, opStr, base := specOperandParts(op, info)
+		field, opStr, base, value := specOperandParts(op, info)
 		if field == "" {
 			return nil, "", "", false
 		}
-		parts = append(parts, field+":"+opStr)
+		parts = append(parts, field+":"+opStr+":"+value)
 		if seenVar == "" {
 			seenVar = base
 		} else if seenVar != base {
@@ -508,12 +509,12 @@ func specKeyParts(operands []ast.Expr, info *types.Info) (parts []string, seenVa
 	return parts, seenVar, seenType, true
 }
 
-// specOperandParts extracts the field name, operator, and base variable
-// from one boolean operand like `user.Age > 18` or `user.Active`.
-func specOperandParts(op ast.Expr, info *types.Info) (field, opStr, base string) {
+// specOperandParts extracts the field name, operator, base variable, and
+// compared value from one boolean operand like `user.Age > 18` or `user.Active`.
+func specOperandParts(op ast.Expr, info *types.Info) (field, opStr, base, value string) {
 	op = specUnwrapParens(op)
 	if field, base, ok := specBareSelector(op); ok {
-		return field, "truthy", base
+		return field, "truthy", base, ""
 	}
 	return specComparisonParts(op)
 }
@@ -542,18 +543,19 @@ func specBareSelector(op ast.Expr) (field, base string, ok bool) {
 	return sel.Sel.Name, id.Name, true
 }
 
-// specComparisonParts extracts field, operator, and base from `user.Age > 18`.
-// Reports empty when the comparison isn't a single-subject rule: both sides
-// must resolve to the same base variable (or a literal), otherwise a rule
-// like `c.x != first.x` would extract with a dangling `first` reference.
-func specComparisonParts(op ast.Expr) (field, opStr, base string) {
+// specComparisonParts extracts field, operator, base, and compared value
+// from `user.Age > 18`. Reports empty when the comparison isn't a
+// single-subject rule: both sides must resolve to the same base variable
+// (or a literal), otherwise a rule like `c.x != first.x` would extract
+// with a dangling `first` reference.
+func specComparisonParts(op ast.Expr) (field, opStr, base, value string) {
 	bin, ok := op.(*ast.BinaryExpr)
 	if !ok {
-		return "", "", ""
+		return "", "", "", ""
 	}
 	sel := specSideSelector(bin)
 	if sel == nil {
-		return "", "", ""
+		return "", "", "", ""
 	}
 	id := sel.X.(*ast.Ident)
 	base = id.Name
@@ -565,9 +567,27 @@ func specComparisonParts(op ast.Expr) (field, opStr, base string) {
 		other = bin.X
 	}
 	if !specSideIsSameOrLiteral(other, base) {
-		return "", "", ""
+		return "", "", "", ""
 	}
-	return sel.Sel.Name, bin.Op.String(), base
+	return sel.Sel.Name, bin.Op.String(), base, specValueString(other)
+}
+
+// specValueString renders the compared value for the rule key: literals
+// by their source text, nil as "nil", anything else as its kind. Two rules
+// with different literals (0.60 vs 0.90) must not share a key.
+func specValueString(e ast.Expr) string {
+	e = specUnwrapParens(e)
+	switch v := e.(type) {
+	case *ast.BasicLit:
+		return v.Value
+	case *ast.Ident:
+		if v.Name == "nil" {
+			return "nil"
+		}
+		return "ident:" + v.Name
+	default:
+		return "expr"
+	}
 }
 
 // specSideIsSameOrLiteral reports whether e is a selector on the same base

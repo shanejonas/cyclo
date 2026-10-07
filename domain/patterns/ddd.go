@@ -268,8 +268,9 @@ func factoryCandidate(k factoryTypeKey, facts []*FuncFacts, funcs map[string]boo
 const specificationScoreMilli = 450
 
 // specificationCandidates finds boolean business rules (2+ conditions)
-// repeated in 2+ functions. Such rules want a Specification type with
-// IsSatisfiedBy (Evans).
+// repeated in 2+ functions. Such rules want a named predicate: a method
+// on the type when it's local, a plain function otherwise (idiomatic Go;
+// the Evans Specification struct is not used).
 func specificationCandidates(facts []*FuncFacts) []Candidate {
 	byRule, first, fileOf := groupSpecRules(facts)
 	var out []Candidate
@@ -324,7 +325,6 @@ func specificationCandidate(k specRuleKey, facts []*FuncFacts, funcs map[string]
 		names = append(names, id)
 	}
 	sort.Strings(names)
-	specName := k.typeName + "Specification"
 	return Candidate{
 		Kind:       Specification,
 		ScoreMilli: specificationScoreMilli,
@@ -333,8 +333,8 @@ func specificationCandidate(k specRuleKey, facts []*FuncFacts, funcs map[string]
 			CoverageMilli: 1000,
 		},
 		Observation:      fmt.Sprintf("business rule on %s repeated in %d functions", k.typeName, len(funcs)),
-		Inference:        "a boolean business rule scattered across callers wants a Specification",
-		PossibleRefactor: fmt.Sprintf("extract a %s with IsSatisfiedBy", specName),
+		Inference:        "a boolean business rule scattered across callers wants a named predicate",
+		PossibleRefactor: fmt.Sprintf("extract a %s predicate method", k.typeName),
 		Sites:            candidateSites(facts, names),
 		FixSpec: &FixSpec{
 			Kind:    Specification,

@@ -101,8 +101,9 @@ const (
 	Factory CandidateKind = "factory"
 	// Specification proposes extracting a business rule (a boolean
 	// expression with 2+ conditions) repeated in 2+ functions into a
-	// Specification type with IsSatisfiedBy. DDD-inspired (Evans); the
-	// transform is mechanical.
+	// Specification extracts a repeated boolean rule into a named predicate:
+	// a method on the type when local, a function otherwise. Idiomatic Go;
+	// the Evans struct is not used. DDD-inspired; the transform is mechanical.
 	Specification CandidateKind = "specification"
 	// DomainService identifies a free function operating on two or more
 	// domain types without belonging to any of them. Per Evans, such

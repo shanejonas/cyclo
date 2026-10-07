@@ -110,7 +110,7 @@ Run ` + "`cyclo fix --kind all [paths...]`" + ` to auto-fix them. Dry-run by def
 
 Use ` + "`cyclo fix --phased --apply [paths...]`" + ` when fixes interact: it mines, applies one phase, re-mines, and repeats to a fixpoint (max 3 cycles). Phases run guard/value-object work first, structural patterns next, and parameterize last.
 
-` + "`domain_service`" + ` is detection-only: it identifies stateless functions operating on 2+ domain types as legitimate Domain Services (Evans), and suppresses the corresponding ` + "`anemic_model`" + ` suggestions. ` + "`specification`" + ` extracts repeated boolean business rules into ` + "`IsSatisfiedBy`" + ` types. ` + "`trait_method`" + ` proposes interfaces from parallel methods on types in the same package.
+` + "`domain_service`" + ` is detection-only: it identifies stateless functions operating on 2+ domain types as legitimate Domain Services (Evans), and suppresses the corresponding ` + "`anemic_model`" + ` suggestions. ` + "`specification`" + ` extracts repeated boolean business rules into named predicates (a method on the type, or a function for external types). ` + "`trait_method`" + ` proposes interfaces from parallel methods on types in the same package.
 
 **Workflow:** Run ` + "`cyclo patterns`" + ` first, then ` + "`cyclo fix --apply`" + ` to clear the mechanical issues. This saves tokens — don't hand-rewrite what the fixer handles. In an agent loop, use ` + "`cyclo fix --changed --apply`" + ` to fix only candidates in functions your diff touched (against ` + "`--base REF`" + `, defaulting to the merge-base with main/master).
 
