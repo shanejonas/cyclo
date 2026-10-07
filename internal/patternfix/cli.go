@@ -27,7 +27,8 @@ Runs the miner, then applies each candidate's fix.
 Dry-run by default (shows a diff); --apply writes the files.
 
   --kind KIND   which fixes to apply: guard_clause, value_object, parameterize,
-                trait_method, capability_set, enum_dispatch, generic_fn, or all (default)
+                trait_method, capability_set, enum_dispatch, generic_fn,
+                anemic_model, primitive_obsession, or all (default)
   --apply       write the fixes to disk (default: dry-run diff only)
 
 Exit 0: always, on success (even with no fixes). Exit 2: parse or IO failure.
@@ -61,12 +62,12 @@ func Run(ctx context.Context, args []string, output io.Writer) error {
 
 // collectFixSpecs runs the miner and returns FixSpecs filtered by kind.
 func collectFixSpecs(ctx context.Context, opts options) ([]*patterns.FixSpec, error) {
-	pdgs, err := gopatterns.Extract(ctx, "", opts.paths)
+	ext, err := gopatterns.Extract(ctx, "", opts.paths)
 	if err != nil {
 		return nil, fmt.Errorf("extract: %w", err)
 	}
-	facts := toFacts(pdgs)
-	report := patterns.Run(facts, patterns.Options{})
+	facts, anemicHits := toFacts(ext)
+	report := patterns.Run(facts, patterns.Options{AnemicModels: anemicHits})
 	var specs []*patterns.FixSpec
 	for _, c := range report.Candidates {
 		if c.FixSpec == nil {
@@ -199,7 +200,7 @@ func parseOptions(args []string) (options, error) {
 }
 
 func (opts options) validate() error {
-	valid := []string{"guard_clause", "value_object", "parameterize", "trait_method", "capability_set", "enum_dispatch", "generic_fn", "all"}
+	valid := []string{"guard_clause", "value_object", "parameterize", "trait_method", "capability_set", "enum_dispatch", "generic_fn", "anemic_model", "primitive_obsession", "all"}
 	if !slices.Contains(valid, opts.kind) {
 		return fmt.Errorf("kind must be one of %v", valid)
 	}
@@ -207,9 +208,9 @@ func (opts options) validate() error {
 }
 
 // toFacts converts extraction to FuncFacts (copied from patterncheck).
-func toFacts(pdgs []gopatterns.FuncPdg) []*patterns.FuncFacts {
+func toFacts(ext *gopatterns.Extraction) ([]*patterns.FuncFacts, []patterns.AnemicModelHit) {
 	var facts []*patterns.FuncFacts
-	for _, fp := range pdgs {
+	for _, fp := range ext.Funcs {
 		fp := fp
 		var guards []patterns.GuardClauseHit
 		for _, g := range fp.GuardClauses {
@@ -236,5 +237,5 @@ func toFacts(pdgs []gopatterns.FuncPdg) []*patterns.FuncFacts {
 			Params:       params,
 		})
 	}
-	return facts
+	return facts, ext.AnemicModels
 }

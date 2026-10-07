@@ -318,3 +318,29 @@ func packageEndOffset(fset *token.FileSet, f *ast.File, src []byte) int {
 }
 
 
+
+// applyAnemicModelFix applies an anemic_model FixSpec.
+func applyAnemicModelFix(spec *patterns.FixSpec, src []byte) ([]byte, error) {
+	fset, f, err := parseSpec(spec, src)
+	if err != nil {
+		return nil, err
+	}
+	out, _, err := FixAnemicModels(fset, f, src)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// applyPrimitiveObsessionFix applies a primitive_obsession FixSpec.
+func applyPrimitiveObsessionFix(spec *patterns.FixSpec, src []byte) ([]byte, error) {
+	fset, f, err := parseSpec(spec, src)
+	if err != nil {
+		return nil, err
+	}
+	out, _, err := FixPrimitiveObsession(fset, f, src)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}

@@ -125,8 +125,8 @@ func use(o *Order) int { return calcTotal(o) + discTotal(o, 10) }
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	if !strings.Contains(out.String(), "3 fixable anemic_model") {
-		t.Errorf("expected 3 anemic_model fixes, got:\n%s", out.String())
+	if !strings.Contains(out.String(), "1 fixable candidate(s)") {
+		t.Errorf("expected 1 fixable candidate, got:\n%s", out.String())
 	}
 	if !strings.Contains(out.String(), "func (o *Order) calcTotal()") {
 		t.Errorf("expected method conversion in diff, got:\n%s", out.String())
