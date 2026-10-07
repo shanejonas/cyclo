@@ -13,7 +13,7 @@ func TestAnemicModelCandidatesProposeMethods(t *testing.T) {
 		EndLine:  15,
 		Funcs:    []string{"CalculateTotal", "ApplyDiscount", "ValidateOrder"},
 	}}
-	cands := anemicModelCandidates(hits)
+	cands := anemicModelCandidates(hits, nil)
 	if len(cands) != 1 {
 		t.Fatalf("expected 1 candidate, got %d", len(cands))
 	}
@@ -47,13 +47,13 @@ func TestAnemicModelSkipsTooFewFuncs(t *testing.T) {
 		EndLine:  15,
 		Funcs:    []string{"CalculateTotal", "ApplyDiscount"},
 	}}
-	if cands := anemicModelCandidates(hits); len(cands) != 0 {
+	if cands := anemicModelCandidates(hits, nil); len(cands) != 0 {
 		t.Fatalf("expected no candidate for 2 funcs, got %d", len(cands))
 	}
 }
 
 func TestAnemicModelEmptyHits(t *testing.T) {
-	if cands := anemicModelCandidates(nil); len(cands) != 0 {
+	if cands := anemicModelCandidates(nil, nil); len(cands) != 0 {
 		t.Fatalf("expected no candidates for nil hits, got %d", len(cands))
 	}
 }

@@ -104,6 +104,13 @@ const (
 	// Specification type with IsSatisfiedBy. DDD-inspired (Evans); the
 	// transform is mechanical.
 	Specification CandidateKind = "specification"
+	// DomainService identifies a free function operating on two or more
+	// domain types without belonging to any of them. Per Evans, such
+	// stateless coordination is a Domain Service, not misplaced behavior:
+	// it complements anemic_model by suppressing the "move into a method"
+	// suggestion for functions that cannot be methods. Detection-only:
+	// choosing the service name and home is design.
+	DomainService CandidateKind = "domain_service"
 )
 
 // FixKindOrder defines the order in which pattern fixes are applied when
@@ -134,6 +141,7 @@ var FixKindOrder = []CandidateKind{
 	Specification,
 	MissingIdentity,
 	EntityIdentity,
+	DomainService,
 	AnemicModel,
 	TypeSwitch,
 	EnumDispatch,

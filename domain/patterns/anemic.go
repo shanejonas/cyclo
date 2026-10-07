@@ -59,23 +59,30 @@ type MissingIdentityHit struct {
 // anemic struct the extractor found. Each candidate names the struct
 // definition as its site (full range, so --changed filtering works);
 // the operating functions are listed in the refactor text.
-func anemicModelCandidates(hits []AnemicModelHit) []Candidate {
+//
+// serviceHits are domain-service functions to suppress: a function
+// operating on two or more types cannot be a method on just one, so the
+// anemic suggestion does not apply to it. Filtering may drop a struct
+// below the threshold, removing the candidate entirely.
+func anemicModelCandidates(hits []AnemicModelHit, serviceHits []DomainServiceHit) []Candidate {
+	services := serviceFuncNames(serviceHits)
 	var out []Candidate
 	for _, hit := range hits {
 		hit := hit
-		if len(hit.Funcs) < minAnemicFuncs {
+		funcs := filterServiceFuncs(hit.Funcs, services)
+		if len(funcs) < minAnemicFuncs {
 			continue
 		}
 		out = append(out, Candidate{
 			Kind:       AnemicModel,
 			ScoreMilli: anemicModelScoreMilli,
 			Breakdown: Breakdown{
-				Support:       len(hit.Funcs),
+				Support:       len(funcs),
 				CoverageMilli: 1000,
 			},
-			Observation:      fmt.Sprintf("type %s has no methods, but %d functions operate on its fields", hit.TypeName, len(hit.Funcs)),
+			Observation:      fmt.Sprintf("type %s has no methods, but %d functions operate on its fields", hit.TypeName, len(funcs)),
 			Inference:        "behavior lives outside the type — this is an anemic domain model",
-			PossibleRefactor: fmt.Sprintf("move %s into methods on *%s", strings.Join(hit.Funcs, ", "), hit.TypeName),
+			PossibleRefactor: fmt.Sprintf("move %s into methods on *%s", strings.Join(funcs, ", "), hit.TypeName),
 			Sites: []Site{{
 				Path:    hit.Path,
 				Line:    hit.Line,

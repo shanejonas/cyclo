@@ -64,7 +64,7 @@ var fixPhases = [][]patterns.CandidateKind{
 	{patterns.GuardClause, patterns.PrimitiveObsession},
 	{patterns.ValueObject},
 	{patterns.Factory, patterns.Specification, patterns.MissingIdentity, patterns.EntityIdentity,
-		patterns.AnemicModel, patterns.TypeSwitch, patterns.EnumDispatch,
+		patterns.DomainService, patterns.AnemicModel, patterns.TypeSwitch, patterns.EnumDispatch,
 		patterns.TraitMethod, patterns.CapabilitySet, patterns.GenericFn},
 	{patterns.Parameterize},
 }
@@ -395,8 +395,8 @@ func mineCandidates(ctx context.Context, opts options) ([]patterns.Candidate, er
 	if err != nil {
 		return nil, fmt.Errorf("extract: %w", err)
 	}
-	facts, anemicHits, missingHits := toFacts(ext)
-	report := patterns.Run(facts, patterns.Options{AnemicModels: anemicHits, MissingIdentities: missingHits})
+	facts, anemicHits, missingHits, serviceHits := toFacts(ext)
+	report := patterns.Run(facts, patterns.Options{AnemicModels: anemicHits, MissingIdentities: missingHits, DomainServices: serviceHits})
 	var candidates []patterns.Candidate
 	for _, c := range report.Candidates {
 		if c.FixSpec == nil {
@@ -587,7 +587,7 @@ func parseOptions(args []string) (options, error) {
 }
 
 func (opts options) validate() error {
-	valid := []string{"guard_clause", "value_object", "parameterize", "trait_method", "capability_set", "enum_dispatch", "generic_fn", "anemic_model", "primitive_obsession", "type_switch", "entity_identity", "missing_identity", "mutable_identity", "aggregate", "repository", "factory", "specification", "all"}
+	valid := []string{"guard_clause", "value_object", "parameterize", "trait_method", "capability_set", "enum_dispatch", "generic_fn", "anemic_model", "primitive_obsession", "type_switch", "entity_identity", "missing_identity", "mutable_identity", "aggregate", "repository", "factory", "specification", "domain_service", "all"}
 	if !slices.Contains(valid, opts.kind) {
 		return fmt.Errorf("kind must be one of %v", valid)
 	}
@@ -595,7 +595,7 @@ func (opts options) validate() error {
 }
 
 // toFacts converts extraction to FuncFacts (copied from patterncheck).
-func toFacts(ext *gopatterns.Extraction) ([]*patterns.FuncFacts, []patterns.AnemicModelHit, []patterns.MissingIdentityHit) {
+func toFacts(ext *gopatterns.Extraction) ([]*patterns.FuncFacts, []patterns.AnemicModelHit, []patterns.MissingIdentityHit, []patterns.DomainServiceHit) {
 	var facts []*patterns.FuncFacts
 	for _, fp := range ext.Funcs {
 		fp := fp
@@ -650,5 +650,5 @@ func toFacts(ext *gopatterns.Extraction) ([]*patterns.FuncFacts, []patterns.Anem
 			Params:           params,
 		})
 	}
-	return facts, ext.AnemicModels, ext.MissingIdentities
+	return facts, ext.AnemicModels, ext.MissingIdentities, ext.DomainServices
 }

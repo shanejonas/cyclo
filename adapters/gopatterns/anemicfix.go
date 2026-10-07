@@ -113,10 +113,84 @@ func anemicCandidate(f *ast.File, decl ast.Decl, structs, methoded map[string]bo
 	if !anemicTargetType(recvName, typeName, structs, methoded) {
 		return nil, "", false
 	}
-	if !anemicFuncSafe(f, fn, recvName) {
+	if !anemicChecksPass(f, fn, recvName, structs) {
 		return nil, "", false
 	}
 	return fn, typeName, true
+}
+
+// anemicChecksPass runs the safety checks for an anemic-model fix
+// candidate: field access, no value use, safe call sites, and not a
+// domain service (which must not become a method).
+func anemicChecksPass(f *ast.File, fn *ast.FuncDecl, recvName string, structs map[string]bool) bool {
+	if !anemicFuncSafe(f, fn, recvName) {
+		return false
+	}
+	return !isServiceLike(fn, structs)
+}
+
+// isServiceLike reports whether fn accesses the fields of two or more
+// distinct struct types via its parameters. Such a function is a
+// domain service (Evans): stateless coordination between types, not a
+// misplaced method. The anemic fixer must not convert it.
+func isServiceLike(fn *ast.FuncDecl, structs map[string]bool) bool {
+	paramTypes := structParamTypes(fn, structs)
+	if len(paramTypes) < 2 {
+		return false
+	}
+	return countAccessedTypes(fn.Body, paramTypes) >= 2
+}
+
+// structParamTypes maps parameter names to struct type names for params
+// whose type is a known struct (identifier or pointer to identifier).
+func structParamTypes(fn *ast.FuncDecl, structs map[string]bool) map[string]string {
+	out := map[string]string{}
+	if fn.Type.Params == nil {
+		return out
+	}
+	for _, field := range fn.Type.Params.List {
+		tname := derefTypeName(field.Type)
+		if tname == "" || !structs[tname] {
+			continue
+		}
+		for _, name := range field.Names {
+			out[name.Name] = tname
+		}
+	}
+	return out
+}
+
+// countAccessedTypes counts distinct struct types whose fields are
+// accessed via the named params, stopping at 2.
+func countAccessedTypes(body *ast.BlockStmt, paramTypes map[string]string) int {
+	seen := map[string]bool{}
+	count := 0
+	ast.Inspect(body, func(n ast.Node) bool {
+		if count >= 2 {
+			return false
+		}
+		if tname, ok := selectorParamType(n, paramTypes); ok && !seen[tname] {
+			seen[tname] = true
+			count++
+		}
+		return true
+	})
+	return count
+}
+
+// selectorParamType returns the struct type name when n is a selector
+// expression on a known param (e.g. o.Items where o is a param).
+func selectorParamType(n ast.Node, paramTypes map[string]string) (string, bool) {
+	sel, ok := n.(*ast.SelectorExpr)
+	if !ok {
+		return "", false
+	}
+	ident, ok := sel.X.(*ast.Ident)
+	if !ok {
+		return "", false
+	}
+	tname, ok := paramTypes[ident.Name]
+	return tname, ok
 }
 
 // anemicTargetType reports whether typeName is a convertible struct:

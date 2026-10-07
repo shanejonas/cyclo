@@ -68,6 +68,10 @@ type Extraction struct {
 	AnemicModels []patterns.AnemicModelHit
 	// MissingIdentities are structs used as entities without an ID field.
 	MissingIdentities []patterns.MissingIdentityHit
+	// DomainServices are free functions operating on the fields of two
+	// or more struct types: stateless domain services (Evans), not
+	// anemic-model violations.
+	DomainServices []patterns.DomainServiceHit
 }
 
 // Extract loads the packages enclosing paths and returns PDGs per
@@ -91,6 +95,7 @@ func Extract(ctx context.Context, root string, paths []string) (*Extraction, err
 		out.Funcs = append(out.Funcs, packagePdgs(pkg, abs)...)
 		out.AnemicModels = append(out.AnemicModels, findAnemicModels(pkg, abs)...)
 		out.MissingIdentities = append(out.MissingIdentities, findMissingIdentities(pkg, abs)...)
+		out.DomainServices = append(out.DomainServices, findDomainServices(pkg, abs)...)
 	}
 	return out, nil
 }
