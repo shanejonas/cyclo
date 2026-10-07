@@ -318,9 +318,16 @@ func groupSpecRules(facts []*FuncFacts) (map[specRuleKey]map[string]bool, map[sp
 	return byRule, first, fileOf
 }
 
+// shortTypeName strips a package qualifier for display: "apidomain.AgentArgs" -> "AgentArgs".
+func shortTypeName(typeName string) string {
+	if i := strings.LastIndex(typeName, "."); i >= 0 {
+		return typeName[i+1:]
+	}
+	return typeName
+}
+
 // specificationCandidate builds the fixable candidate for a business rule.
-func specificationCandidate(k specRuleKey, facts []*FuncFacts, funcs map[string]bool, hit SpecificationHit, file string) Candidate {
-	names := make([]string, 0, len(funcs))
+func specificationCandidate(k specRuleKey, facts []*FuncFacts, funcs map[string]bool, hit SpecificationHit, file string) Candidate {	names := make([]string, 0, len(funcs))
 	for id := range funcs {
 		names = append(names, id)
 	}
@@ -332,9 +339,9 @@ func specificationCandidate(k specRuleKey, facts []*FuncFacts, funcs map[string]
 			Support:       len(funcs),
 			CoverageMilli: 1000,
 		},
-		Observation:      fmt.Sprintf("business rule on %s repeated in %d functions", k.typeName, len(funcs)),
+		Observation:      fmt.Sprintf("business rule on %s repeated in %d functions", shortTypeName(k.typeName), len(funcs)),
 		Inference:        "a boolean business rule scattered across callers wants a named predicate",
-		PossibleRefactor: fmt.Sprintf("extract a %s predicate method", k.typeName),
+		PossibleRefactor: fmt.Sprintf("extract a %s predicate method", shortTypeName(k.typeName)),
 		Sites:            candidateSites(facts, names),
 		FixSpec: &FixSpec{
 			Kind:    Specification,
