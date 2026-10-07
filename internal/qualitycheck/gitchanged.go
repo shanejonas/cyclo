@@ -232,8 +232,9 @@ func rootRelative(factPath, root, cwd string) string {
 	return factPath
 }
 
-// filterChanged keeps only diagnostics whose function the diff touches.
-func filterChanged(report quality.Report, touched map[string]bool) quality.Report {
+// filterChanged keeps only diagnostics whose function the diff touches,
+// then rebuilds the work plan over the remaining findings.
+func filterChanged(report quality.Report, facts []quality.Function, touched map[string]bool, config quality.Config) (quality.Report, error) {
 	diagnostics := make([]quality.Diagnostic, 0, len(report.Diagnostics))
 	for _, diagnostic := range report.Diagnostics {
 		if touched[diagnostic.Path+"\x00"+diagnostic.Name] {
@@ -241,5 +242,10 @@ func filterChanged(report quality.Report, touched map[string]bool) quality.Repor
 		}
 	}
 	report.Diagnostics = diagnostics
-	return report
+	groups, err := quality.BuildFixGroups(facts, diagnostics, config)
+	if err != nil {
+		return report, err
+	}
+	report.FixGroups = groups
+	return report, nil
 }

@@ -23,6 +23,11 @@ type Config struct {
 	// Prefixes are appended to defaults by the config adapter. Later entries
 	// win equal-length ties, so projects can override classifications.
 	Prefixes []Prefix `toml:"prefixes"`
+	// Grouping controls fix-group formation: which violations must be fixed
+	// together. A violation's footprint is its function plus, for caller
+	// rules, its callers up to CallerHops, because a signature fix edits
+	// every call site.
+	Grouping Grouping `toml:"grouping"`
 }
 
 type Weights struct {
@@ -42,12 +47,19 @@ type Prefix struct {
 	Kind Kind   `toml:"kind"`
 }
 
+// Grouping decides which violations must be fixed together.
+type Grouping struct {
+	CallerRules []string `toml:"caller_rules"`
+	CallerHops  int      `toml:"caller_hops"`
+}
+
 func DefaultConfig() Config {
 	return Config{
 		FnLength: Rule{true, 50}, FnParams: Rule{true, 4},
 		MutationPerTarget: Rule{true, 3}, MutatedTargets: Rule{true, 3},
 		SideEffectDensity: Rule{true, 500}, MinStatements: 3, Granularity: "root",
 		Weights: Weights{1, 3, 3, 2, 4, 1, 1, 0, 1}, Prefixes: defaultPrefixes(),
+		Grouping: Grouping{CallerRules: []string{"fn_params"}, CallerHops: 1},
 	}
 }
 
@@ -58,7 +70,7 @@ func (c Config) Validate() error {
 	if !within(int64(c.MinStatements), 1_000_000) {
 		return fmt.Errorf("min_statements must be between 0 and 1000000")
 	}
-	for _, validate := range []func() error{c.validateLimits, c.validateWeights, c.validatePrefixes} {
+	for _, validate := range []func() error{c.validateLimits, c.validateWeights, c.validatePrefixes, c.validateGrouping} {
 		if err := validate(); err != nil {
 			return err
 		}
@@ -91,6 +103,20 @@ func (c Config) validatePrefixes() error {
 		if prefix.Path == "" || !validKind(prefix.Kind, true) {
 			return fmt.Errorf("invalid classification prefix %q (%s)", prefix.Path, prefix.Kind)
 		}
+	}
+	return nil
+}
+
+// validateGrouping rejects unknown caller rules so a typo never silently
+// changes which violations are fixed together.
+func (c Config) validateGrouping() error {
+	for _, rule := range c.Grouping.CallerRules {
+		if !slices.Contains(ruleIDs, rule) {
+			return fmt.Errorf("unknown grouping caller rule %q", rule)
+		}
+	}
+	if !within(int64(c.Grouping.CallerHops), 1_000_000) {
+		return fmt.Errorf("grouping caller_hops must be between 0 and 1000000")
 	}
 	return nil
 }

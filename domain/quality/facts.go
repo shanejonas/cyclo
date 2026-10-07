@@ -123,4 +123,25 @@ type Report struct {
 	Summary       Summary          `json:"summary"`
 	Functions     []FunctionResult `json:"functions"`
 	Diagnostics   []Diagnostic     `json:"diagnostics"`
+	// FixGroups is the work plan over Diagnostics: violations whose fixes
+	// overlap, ordered callees-first. Additive presentation only; rule
+	// metrics are unaffected.
+	FixGroups []FixGroup `json:"fix_groups,omitempty"`
+}
+
+// FixGroup is a set of violations whose fixes overlap: land them in one
+// change or stack them in Functions order (callees first). Groups are
+// independent of each other and can be fixed in parallel.
+type FixGroup struct {
+	ID        int             `json:"id"`
+	Functions []GroupFunction `json:"functions"`
+	// Stacked reports whether the group lists several functions that must
+	// be fixed together. Single-function groups are independent.
+	Stacked bool `json:"stacked"`
+}
+
+// GroupFunction is one violating function in a fix group and the rules it violates.
+type GroupFunction struct {
+	Location
+	Rules []string `json:"rules"`
 }

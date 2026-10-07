@@ -468,5 +468,54 @@
         "unsafe": 8
       }
     }
+  ],
+  "fix_groups": [
+    {
+      "id": 1,
+      "functions": [
+        {
+          "path": "edge.go",
+          "line": 7,
+          "column": 1,
+          "name": "example.com/sample.TupleAndTemporary",
+          "rules": [
+            "side_effect_density"
+          ]
+        }
+      ],
+      "stacked": false
+    },
+    {
+      "id": 2,
+      "functions": [
+        {
+          "path": "sample.go",
+          "line": 23,
+          "column": 1,
+          "name": "example.com/sample.Writes",
+          "rules": [
+            "fn_params",
+            "mutated_targets",
+            "side_effect_density"
+          ]
+        }
+      ],
+      "stacked": false
+    },
+    {
+      "id": 3,
+      "functions": [
+        {
+          "path": "unsafe.go",
+          "line": 7,
+          "column": 1,
+          "name": "example.com/sample.Unsafe",
+          "rules": [
+            "side_effect_density"
+          ]
+        }
+      ],
+      "stacked": false
+    }
   ]
 }

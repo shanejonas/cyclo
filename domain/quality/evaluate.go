@@ -38,6 +38,7 @@ func Evaluate(facts []Function, config Config) (Report, error) {
 		Functions:     results,
 		Diagnostics:   diagnostics,
 		Summary:       summarize(results),
+		FixGroups:     buildFixGroups(functions, diagnostics, config),
 	}, nil
 }
 
