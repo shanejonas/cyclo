@@ -245,3 +245,17 @@ func TestDefaultParamsZeroValue(t *testing.T) {
 		t.Fatalf("explicit Params must pass through, got %+v", got)
 	}
 }
+
+func TestSingleFunctionBuildersInFixKindOrder(t *testing.T) {
+	// The miner must detect patterns in dependency order: guards first
+	// (simplify control flow), type-creating passes next, factories after
+	// the types they use, detection-only kinds last. This mirrors the
+	// fixer order (FixKindOrder) so detection and fixing agree.
+	for i := 1; i < len(singleFunctionBuilders); i++ {
+		prev, curr := singleFunctionBuilders[i-1].kind, singleFunctionBuilders[i].kind
+		if FixKindRank(prev) >= FixKindRank(curr) {
+			t.Errorf("builder %d (%q, rank %d) not before builder %d (%q, rank %d)",
+				i-1, prev, FixKindRank(prev), i, curr, FixKindRank(curr))
+		}
+	}
+}

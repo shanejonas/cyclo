@@ -256,7 +256,6 @@ func selectorText(sel *ast.SelectorExpr) string {
 // function has construction logic (validation, defaults, error handling)
 // that a factory could encapsulate — plain field assignment doesn't qualify.
 func findFactoryLits(fn *ast.FuncDecl, fset *token.FileSet, info *types.Info, pkg *types.Package) []patterns.FactoryHit {
-	hasLogic := funcHasConstructionLogic(fn, info)
 	var out []patterns.FactoryHit
 	ast.Inspect(fn.Body, func(n ast.Node) bool {
 		lit, ok := n.(*ast.CompositeLit)
@@ -267,51 +266,115 @@ func findFactoryLits(fn *ast.FuncDecl, fset *token.FileSet, info *types.Info, pk
 		if !ok {
 			return true
 		}
+		ctx := constructionCtx{fset: fset, info: info, typeName: name}
 		out = append(out, patterns.FactoryHit{
 			Line:      fset.Position(lit.Pos()).Line,
 			TypeName:  name,
 			NumFields: len(lit.Elts),
 			DeclFile:  declFile,
-			HasLogic:  hasLogic,
+			HasLogic:  litHasConstructionLogic(fn, lit, ctx),
 		})
 		return true
 	})
 	return out
 }
 
-// funcHasConstructionLogic reports whether fn has logic around construction
-// that a factory could encapsulate: validation (if statements), defaults
-// (conditional assignment), or fallible construction (returns error).
-func funcHasConstructionLogic(fn *ast.FuncDecl, info *types.Info) bool {
+// constructionLogicWindow is how close (in lines) an if statement must be
+// to a struct literal to count as construction logic.
+const constructionLogicWindow = 5
+
+// constructionCtx bundles the type-checking context for
+// construction-logic detection (keeps fn_params within the gate).
+type constructionCtx struct {
+	fset     *token.FileSet
+	info     *types.Info
+	typeName string
+}
+
+// litHasConstructionLogic reports whether the struct literal's construction
+// has logic that a factory could encapsulate. The logic must be ABOUT the
+// construction, not just anywhere in the function:
+//   - an if statement within 5 lines of the literal (validation/defaults), or
+//   - an if statement referencing the struct type, or
+//   - the function returns (T, error) where T is the struct type.
+func litHasConstructionLogic(fn *ast.FuncDecl, lit *ast.CompositeLit, ctx constructionCtx) bool {
 	if fn.Body == nil {
 		return false
 	}
-	if funcReturnsError(fn, info) {
+	if funcReturnsStructAndError(fn, ctx) {
 		return true
 	}
-	hasIf := false
+	litLine := ctx.fset.Position(lit.Pos()).Line
+	logic := false
 	ast.Inspect(fn.Body, func(n ast.Node) bool {
-		if _, ok := n.(*ast.IfStmt); ok {
-			hasIf = true
+		ifStmt, ok := n.(*ast.IfStmt)
+		if !ok {
+			return true
+		}
+		if ctx.ifIsLogic(ifStmt, litLine) {
+			logic = true
 			return false
 		}
 		return true
 	})
-	return hasIf
+	return logic
 }
 
-// funcReturnsError reports whether fn's results include an error type:
-// construction that can fail wants a factory.
-func funcReturnsError(fn *ast.FuncDecl, info *types.Info) bool {
+// ifIsLogic reports whether the if statement is construction logic for the
+// literal: close to it in the source, or referencing the struct type.
+func (ctx constructionCtx) ifIsLogic(ifStmt *ast.IfStmt, litLine int) bool {
+	ifLine := ctx.fset.Position(ifStmt.Pos()).Line
+	if ifLine >= litLine-constructionLogicWindow && ifLine <= litLine+constructionLogicWindow {
+		return true
+	}
+	return ctx.ifRefsType(ifStmt)
+}
+
+// ifRefsType reports whether the if statement mentions the struct type,
+// either by name or via a variable of that type.
+func (ctx constructionCtx) ifRefsType(ifStmt *ast.IfStmt) bool {
+	refs := false
+	ast.Inspect(ifStmt, func(n ast.Node) bool {
+		id, ok := n.(*ast.Ident)
+		if !ok {
+			return true
+		}
+		if id.Name == ctx.typeName {
+			refs = true
+			return false
+		}
+		if isStructNamed(ctx.info.TypeOf(id), ctx.typeName) {
+			refs = true
+			return false
+		}
+		return true
+	})
+	return refs
+}
+
+// funcReturnsStructAndError reports whether fn returns the named struct type
+// and an error: fallible construction wants a factory.
+func funcReturnsStructAndError(fn *ast.FuncDecl, ctx constructionCtx) bool {
 	if fn.Type.Results == nil {
 		return false
 	}
+	var hasT, hasErr bool
 	for _, field := range fn.Type.Results.List {
-		if isErrorType(info.TypeOf(field.Type)) {
-			return true
+		t := ctx.info.TypeOf(field.Type)
+		switch {
+		case isErrorType(t):
+			hasErr = true
+		case isStructNamed(t, ctx.typeName):
+			hasT = true
 		}
 	}
-	return false
+	return hasT && hasErr
+}
+
+// isStructNamed reports whether t is the named struct type.
+func isStructNamed(t types.Type, typeName string) bool {
+	named, ok := litNamedStruct(t)
+	return ok && named.Obj() != nil && named.Obj().Name() == typeName
 }
 
 // isErrorType reports whether t is the builtin error type.

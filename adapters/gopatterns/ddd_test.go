@@ -211,3 +211,62 @@ func fallible(host string) (Config, error) {
 		t.Errorf("fallible: HasLogic = false, want true (returns error)")
 	}
 }
+
+func TestFindFactoryLitsDistantIf(t *testing.T) {
+	src := `package p
+type Config struct {
+	Host string
+	Port int
+	User string
+	Pass string
+	Name string
+	DB   string
+}
+func distant(flag bool) Config {
+	if flag {
+		println("unrelated")
+	}
+	x := 1
+	y := 2
+	z := 3
+	w := 4
+	v := 5
+	_ = x + y + z + w + v
+	return Config{Host: "h", Port: 1, User: "u", Pass: "p", Name: "n", DB: "d"}
+}
+func typeRef(name string) Config {
+	c := Config{Host: "h", Port: 1, User: "u", Pass: "p", Name: "n", DB: "d"}
+	x := 1
+	y := 2
+	z := 3
+	w := 4
+	v := 5
+	u := 6
+	_ = x + y + z + w + v + u
+	_ = name
+	if c.Host == "" {
+		c.Host = "localhost"
+	}
+	return c
+}
+`
+	f, fset, info, pkg := typeCheck(t, src)
+	// If statement is 8+ lines above the literal and doesn't reference
+	// the type: not construction logic.
+	hits := findFactoryLits(findFunc(f, "distant"), fset, info, pkg)
+	if len(hits) != 1 {
+		t.Fatalf("distant: got %d hits, want 1", len(hits))
+	}
+	if hits[0].HasLogic {
+		t.Errorf("distant: HasLogic = true, want false (if is far and unrelated)")
+	}
+	// If statement references a variable of the struct type: construction
+	// logic even though it's after the literal.
+	hits = findFactoryLits(findFunc(f, "typeRef"), fset, info, pkg)
+	if len(hits) != 1 {
+		t.Fatalf("typeRef: got %d hits, want 1", len(hits))
+	}
+	if !hits[0].HasLogic {
+		t.Errorf("typeRef: HasLogic = false, want true (if references Config var)")
+	}
+}

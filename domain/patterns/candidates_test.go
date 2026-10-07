@@ -609,3 +609,37 @@ func candidateKindsFromReport(report PatternsReport) []CandidateKind {
 	}
 	return kinds
 }
+
+func TestFixKindOrder(t *testing.T) {
+	// The dependency order: guards simplify control flow first,
+	// type-creating passes next, parameterize last (PDG-sensitive).
+	order := []CandidateKind{
+		GuardClause, PrimitiveObsession, ValueObject, Factory,
+		Parameterize,
+	}
+	for i := 1; i < len(order); i++ {
+		if FixKindRank(order[i-1]) >= FixKindRank(order[i]) {
+			t.Errorf("FixKindRank(%q)=%d not before FixKindRank(%q)=%d",
+				order[i-1], FixKindRank(order[i-1]), order[i], FixKindRank(order[i]))
+		}
+	}
+	// Detection-only kinds (never produce FixSpecs) sort after all
+	// fixable kinds.
+	lastFixable := FixKindRank(Parameterize)
+	for _, k := range []CandidateKind{MutableIdentity, Aggregate, Repository} {
+		if FixKindRank(k) <= lastFixable {
+			t.Errorf("FixKindRank(%q)=%d, want after %d (fixable kinds first)",
+				k, FixKindRank(k), lastFixable)
+		}
+	}
+	// Every fixable kind is in the order.
+	for _, k := range []CandidateKind{
+		GuardClause, PrimitiveObsession, ValueObject, Factory,
+		MissingIdentity, EntityIdentity, AnemicModel, TypeSwitch,
+		EnumDispatch, TraitMethod, CapabilitySet, GenericFn, Parameterize,
+	} {
+		if FixKindRank(k) >= len(FixKindOrder) {
+			t.Errorf("fixable kind %q not in FixKindOrder", k)
+		}
+	}
+}
