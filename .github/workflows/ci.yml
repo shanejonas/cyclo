@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: openmuse-linux-checks
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -25,7 +25,7 @@ jobs:
         run: make lint
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: openmuse-linux-checks
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -39,7 +39,7 @@ jobs:
         run: make test
 
   test-race:
-    runs-on: ubuntu-latest
+    runs-on: openmuse-linux-checks
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -53,7 +53,7 @@ jobs:
         run: make test-race
 
   cyclo-check:
-    runs-on: ubuntu-latest
+    runs-on: openmuse-linux-checks
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -67,7 +67,7 @@ jobs:
         run: make cyclo-check
 
   quality-gate:
-    runs-on: ubuntu-latest
+    runs-on: openmuse-linux-checks
     steps:
       - name: Checkout
         uses: actions/checkout@v6
