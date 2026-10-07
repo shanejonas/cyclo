@@ -167,6 +167,18 @@ func small() {
 	c := Config{Host: "h"}
 	_ = c
 }
+func validated(host string) Config {
+	if host == "" {
+		host = "localhost"
+	}
+	return Config{Host: host, Port: 1, User: "u", Pass: "p", Name: "n", DB: "d"}
+}
+func fallible(host string) (Config, error) {
+	if host == "" {
+		return Config{}, nil
+	}
+	return Config{Host: host, Port: 1, User: "u", Pass: "p", Name: "n", DB: "d"}, nil
+}
 `
 	f, fset, info, pkg := typeCheck(t, src)
 	hits := findFactoryLits(findFunc(f, "a"), fset, info, pkg)
@@ -176,7 +188,26 @@ func small() {
 	if hits[0].TypeName != "Config" || hits[0].NumFields != 6 {
 		t.Errorf("hit = %+v, want Config with 6 fields", hits[0])
 	}
+	if hits[0].HasLogic {
+		t.Errorf("a: HasLogic = true, want false (plain field assignment)")
+	}
 	if hits := findFactoryLits(findFunc(f, "small"), fset, info, pkg); len(hits) != 0 {
 		t.Errorf("small: got %d hits, want 0 (under threshold)", len(hits))
+	}
+	// Validation logic: if statement setting defaults.
+	hits = findFactoryLits(findFunc(f, "validated"), fset, info, pkg)
+	if len(hits) != 1 {
+		t.Fatalf("validated: got %d hits, want 1", len(hits))
+	}
+	if !hits[0].HasLogic {
+		t.Errorf("validated: HasLogic = false, want true (if statement)")
+	}
+	// Fallible construction: returns (Config, error).
+	hits = findFactoryLits(findFunc(f, "fallible"), fset, info, pkg)
+	if len(hits) != 1 {
+		t.Fatalf("fallible: got %d hits, want 1", len(hits))
+	}
+	if !hits[0].HasLogic {
+		t.Errorf("fallible: HasLogic = false, want true (returns error)")
 	}
 }

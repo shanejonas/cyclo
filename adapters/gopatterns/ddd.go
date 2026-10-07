@@ -252,8 +252,11 @@ func selectorText(sel *ast.SelectorExpr) string {
 
 // findFactoryLits records struct literals with 5+ fields. Only literals
 // of named structs declared in the current package are recorded: the
-// factory must live with the type.
+// factory must live with the type. HasLogic is set when the enclosing
+// function has construction logic (validation, defaults, error handling)
+// that a factory could encapsulate — plain field assignment doesn't qualify.
 func findFactoryLits(fn *ast.FuncDecl, fset *token.FileSet, info *types.Info, pkg *types.Package) []patterns.FactoryHit {
+	hasLogic := funcHasConstructionLogic(fn, info)
 	var out []patterns.FactoryHit
 	ast.Inspect(fn.Body, func(n ast.Node) bool {
 		lit, ok := n.(*ast.CompositeLit)
@@ -269,10 +272,52 @@ func findFactoryLits(fn *ast.FuncDecl, fset *token.FileSet, info *types.Info, pk
 			TypeName:  name,
 			NumFields: len(lit.Elts),
 			DeclFile:  declFile,
+			HasLogic:  hasLogic,
 		})
 		return true
 	})
 	return out
+}
+
+// funcHasConstructionLogic reports whether fn has logic around construction
+// that a factory could encapsulate: validation (if statements), defaults
+// (conditional assignment), or fallible construction (returns error).
+func funcHasConstructionLogic(fn *ast.FuncDecl, info *types.Info) bool {
+	if fn.Body == nil {
+		return false
+	}
+	if funcReturnsError(fn, info) {
+		return true
+	}
+	hasIf := false
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		if _, ok := n.(*ast.IfStmt); ok {
+			hasIf = true
+			return false
+		}
+		return true
+	})
+	return hasIf
+}
+
+// funcReturnsError reports whether fn's results include an error type:
+// construction that can fail wants a factory.
+func funcReturnsError(fn *ast.FuncDecl, info *types.Info) bool {
+	if fn.Type.Results == nil {
+		return false
+	}
+	for _, field := range fn.Type.Results.List {
+		if isErrorType(info.TypeOf(field.Type)) {
+			return true
+		}
+	}
+	return false
+}
+
+// isErrorType reports whether t is the builtin error type.
+func isErrorType(t types.Type) bool {
+	named, ok := t.(*types.Named)
+	return ok && named.Obj() != nil && named.Obj().Name() == "error"
 }
 
 // litStructTarget returns the named struct type of a composite literal and

@@ -107,7 +107,7 @@ func TestFactoryCandidates(t *testing.T) {
 			Path: "x.go",
 			Line: 10,
 			FactoryLits: []FactoryHit{
-				{Line: 12, TypeName: "Config", NumFields: 6, DeclFile: "config.go"},
+				{Line: 12, TypeName: "Config", NumFields: 6, DeclFile: "config.go", HasLogic: true},
 			},
 		},
 		{
@@ -116,7 +116,7 @@ func TestFactoryCandidates(t *testing.T) {
 			Path: "y.go",
 			Line: 20,
 			FactoryLits: []FactoryHit{
-				{Line: 22, TypeName: "Config", NumFields: 6, DeclFile: "config.go"},
+				{Line: 22, TypeName: "Config", NumFields: 6, DeclFile: "config.go", HasLogic: true},
 			},
 		},
 	}
@@ -146,11 +146,67 @@ func TestFactoryCandidatesSingleFunctionSkipped(t *testing.T) {
 		Path: "x.go",
 		Line: 10,
 		FactoryLits: []FactoryHit{
-			{Line: 12, TypeName: "Config", NumFields: 6, DeclFile: "config.go"},
+			{Line: 12, TypeName: "Config", NumFields: 6, DeclFile: "config.go", HasLogic: true},
 		},
 	}}
 	if cands := factoryCandidates(facts); len(cands) != 0 {
 		t.Errorf("got %d candidates, want 0", len(cands))
+	}
+}
+
+func TestFactoryCandidatesNoLogicSkipped(t *testing.T) {
+	// Plain field assignment in 2+ functions: no construction logic,
+	// so no factory. This is the "just field shuffling" case Shane rejected.
+	facts := []*FuncFacts{
+		{
+			ID:   "pkg.a",
+			Name: "a",
+			Path: "x.go",
+			Line: 10,
+			FactoryLits: []FactoryHit{
+				{Line: 12, TypeName: "Config", NumFields: 6, DeclFile: "config.go", HasLogic: false},
+			},
+		},
+		{
+			ID:   "pkg.b",
+			Name: "b",
+			Path: "y.go",
+			Line: 20,
+			FactoryLits: []FactoryHit{
+				{Line: 22, TypeName: "Config", NumFields: 6, DeclFile: "config.go", HasLogic: false},
+			},
+		},
+	}
+	if cands := factoryCandidates(facts); len(cands) != 0 {
+		t.Errorf("got %d candidates, want 0 (no construction logic)", len(cands))
+	}
+}
+
+func TestFactoryCandidatesMixedLogicSkipped(t *testing.T) {
+	// Only one site has logic: the "pattern" isn't scattered, so no factory.
+	// Extracting would impose site A's validation on site B (behavior change).
+	facts := []*FuncFacts{
+		{
+			ID:   "pkg.a",
+			Name: "a",
+			Path: "x.go",
+			Line: 10,
+			FactoryLits: []FactoryHit{
+				{Line: 12, TypeName: "Config", NumFields: 6, DeclFile: "config.go", HasLogic: true},
+			},
+		},
+		{
+			ID:   "pkg.b",
+			Name: "b",
+			Path: "y.go",
+			Line: 20,
+			FactoryLits: []FactoryHit{
+				{Line: 22, TypeName: "Config", NumFields: 6, DeclFile: "config.go", HasLogic: false},
+			},
+		},
+	}
+	if cands := factoryCandidates(facts); len(cands) != 0 {
+		t.Errorf("got %d candidates, want 0 (only one site has logic)", len(cands))
 	}
 }
 
@@ -162,7 +218,7 @@ func TestFactoryCandidatesSmallLiteralSkipped(t *testing.T) {
 			Path: "x.go",
 			Line: 10,
 			FactoryLits: []FactoryHit{
-				{Line: 12, TypeName: "Config", NumFields: 3, DeclFile: "config.go"},
+				{Line: 12, TypeName: "Config", NumFields: 3, DeclFile: "config.go", HasLogic: true},
 			},
 		},
 		{
@@ -171,7 +227,7 @@ func TestFactoryCandidatesSmallLiteralSkipped(t *testing.T) {
 			Path: "y.go",
 			Line: 20,
 			FactoryLits: []FactoryHit{
-				{Line: 22, TypeName: "Config", NumFields: 3, DeclFile: "config.go"},
+				{Line: 22, TypeName: "Config", NumFields: 3, DeclFile: "config.go", HasLogic: true},
 			},
 		},
 	}
