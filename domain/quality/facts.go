@@ -29,6 +29,9 @@ type Function struct {
 	Mutations     []Mutation `json:"mutations"`
 	Calls         []Call     `json:"calls"`
 	Effects       []Effect   `json:"effects"`
+	// ParamList describes each parameter (receiver excluded, matching
+	// Params); used for parameter refactor plans.
+	ParamList []ParamFacts `json:"param_list,omitempty"`
 }
 
 // Provenance concerns observable state, not allocation on the Go heap.
@@ -53,6 +56,38 @@ type Call struct {
 	Line    int    `json:"line"`
 	Dynamic bool   `json:"dynamic"`
 	Local   bool   `json:"local"`
+	// Args records each argument's provenance, relative to the caller.
+	Args []ArgSource `json:"args,omitempty"`
+}
+
+// ArgSourceKind classifies one call-site argument relative to the caller.
+type ArgSourceKind string
+
+const (
+	// ArgParam is a bare caller parameter (possibly behind &, *, or parens).
+	ArgParam ArgSourceKind = "param"
+	// ArgConst is a literal or named constant.
+	ArgConst ArgSourceKind = "const"
+	// ArgField is a field projection rooted at a local, parameter, or receiver.
+	ArgField ArgSourceKind = "field"
+	// ArgOther is anything else.
+	ArgOther ArgSourceKind = "other"
+)
+
+// ArgSource is the provenance of one call-site argument.
+type ArgSource struct {
+	Kind ArgSourceKind `json:"kind"`
+	// Param is the caller's parameter index when Kind is ArgParam.
+	Param int `json:"param,omitempty"`
+}
+
+// ParamFacts describes one function parameter (receiver excluded, matching
+// the Params count).
+type ParamFacts struct {
+	Name string `json:"name"`
+	Type string `json:"type"`
+	// Uses counts syntactic references to the parameter in the body.
+	Uses int `json:"uses"`
 }
 
 type Kind string
@@ -97,6 +132,9 @@ type Diagnostic struct {
 	Weight      int64            `json:"weight,omitempty"`
 	Statements  int64            `json:"statements,omitempty"`
 	KindWeights map[string]int64 `json:"kind_weights,omitempty"`
+	// Plan is the ordered refactor plan for fn_params violations: which
+	// signatures change first and which call sites follow.
+	Plan *StackPlan `json:"plan,omitempty"`
 }
 
 type FunctionResult struct {
@@ -148,4 +186,45 @@ type FixGroup struct {
 type GroupFunction struct {
 	Location
 	Rules []string `json:"rules"`
+}
+
+// ParamRef is a parameter as written: name and type.
+type ParamRef struct {
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
+// Bundle is a params-struct candidate: parameters that callers hand to a
+// re-signed function together, unchanged.
+type Bundle struct {
+	Params []ParamRef `json:"params"`
+	// Sites is the number of call sites forwarding all of Params.
+	Sites int `json:"sites"`
+	// Functions names the functions on either side of those call sites, sorted.
+	Functions []string `json:"functions"`
+}
+
+// PlanStep is one edit in a parameter refactor.
+type PlanStep struct {
+	Location
+	// Signature is true when the function's own signature changes (it
+	// violates fn_params); otherwise only its call sites do.
+	Signature bool `json:"signature"`
+	// IncomingSites counts call sites in the workspace calling this function.
+	IncomingSites int `json:"incoming_sites"`
+	// OutgoingSites counts this function's call sites into re-signed functions.
+	OutgoingSites int `json:"outgoing_sites"`
+	// PassThrough names parameters only ever forwarded to re-signed
+	// functions: the fix belongs in the callee or an upper layer, and they
+	// can leave this signature.
+	PassThrough []string `json:"pass_through,omitempty"`
+}
+
+// StackPlan is an ordered parameter refactor for an fn_params violation:
+// re-signed functions callee-first, then the callers whose call sites must
+// follow. Shaped to attach to FixGroup when fix groups land; currently built
+// per fn_params diagnostic.
+type StackPlan struct {
+	Steps   []PlanStep `json:"steps"`
+	Bundles []Bundle   `json:"bundles,omitempty"`
 }

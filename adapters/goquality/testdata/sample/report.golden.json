@@ -370,7 +370,20 @@
       "rule_id": "fn_params",
       "actual": 5,
       "limit": 4,
-      "message": "fn_params: 5 exceeds 4"
+      "message": "fn_params: 5 exceeds 4",
+      "plan": {
+        "steps": [
+          {
+            "path": "sample.go",
+            "line": 23,
+            "column": 1,
+            "name": "example.com/sample.Writes",
+            "signature": true,
+            "incoming_sites": 0,
+            "outgoing_sites": 0
+          }
+        ]
+      }
     },
     {
       "path": "sample.go",

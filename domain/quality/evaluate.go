@@ -22,8 +22,10 @@ func Evaluate(facts []Function, config Config) (Report, error) {
 	}
 	results := []FunctionResult{}
 	diagnostics := []Diagnostic{}
-	for _, function := range functions {
+	sites := stackSites(functions)
+	for idx, function := range functions {
 		result, findings := evaluateFunction(function, config)
+		planFindings(functions, sites, idx, findings)
 		results = append(results, result)
 		diagnostics = append(diagnostics, findings...)
 	}

@@ -17,6 +17,11 @@ type extractor struct {
 	fact       quality.Function
 	bindings   map[types.Object]referenceBinding
 	parameters map[types.Object]bool
+	// paramIndex maps outer-function parameter objects to their ParamList
+	// index. The receiver and closure parameters are not indexed: they are
+	// not forwardable as bare Param(i) arguments.
+	paramIndex map[types.Object]int
+	receiver   types.Object
 }
 
 func extractFunction(pkg *packages.Package, fn *ast.FuncDecl, path string, source []byte) quality.Function {
@@ -25,13 +30,15 @@ func extractFunction(pkg *packages.Package, fn *ast.FuncDecl, path string, sourc
 	if object, ok := pkg.TypesInfo.Defs[fn.Name].(*types.Func); ok {
 		name = resolvedName(object)
 	}
-	x := extractor{pkg: pkg, bindings: map[types.Object]referenceBinding{}, parameters: map[types.Object]bool{}, fact: quality.Function{
+	x := extractor{pkg: pkg, bindings: map[types.Object]referenceBinding{}, parameters: map[types.Object]bool{}, paramIndex: map[types.Object]int{}, fact: quality.Function{
 		Location: quality.Location{Path: path, Line: start.Line, Column: start.Column, Name: name},
 		Params:   parameterCount(fn.Type.Params), HasSelf: fn.Recv != nil,
 		Source: string(source[start.Offset:end.Offset]), PrecedingLine: precedingSuppression(fn.Doc),
 		Mutations: []quality.Mutation{}, Calls: []quality.Call{}, Effects: []quality.Effect{},
 	}}
 	x.fact.CodeLines = codeLines(x.fact.Source)
+	x.indexParameters(fn.Type.Params)
+	x.noteReceiver(fn.Recv)
 	x.addParameters(fn.Type.Params)
 	x.addParameters(fn.Recv)
 	x.collectBindings(fn.Body)
@@ -61,6 +68,79 @@ func (x *extractor) addParameters(fields *ast.FieldList) {
 	}
 }
 
+// indexParameters builds the ParamList in source order and maps each named
+// parameter object to its index. Unnamed parameters keep an empty entry so
+// indices stay aligned with the Params count. The receiver is excluded,
+// matching the fn_params budget.
+func (x *extractor) indexParameters(fields *ast.FieldList) {
+	x.fact.ParamList, x.paramIndex = buildParams(fields, x.pkg.TypesInfo)
+}
+
+// buildParams is pure: it returns the parameter list and object→index map
+// without mutating shared state.
+func buildParams(fields *ast.FieldList, info *types.Info) ([]quality.ParamFacts, map[types.Object]int) {
+	var list []quality.ParamFacts
+	index := map[types.Object]int{}
+	if fields == nil {
+		return list, index
+	}
+	for _, field := range fields.List {
+		typ := paramType(field.Type, info)
+		if len(field.Names) == 0 {
+			list = append(list, quality.ParamFacts{Type: typ})
+			continue
+		}
+		for _, name := range field.Names {
+			if obj := info.Defs[name]; obj != nil {
+				index[obj] = len(list)
+			}
+			list = append(list, quality.ParamFacts{Name: name.Name, Type: typ})
+		}
+	}
+	return list, index
+}
+
+func paramType(expr ast.Expr, info *types.Info) string {
+	typ := info.TypeOf(expr)
+	if typ == nil {
+		return ""
+	}
+	return types.TypeString(typ, func(pkg *types.Package) string {
+		if pkg == nil {
+			return ""
+		}
+		return pkg.Name()
+	})
+}
+
+func (x *extractor) noteReceiver(fields *ast.FieldList) {
+	if fields == nil {
+		return
+	}
+	for _, field := range fields.List {
+		for _, name := range field.Names {
+			if obj := x.pkg.TypesInfo.Defs[name]; obj != nil {
+				x.receiver = obj
+			}
+		}
+	}
+}
+
+// countParam records one syntactic reference to a parameter, if the node
+// is a parameter use.
+func (x *extractor) countParam(node ast.Node) {
+	if id, ok := node.(*ast.Ident); ok {
+		x.countParamUse(id)
+	}
+}
+
+// countParamUse records one syntactic reference to a parameter.
+func (x *extractor) countParamUse(id *ast.Ident) {
+	if index, ok := x.paramIndex[x.pkg.TypesInfo.Uses[id]]; ok {
+		x.fact.ParamList[index].Uses++
+	}
+}
+
 func (x *extractor) addLiteralParameters(node ast.Node) {
 	if literal, ok := node.(*ast.FuncLit); ok {
 		x.addParameters(literal.Type.Params)
@@ -73,6 +153,7 @@ func (x *extractor) visit(node ast.Node) bool {
 	if countedStatement(node) {
 		x.fact.Statements++
 	}
+	x.countParam(node)
 	switch node := node.(type) {
 	case *ast.AssignStmt:
 		x.assignment(node)
