@@ -166,7 +166,7 @@ func digest(own, salt uint64, neighbours []Nb, prev []uint64) uint64 {
 	return acc
 }
 
-func refine(g *Graph, prev []uint64) []uint64 {
+func (g *Graph) refine(prev []uint64) []uint64 {
 	next := make([]uint64, len(prev))
 	for v := range prev {
 		inward := digest(prev[v], inSalt, g.inc[v], prev)
@@ -194,13 +194,13 @@ func histogram(colors []uint64) []histEntry {
 }
 
 // eccentricity is the longest shortest path from start (BFS levels).
-func eccentricity(g *Graph, start int) int {
+func (g *Graph) eccentricity(start int) int {
 	seen := make([]bool, len(g.labels))
 	seen[start] = true
 	frontier := []int{start}
 	depth := 0
 	for len(frontier) > 0 {
-		frontier = expandFrontier(g, frontier, seen)
+		frontier = g.expandFrontier(frontier, seen)
 		if len(frontier) == 0 {
 			return depth
 		}
@@ -210,7 +210,7 @@ func eccentricity(g *Graph, start int) int {
 }
 
 // expandFrontier returns the unvisited neighbours of frontier, marking them.
-func expandFrontier(g *Graph, frontier []int, seen []bool) []int {
+func (g *Graph) expandFrontier(frontier []int, seen []bool) []int {
 	fresh := map[int]bool{}
 	for _, v := range frontier {
 		collectNeighbours(g.inc[v], seen, fresh)
@@ -238,7 +238,7 @@ func diameter(g *Graph) int {
 	}
 	max := 0
 	for v := range g.labels {
-		if e := eccentricity(g, v); e > max {
+		if e := g.eccentricity(v); e > max {
 			max = e
 		}
 	}
@@ -340,7 +340,7 @@ func NewWl(pdg *Pdg) *Wl {
 	d := diameter(&g)
 	// CCGraph optimization: only compute rounds up to diameter+1 (capped),
 	// not the full maxLevels. Small-diameter graphs save refinement work.
-	rounds := refineRoundsDiameter(&g, d)
+	rounds := (&g).refineRoundsDiameter(d)
 	return &Wl{
 		graph:    g,
 		rounds:   rounds,
@@ -353,10 +353,10 @@ func NewWl(pdg *Pdg) *Wl {
 }
 
 func refineRounds(g *Graph) [][]uint64 {
-	return refineRoundsDiameter(g, maxLevels-1)
+	return g.refineRoundsDiameter(maxLevels - 1)
 }
 
-func refineRoundsDiameter(g *Graph, d int) [][]uint64 {
+func (g *Graph) refineRoundsDiameter(d int) [][]uint64 {
 	h := d + 1
 	if h < 1 {
 		h = 1
@@ -366,7 +366,7 @@ func refineRoundsDiameter(g *Graph, d int) [][]uint64 {
 	}
 	rounds := [][]uint64{g.labels}
 	for i := 1; i < h; i++ {
-		rounds = append(rounds, refine(g, rounds[len(rounds)-1]))
+		rounds = append(rounds, g.refine(rounds[len(rounds)-1]))
 	}
 	return rounds
 }
