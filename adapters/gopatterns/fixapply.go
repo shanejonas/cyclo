@@ -875,14 +875,10 @@ func applySpecificationFix(spec *patterns.FixSpec, src []byte) ([]byte, error) {
 	if len(matches) == 0 {
 		return src, nil
 	}
-	// Derive the predicate name from the first match's condition.
-	predName := predicateName(matches[0].stmt.Cond)
-	if predName == "" {
-		return nil, fmt.Errorf("specification: cannot derive predicate name")
+	predName, isLocal, ok := specFixPlan(f, typeName, matches)
+	if !ok {
+		return src, nil
 	}
-	predName = uniquePredName(f, predName)
-	// Method on local type, function for external/unknown types.
-	isLocal := hasTypeDecl(f, baseTypeName(typeName))
 	edits := predEdits(fset, f, src, predName, typeName, isLocal, matches)
 	out := applyEdits(src, edits)
 	formatted, err := format.Source(out)
@@ -890,6 +886,26 @@ func applySpecificationFix(spec *patterns.FixSpec, src []byte) ([]byte, error) {
 		return nil, fmt.Errorf("gofmt after specification fix: %w", err)
 	}
 	return formatted, nil
+}
+
+// specFixPlan derives the predicate name and determines whether to generate
+// a method (local type) or function (external type). Returns false when the
+// fix cannot be generated safely.
+func specFixPlan(f *ast.File, typeName string, matches []specMatch) (predName string, isLocal, ok bool) {
+	// Derive the predicate name from the first match's condition.
+	predName = predicateName(matches[0].stmt.Cond)
+	if predName == "" {
+		return "", false, false
+	}
+	predName = uniquePredName(f, predName)
+	// Method on local type, function for external types.
+	// If the type isn't local and has no package qualifier, we can't
+	// generate a correct signature — skip rather than emit broken code.
+	isLocal = hasTypeDecl(f, baseTypeName(typeName))
+	if !isLocal && !strings.Contains(typeName, ".") {
+		return "", false, false
+	}
+	return predName, isLocal, true
 }
 
 // baseTypeName strips a package qualifier: "apidomain.AgentArgs" -> "AgentArgs".
@@ -952,25 +968,55 @@ func splitBoolOps(cond ast.Expr) ([]ast.Expr, token.Token) {
 // `u.Age > 18` -> `AgeOver18`, `u.Active` -> `Active`, `!u.Active` -> `NotActive`.
 func operandPredName(op ast.Expr) string {
 	op = specUnwrapParens(op)
-	// Negation: !u.Active -> NotActive
-	if unary, ok := op.(*ast.UnaryExpr); ok && unary.Op == token.NOT {
-		inner := operandPredName(unary.X)
-		if inner == "" {
-			return ""
-		}
-		return "Not" + inner
+	if name, ok := negatedPredName(op); ok {
+		return name
 	}
 	// Bare selector: u.Active -> Active
 	if field, _, ok := specBareSelector(op); ok {
 		return capitalize(field)
 	}
-	// Comparison: u.Age > 18 -> AgeOver18
+	return comparisonPredName(op)
+}
+
+// negatedPredName handles `!u.Active` -> `NotActive`.
+func negatedPredName(op ast.Expr) (string, bool) {
+	unary, ok := op.(*ast.UnaryExpr)
+	if !ok || unary.Op != token.NOT {
+		return "", false
+	}
+	inner := operandPredName(unary.X)
+	if inner == "" {
+		return "", false
+	}
+	return "Not" + inner, true
+}
+
+// comparisonPredName handles `u.Age > 18` -> `AgeOver18`.
+func comparisonPredName(op ast.Expr) string {
 	field, opStr, base, value := specOperandParts(op, nil)
 	if field == "" {
 		return ""
 	}
 	_ = base
+	if name, ok := emptyNilName(field, opStr, value); ok {
+		return name
+	}
 	return capitalize(field) + cmpWord(opStr) + sanitizeLiteral(value)
+}
+
+// emptyNilName returns a natural name for empty/nil comparisons:
+// `s == ""` -> `SEmpty`, `s != ""` -> `SNotEmpty`, `p == nil` -> `PNil`.
+func emptyNilName(field, opStr, value string) (string, bool) {
+	suffixes := map[string]map[string]string{
+		`""`:  {"==": "Empty", "!=": "NotEmpty"},
+		"nil": {"==": "Nil", "!=": "NotNil"},
+	}
+	if ops, ok := suffixes[value]; ok {
+		if suffix, ok := ops[opStr]; ok {
+			return capitalize(field) + suffix, true
+		}
+	}
+	return "", false
 }
 
 // cmpWord maps a comparison operator to a name fragment.
