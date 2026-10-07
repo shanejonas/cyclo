@@ -1,0 +1,111 @@
+// Package patterncheck is the IO boundary for cyclo's patterns miner: it
+// proposes latent shared abstractions (interfaces, params structs, generics)
+// found by structural mining. It is informational only: it always exits 0 on
+// success and never feeds the quality gate. Pattern facts live apart from
+// quality facts and are never passed to quality.Evaluate.
+package patterncheck
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"io"
+	"slices"
+	"strings"
+
+	"github.com/shanejonas/cyclo/adapters/gopatterns"
+	"github.com/shanejonas/cyclo/domain/patterns"
+)
+
+const usage = `Usage: cyclo patterns [OPTIONS] [DIRECTORIES OR GO FILES...]
+
+Mine the codebase for latent shared abstractions: structurally parallel
+functions that suggest interfaces, params structs, or generics.
+Informational only: always exits 0, never a quality gate.
+  --format FORMAT   text (default) or json
+  --threshold N     minimum WL similarity (0-1000) for clustering [default 600]
+
+Exit 0: always, on success (even with no candidates). Exit 2: extraction or
+analysis failure.
+`
+
+type options struct {
+	format    string
+	threshold uint
+	paths     []string
+}
+
+// Run extracts PDGs for paths, mines them for abstraction candidates, and
+// writes the report. It returns nil on success regardless of how many (or
+// how few) candidates the miner finds; only extraction, analysis, or IO
+// failures are errors.
+func Run(ctx context.Context, args []string, output io.Writer) error {
+	opts, err := parseOptions(args)
+	if err != nil {
+		return err
+	}
+	pdgs, err := gopatterns.Extract(ctx, "", opts.paths)
+	if err != nil {
+		return err
+	}
+	params := patterns.DefaultParams()
+	params.ThresholdMilli = uint32(opts.threshold)
+	report := patterns.Run(toFacts(pdgs), patterns.Options{Params: params})
+	if opts.format == "json" {
+		out, err := patterns.JSON(&report)
+		if err != nil {
+			return err
+		}
+		_, err = io.WriteString(output, out+"\n")
+		return err
+	}
+	_, err = io.WriteString(output, patterns.Text(&report)+"\n")
+	return err
+}
+
+// toFacts converts extracted PDGs to miner facts. The signature key derives
+// from the parameter type classes, so functions with the same shape of
+// signature block together in sigmine.
+func toFacts(pdgs []gopatterns.FuncPdg) []*patterns.FuncFacts {
+	facts := make([]*patterns.FuncFacts, 0, len(pdgs))
+	for _, fp := range pdgs {
+		var params []string
+		for _, node := range fp.Pdg.Nodes {
+			if node.Kind == patterns.Param {
+				params = append(params, node.TyClass)
+			}
+		}
+		fp := fp
+		facts = append(facts, &patterns.FuncFacts{
+			ID:     fp.Name,
+			Name:   fp.Name,
+			Path:   fp.Path,
+			Line:   fp.Line,
+			Pdg:    &fp.Pdg,
+			SigKey: "fn(" + strings.Join(params, ",") + ")",
+		})
+	}
+	return facts
+}
+
+func parseOptions(args []string) (options, error) {
+	flags := flag.NewFlagSet("patterns", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	format := flags.String("format", "text", "output format")
+	threshold := flags.Uint("threshold", 600, "minimum WL similarity (0-1000)")
+	if err := flags.Parse(args); err != nil {
+		return options{}, err
+	}
+	result := options{format: *format, threshold: *threshold, paths: flags.Args()}
+	return result, result.validate()
+}
+
+func (opts options) validate() error {
+	if !slices.Contains([]string{"text", "json"}, opts.format) {
+		return fmt.Errorf("format must be text or json")
+	}
+	if opts.threshold > 1000 {
+		return fmt.Errorf("threshold must be between 0 and 1000")
+	}
+	return nil
+}
