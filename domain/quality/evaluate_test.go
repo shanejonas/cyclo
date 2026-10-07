@@ -255,7 +255,7 @@ func TestSuppressionsRequireReasonAndKnownRules(t *testing.T) {
 func TestDeterminismDeduplicationAndInputImmutability(t *testing.T) {
 	a, b := fact("a", 10), fact("b", 1)
 	a.Params, b.Params = 8, 9
-	a.Effects = []Effect{{IO, "late", 12}, {Time, "early", 11}}
+	a.Effects = []Effect{{Kind: IO, Detail: "late", Line: 12}, {Kind: Time, Detail: "early", Line: 11}}
 	facts := []Function{a, b, a}
 	before, _ := json.Marshal(facts)
 	first, err := Evaluate(facts, DefaultConfig())

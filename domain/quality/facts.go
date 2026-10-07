@@ -76,6 +76,10 @@ type Effect struct {
 	Kind   Kind   `json:"kind"`
 	Detail string `json:"detail"`
 	Line   int    `json:"line"`
+	// Via names the immediate local helper an inherited effect arrived
+	// through, so a density finding shows which helper makes the
+	// function hot. Direct effects leave it empty.
+	Via string `json:"via,omitempty"`
 }
 
 type Diagnostic struct {

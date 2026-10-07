@@ -206,7 +206,8 @@
         {
           "kind": "mutation",
           "detail": "example.com/sample.Box.Bump → b.Count",
-          "line": 50
+          "line": 50,
+          "via": "sample.Box.Bump"
         }
       ]
     },

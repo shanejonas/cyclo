@@ -251,7 +251,7 @@ func mutationEffects(mutations []Mutation) []Effect {
 		if mutation.FieldPath != "" {
 			label += "." + mutation.FieldPath
 		}
-		effects = append(effects, Effect{kind, label, mutation.Line})
+		effects = append(effects, Effect{Kind: kind, Detail: label, Line: mutation.Line})
 	}
 	return effects
 }
