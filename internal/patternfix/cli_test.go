@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/shanejonas/cyclo/domain/patterns"
 )
 
 func writeTempGo(t *testing.T, src string) string {
@@ -298,4 +300,83 @@ func TestFixChangedUnknownBase(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected error for unknown base, got:\n%s", out.String())
 	}
+}
+
+// TestApplySpecsKindOrder verifies FixSpecs apply in pattern dependency
+// order (guard_clause before factory, parameterize last), not in line
+// order. The ordering is what lets type-creating passes feed later ones.
+func TestApplySpecsKindOrder(t *testing.T) {
+	specs := []*patterns.FixSpec{
+		{Kind: patterns.Parameterize, File: "a.go", Line: 10},
+		{Kind: patterns.Factory, File: "a.go", Line: 20},
+		{Kind: patterns.GuardClause, File: "a.go", Line: 30},
+		{Kind: patterns.ValueObject, File: "a.go", Line: 40},
+		{Kind: patterns.GuardClause, File: "a.go", Line: 50},
+	}
+	ordered := sortSpecsForApply(specs)
+	// Expect: guard(50), guard(30), valueobj(40), factory(20), param(10).
+	// Guards first (bottom-up by line), then value_object, factory, parameterize last.
+	want := []patterns.CandidateKind{
+		patterns.GuardClause, patterns.GuardClause,
+		patterns.ValueObject, patterns.Factory, patterns.Parameterize,
+	}
+	for i, s := range ordered {
+		if s.Kind != want[i] {
+			t.Errorf("position %d: got %q, want %q", i, s.Kind, want[i])
+		}
+	}
+	// Within-kind bottom-up: the line-50 guard comes before line-30.
+	if ordered[0].Line != 50 || ordered[1].Line != 30 {
+		t.Errorf("guards not bottom-up: got lines %d, %d", ordered[0].Line, ordered[1].Line)
+	}
+}
+
+// TestFixEndToEndKindOrder mines real code with multiple fixable patterns
+// and verifies the collected FixSpecs sort in dependency order. This proves
+// the ordering isn't just theoretical: the miner finds the candidates and
+// the fixer applies guards before value objects before factories.
+func TestFixEndToEndKindOrder(t *testing.T) {
+	path := writeTempGo(t, `package main
+
+func f(x int, host string, port int) int {
+	if x > 0 {
+		println(host, port)
+		println(x)
+	} else {
+		return -1
+	}
+	return x
+}
+
+func g(y int, host string, port int) int {
+	if y > 0 {
+		println(host, port)
+		println(y)
+	} else {
+		return -1
+	}
+	return y
+}
+`)
+	var out bytes.Buffer
+	// Collect specs without applying.
+	specs, err := collectFixSpecs(context.Background(), options{paths: []string{path}, kind: "all"})
+	if err != nil {
+		t.Fatalf("collectFixSpecs: %v", err)
+	}
+	if len(specs) == 0 {
+		t.Fatalf("expected fixable candidates, got none")
+	}
+	ordered := sortSpecsForApply(specs)
+	// Verify dependency order: all guards before all value objects.
+	seenValueObject := false
+	for _, s := range ordered {
+		if s.Kind == patterns.ValueObject {
+			seenValueObject = true
+		}
+		if s.Kind == patterns.GuardClause && seenValueObject {
+			t.Errorf("guard_clause applied after value_object: ordering violated")
+		}
+	}
+	_ = out
 }

@@ -101,6 +101,57 @@ const (
 	Factory CandidateKind = "factory"
 )
 
+// FixKindOrder defines the order in which pattern fixes are applied when
+// multiple kinds run together. Earlier kinds run first; later kinds see
+// the modified source.
+//
+// The ordering is deliberate:
+//  1. guard_clause simplifies control flow (less nesting), giving every
+//     later fixer a cleaner AST to work with.
+//  2. primitive_obsession creates named types from raw primitives, so
+//     later bundling sees domain types instead of strings and ints.
+//  3. value_object bundles co-occurring params into types, so factories
+//     built afterwards take fewer, more meaningful params.
+//  4. factory extracts constructors; it runs after the type-creating
+//     passes so it can use the new types.
+//  5. The independent semantic fixes (entity identity, anemic models,
+//     switches, interfaces, generics) run in the middle: they don't
+//     depend on the type-creation passes and nothing depends on them.
+//  6. parameterize runs last: it's PDG-based clone detection, the most
+//     sensitive to code shape, so it sees the final structure.
+var FixKindOrder = []CandidateKind{
+	GuardClause,
+	PrimitiveObsession,
+	ValueObject,
+	Factory,
+	MissingIdentity,
+	EntityIdentity,
+	AnemicModel,
+	TypeSwitch,
+	EnumDispatch,
+	TraitMethod,
+	CapabilitySet,
+	GenericFn,
+	Parameterize,
+	// Detection-only kinds never produce FixSpecs; they sort last.
+	// Listed explicitly so the miner and fixer agree on the full order.
+	MutableIdentity,
+	Aggregate,
+	Repository,
+}
+
+// FixKindRank returns the application-order rank for a pattern kind.
+// Lower runs first. Kinds not in FixKindOrder (including detection-only
+// kinds, which never produce FixSpecs) sort last.
+func FixKindRank(k CandidateKind) int {
+	for i, kind := range FixKindOrder {
+		if kind == k {
+			return i
+		}
+	}
+	return len(FixKindOrder)
+}
+
 // Site is one function that shows the pattern.
 type Site struct {
 	Path string

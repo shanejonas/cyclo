@@ -27,6 +27,11 @@ const factoryScoreMilli = 450
 // factory. Must match the extractor's threshold.
 const factoryMinFields = 5
 
+// factoryMaxFields caps the struct field count: a factory with more params
+// would violate the fn_params quality gate, so don't propose it. With the
+// min at 5 this keeps the pattern dormant until param bundling is designed.
+const factoryMaxFields = 4
+
 // aggregateCandidates finds pairs of struct types mutated together in 2+
 // functions. Such types likely belong under one aggregate root.
 func aggregateCandidates(facts []*FuncFacts) []Candidate {
@@ -218,9 +223,14 @@ func groupFactoryLits(facts []*FuncFacts) (map[factoryTypeKey]map[string]bool, m
 }
 
 // factoryHitQualifies reports whether a factory hit has the field count
-// and construction logic to warrant a factory.
+// and construction logic to warrant a factory. Structs with more than 4
+// fields are skipped: the factory would need more than 4 params, violating
+// the fn_params quality gate.
 func factoryHitQualifies(h FactoryHit) bool {
-	return h.TypeName != "" && h.NumFields >= factoryMinFields && h.HasLogic
+	return h.TypeName != "" &&
+		h.NumFields >= factoryMinFields &&
+		h.NumFields <= factoryMaxFields &&
+		h.HasLogic
 }
 
 // factoryCandidate builds the fixable candidate for a struct type.

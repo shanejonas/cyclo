@@ -99,7 +99,10 @@ func TestRepositoryCandidatesNoneSkipped(t *testing.T) {
 	}
 }
 
-func TestFactoryCandidates(t *testing.T) {
+func TestFactoryCandidatesOverFieldCapSkipped(t *testing.T) {
+	// 6 fields with logic in 2 functions would previously qualify, but the
+	// factory would need 6 params, violating the fn_params quality gate.
+	// The pattern stays dormant until param bundling is designed.
 	facts := []*FuncFacts{
 		{
 			ID:   "pkg.a",
@@ -120,22 +123,8 @@ func TestFactoryCandidates(t *testing.T) {
 			},
 		},
 	}
-	cands := factoryCandidates(facts)
-	if len(cands) != 1 {
-		t.Fatalf("got %d candidates, want 1", len(cands))
-	}
-	c := cands[0]
-	if c.Kind != Factory {
-		t.Errorf("kind = %q, want factory", c.Kind)
-	}
-	if c.FixSpec == nil {
-		t.Fatal("FixSpec should not be nil")
-	}
-	if c.FixSpec.Params["type"] != "Config" {
-		t.Errorf("type = %q, want Config", c.FixSpec.Params["type"])
-	}
-	if c.FixSpec.File != "config.go" {
-		t.Errorf("file = %q, want config.go", c.FixSpec.File)
+	if cands := factoryCandidates(facts); len(cands) != 0 {
+		t.Errorf("got %d candidates, want 0 (over fn_params cap)", len(cands))
 	}
 }
 

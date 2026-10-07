@@ -181,13 +181,14 @@ func fixFileWithSpecs(path string, specs []*patterns.FixSpec, opts options, outp
 	return showDiff(path, src, out, applied, output)
 }
 
-// applySpecsToSource applies each spec, skipping failures. Specs run
-// bottom-up (highest line first) so an edit never shifts the line numbers
-// of specs that have not run yet.
+// applySpecsToSource applies each spec, skipping failures. Specs run in
+// pattern dependency order (see patterns.FixKindOrder): guard clauses
+// first to simplify control flow, type-creating passes next, parameterize
+// last since it's the most sensitive to code shape. Within a kind, specs
+// run bottom-up (highest line first) so an edit never shifts the line
+// numbers of specs that have not run yet.
 func applySpecsToSource(path string, specs []*patterns.FixSpec, src []byte) ([]byte, int) {
-	ordered := make([]*patterns.FixSpec, len(specs))
-	copy(ordered, specs)
-	slices.SortFunc(ordered, func(a, b *patterns.FixSpec) int { return b.Line - a.Line })
+	ordered := sortSpecsForApply(specs)
 	out := src
 	var applied int
 	for _, spec := range ordered {
@@ -202,6 +203,20 @@ func applySpecsToSource(path string, specs []*patterns.FixSpec, src []byte) ([]b
 		}
 	}
 	return out, applied
+}
+
+// sortSpecsForApply orders specs by pattern dependency rank, then bottom-up
+// by line within a kind.
+func sortSpecsForApply(specs []*patterns.FixSpec) []*patterns.FixSpec {
+	ordered := make([]*patterns.FixSpec, len(specs))
+	copy(ordered, specs)
+	slices.SortFunc(ordered, func(a, b *patterns.FixSpec) int {
+		if ra, rb := patterns.FixKindRank(a.Kind), patterns.FixKindRank(b.Kind); ra != rb {
+			return ra - rb
+		}
+		return b.Line - a.Line
+	})
+	return ordered
 }
 
 // writeFixed writes the fixed source and reports.

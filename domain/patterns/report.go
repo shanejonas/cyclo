@@ -89,25 +89,35 @@ func Run(facts []*FuncFacts, options Options) PatternsReport {
 	return report
 }
 
+// singleFunctionBuilder pairs a pattern kind with its candidate builder.
+type singleFunctionBuilder struct {
+	kind  CandidateKind
+	build func(prepared []*FuncFacts, options Options) []Candidate
+}
+
+// singleFunctionBuilders runs in FixKindOrder so detection respects
+// dependencies: guards simplify control flow first, primitive types are
+// created before value objects bundle them, factories run after the
+// type-creating passes. Detection-only kinds sort last.
+var singleFunctionBuilders = []singleFunctionBuilder{
+	{GuardClause, func(prepared []*FuncFacts, options Options) []Candidate { return guardCandidates(prepared) }},
+	{PrimitiveObsession, func(prepared []*FuncFacts, options Options) []Candidate { return primitiveObsessionCandidates(prepared) }},
+	{ValueObject, func(prepared []*FuncFacts, options Options) []Candidate { return valueObjectCandidates(prepared) }},
+	{Factory, func(prepared []*FuncFacts, options Options) []Candidate { return factoryCandidates(prepared) }},
+	{MissingIdentity, func(prepared []*FuncFacts, options Options) []Candidate { return missingIdentityCandidates(options.MissingIdentities) }},
+	{EntityIdentity, func(prepared []*FuncFacts, options Options) []Candidate { return entityIdentityCandidates(prepared) }},
+	{AnemicModel, func(prepared []*FuncFacts, options Options) []Candidate { return anemicModelCandidates(options.AnemicModels) }},
+	{MutableIdentity, func(prepared []*FuncFacts, options Options) []Candidate { return mutableIdentityCandidates(prepared) }},
+	{Aggregate, func(prepared []*FuncFacts, options Options) []Candidate { return aggregateCandidates(prepared) }},
+	{Repository, func(prepared []*FuncFacts, options Options) []Candidate { return repositoryCandidates(prepared) }},
+}
+
 // addSingleFunctionCandidates appends fixed-score candidates that need no
-// clustering: guard clauses, value objects, anemic models, primitive
-// obsession, and entity identity patterns.
+// clustering. Builders run in FixKindOrder (see singleFunctionBuilders)
+// so detection respects pattern dependencies.
 func addSingleFunctionCandidates(mined *Mined, prepared []*FuncFacts, options Options) {
-	// Each builder returns candidates; empty means none found.
-	builders := []func() []Candidate{
-		func() []Candidate { return guardCandidates(prepared) },
-		func() []Candidate { return valueObjectCandidates(prepared) },
-		func() []Candidate { return anemicModelCandidates(options.AnemicModels) },
-		func() []Candidate { return primitiveObsessionCandidates(prepared) },
-		func() []Candidate { return entityIdentityCandidates(prepared) },
-		func() []Candidate { return missingIdentityCandidates(options.MissingIdentities) },
-		func() []Candidate { return mutableIdentityCandidates(prepared) },
-		func() []Candidate { return aggregateCandidates(prepared) },
-		func() []Candidate { return repositoryCandidates(prepared) },
-		func() []Candidate { return factoryCandidates(prepared) },
-	}
-	for _, build := range builders {
-		if cands := build(); len(cands) > 0 {
+	for _, b := range singleFunctionBuilders {
+		if cands := b.build(prepared, options); len(cands) > 0 {
 			mined.Candidates = append(mined.Candidates, cands...)
 			sortMined(mined)
 		}
