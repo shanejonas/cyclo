@@ -76,3 +76,7 @@ handles, required state, commands, and observable proof.
   narrowing findings to git-touched functions.
 - [Bug reducer](./bug-reducer.md) covers minimizing a reproducer with the
   checker contract and script-friendly output.
+- [Pattern mining](./patterns.md) covers `cyclo patterns`: the 18 pattern
+  kinds, detection-only kinds, and the miner's suppression rules.
+- [Pattern autofix](./fix.md) covers `cyclo fix`: dry-run vs `--apply`,
+  `--kind`, `--phased`, `--changed`, and idempotency.
