@@ -125,16 +125,13 @@ func TestFixPrimitiveObsessionKeepsTypeDeclTogether(t *testing.T) {
 	// `Name string`. The declaration must stay together.
 	src := `package p
 
-import "strings"
-
 // ParseCalendar turns a feed into event drafts.
 // Second line of docs.
-func findProp(name string) string {
-	_ = strings.TrimSpace("x")
-	return name
+func findProp(name string) bool {
+	return name != ""
 }
-func findOther(name string) string {
-	return name
+func findOther(name string) bool {
+	return name == "x"
 }
 `
 	fset := token.NewFileSet()
@@ -156,5 +153,57 @@ func findOther(name string) string {
 	funcIdx := strings.Index(s, "func findProp")
 	if !(typeIdx < docIdx && docIdx < funcIdx) {
 		t.Errorf("doc comment misplaced, got:\n%s", s)
+	}
+}
+
+func TestFixPrimitiveObsessionSkipsUnsafeBodies(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+	}{
+		// string field == named param would not compile.
+		{"typed comparison", "type P struct{ name string }\nfunc f(p P, name string) bool { return p.name == name }\nfunc g(p P, name string) bool { return p.name == name }"},
+		// Result type stays string.
+		{"return", "func f(name string) string { return name }\nfunc g(name string) string { return name }"},
+		// h takes a plain string; the fixer only rewrites group calls.
+		{"plain call", "func h(s string) {}\nfunc f(name string) { h(name) }\nfunc g(name string) { h(name) }"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			src := "package p\n\n" + tc.body + "\n"
+			fset := token.NewFileSet()
+			f, err := parser.ParseFile(fset, "test.go", src, parser.ParseComments)
+			if err != nil {
+				t.Fatalf("parse: %v", err)
+			}
+			_, fixes, err := FixPrimitiveObsession(fset, f, []byte(src))
+			if err != nil {
+				t.Fatalf("fix: %v", err)
+			}
+			if len(fixes) != 0 {
+				t.Errorf("expected 0 fixes for unsafe body (%s), got %d", tc.name, len(fixes))
+			}
+		})
+	}
+}
+
+func TestFixPrimitiveObsessionAllowsConstComparison(t *testing.T) {
+	// Untyped constants are assignable to the named type: safe.
+	src := `package p
+
+func f(name string) bool { return name == "x" }
+func g(name string) bool { return name != "" }
+`
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, "test.go", src, parser.ParseComments)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	_, fixes, err := FixPrimitiveObsession(fset, f, []byte(src))
+	if err != nil {
+		t.Fatalf("fix: %v", err)
+	}
+	if len(fixes) != 1 {
+		t.Errorf("expected 1 fix for constant comparisons, got %d", len(fixes))
 	}
 }
