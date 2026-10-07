@@ -49,8 +49,9 @@ func TestMissingIdentityCandidates(t *testing.T) {
 	if c.Kind != MissingIdentity {
 		t.Errorf("kind = %q, want missing_identity", c.Kind)
 	}
-	if c.FixSpec == nil {
-		t.Fatal("FixSpec should not be nil")
+	// Detection-only first gate: the entity_identity fixer does the work.
+	if c.FixSpec != nil {
+		t.Error("FixSpec should be nil (detection-only first gate)")
 	}
 }
 

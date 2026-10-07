@@ -112,6 +112,11 @@ type EntityIdentityHit struct {
 	Fields   []string
 	Left     string
 	Right    string
+	// StructPath and StructLine locate the struct definition, for the
+	// no-ID case where the fixer must add the ID field first.
+	// Empty when the ID already exists.
+	StructPath string
+	StructLine int
 }
 
 // MutableIdentityHit is one ID assignment outside a constructor.

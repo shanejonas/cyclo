@@ -62,9 +62,10 @@ func Run(ctx context.Context, args []string, output io.Writer) error {
 	}
 	defer saveCache()
 	report := patterns.Run(toFacts(pdgs.Funcs), patterns.Options{
-		Params:       params,
-		AnemicModels: pdgs.AnemicModels,
-		WlCache:      cache,
+		Params:           params,
+		AnemicModels:     pdgs.AnemicModels,
+		MissingIdentities: pdgs.MissingIdentities,
+		WlCache:          cache,
 	})
 	if opts.format == "json" {
 		out, err := patterns.JSON(&report)
