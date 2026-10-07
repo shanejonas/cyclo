@@ -118,7 +118,32 @@ func applyInterfaceFix(spec *patterns.FixSpec, src []byte) ([]byte, error) {
 		return nil, fmt.Errorf("interface fixer: no methods found")
 	}
 	ifaceName := interfaceNameFor(spec.Kind)
-	return insertAfterImports(fset, f, src, buildInterface(ifaceName, spec.Kind, methods)), nil
+	if declaresType(f, ifaceName) {
+		// Idempotent: a previous fix already generated this interface.
+		// Returning src unchanged keeps re-runs (and --phased re-mining)
+		// from redeclaring it.
+		return src, nil
+	}
+	out := insertAfterImports(fset, f, src, buildInterface(ifaceName, spec.Kind, methods))
+	formatted, err := format.Source(out)
+	if err != nil {
+		return nil, fmt.Errorf("interface fixer: format generated code: %w", err)
+	}
+	return formatted, nil
+}
+
+// declaresType reports whether the file already declares a type with the
+// given name.
+func declaresType(f *ast.File, name string) bool {
+	found := false
+	ast.Inspect(f, func(n ast.Node) bool {
+		if ts, ok := n.(*ast.TypeSpec); ok && ts.Name.Name == name {
+			found = true
+			return false
+		}
+		return true
+	})
+	return found
 }
 
 // collectMethodSigs extracts unique method signatures from definitions.
@@ -136,6 +161,8 @@ func collectMethodSigs(fset *token.FileSet, f *ast.File, defs []string, src []by
 
 // methodSigFromDef parses a "path:line:name" definition and returns the
 // method signature, or "" if it can't be found or was already seen.
+// Definitions carry qualified names ("pkg.Type.method"); the AST lookup
+// needs the bare method name, so the qualifier is stripped.
 func methodSigFromDef(fset *token.FileSet, f *ast.File, def string, src []byte, seen map[string]bool) string {
 	parts := strings.SplitN(def, ":", 3)
 	if len(parts) != 3 {
@@ -146,6 +173,9 @@ func methodSigFromDef(fset *token.FileSet, f *ast.File, def string, src []byte, 
 		return ""
 	}
 	name := parts[2]
+	if i := strings.LastIndex(name, "."); i >= 0 {
+		name = name[i+1:]
+	}
 	if seen[name] {
 		return ""
 	}

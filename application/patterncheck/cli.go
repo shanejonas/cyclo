@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"slices"
-	"strings"
 
 	"github.com/shanejonas/cyclo/adapters/gopatterns"
 	"github.com/shanejonas/cyclo/domain/patterns"
@@ -109,12 +108,6 @@ func toFacts(pdgs []gopatterns.FuncPdg) []*patterns.FuncFacts {
 
 // funcFactsOf converts one extracted function to miner facts.
 func funcFactsOf(fp gopatterns.FuncPdg) *patterns.FuncFacts {
-	var params []string
-	for _, node := range fp.Pdg.Nodes {
-		if node.Kind == patterns.Param {
-			params = append(params, node.TyClass)
-		}
-	}
 	return &patterns.FuncFacts{
 		ID:                fp.Name,
 		Name:              fp.Name,
@@ -122,7 +115,8 @@ func funcFactsOf(fp gopatterns.FuncPdg) *patterns.FuncFacts {
 		Line:              fp.Line,
 		EndLine:           fp.EndLine,
 		Pdg:               &fp.Pdg,
-		SigKey:            "fn(" + strings.Join(params, ",") + ")",
+		SigKey:            gopatterns.SigKeyOf(fp),
+		SelfTy:            fp.SelfTy,
 		GuardClauses:      guardHits(fp.GuardClauses),
 		EnumDispatches:    dispatchHits(fp.EnumDispatches),
 		TypeSwitches:      typeSwitchHits(fp.TypeSwitches),

@@ -76,3 +76,18 @@ func TestPatternsReportsGuardClauses(t *testing.T) {
 		t.Fatalf("proper guard clause parseOther must not be flagged, got:\n%s", text)
 	}
 }
+
+func TestPatternsFindsTraitMethod(t *testing.T) {
+	t.Chdir("testdata/traitmethod")
+	var output strings.Builder
+	if err := Run(context.Background(), []string{"."}, &output); err != nil {
+		t.Fatalf("patterns must exit 0, got error: %v", err)
+	}
+	text := output.String()
+	if !strings.Contains(text, "trait_method") {
+		t.Fatalf("expected a trait_method candidate from the parallel Dog/Cat methods, got:\n%s", text)
+	}
+	if !strings.Contains(text, "sound") {
+		t.Fatalf("expected the sound method hole in the candidate, got:\n%s", text)
+	}
+}

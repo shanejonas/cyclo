@@ -1,39 +1,39 @@
 {
   "version": 1,
-  "generated_at": "2026-10-07T16:49:37Z",
-  "commit": "de771b6",
-  "functions": 1718,
+  "generated_at": "2026-10-07T17:45:58Z",
+  "commit": "8137b54",
+  "functions": 1740,
   "tolerance": 0.05,
   "rules": {
     "aggregate": {
       "limit": 1,
       "excess": 11,
-      "per_1000_functions": 6.40279394644936
+      "per_1000_functions": 6.32183908045977
     },
     "fn_length": {
       "limit": 50,
-      "excess": 12,
-      "per_1000_functions": 6.984866123399302
+      "excess": 6,
+      "per_1000_functions": 3.4482758620689653
     },
     "fn_params": {
       "limit": 4,
-      "excess": 28,
-      "per_1000_functions": 16.298020954598368
+      "excess": 30,
+      "per_1000_functions": 17.241379310344826
     },
     "mutated_targets": {
       "limit": 3,
-      "excess": 24,
-      "per_1000_functions": 13.969732246798603
+      "excess": 22,
+      "per_1000_functions": 12.64367816091954
     },
     "mutation_per_target": {
       "limit": 3,
-      "excess": 117,
-      "per_1000_functions": 68.10244470314319
+      "excess": 116,
+      "per_1000_functions": 66.66666666666667
     },
     "side_effect_density": {
       "limit": 500,
-      "excess": 5034391,
-      "per_1000_functions": 2930378.9289871943
+      "excess": 5014132,
+      "per_1000_functions": 2881685.057471264
     }
   }
 }

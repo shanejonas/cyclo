@@ -599,38 +599,6 @@ func toFacts(ext *gopatterns.Extraction) ([]*patterns.FuncFacts, []patterns.Anem
 	var facts []*patterns.FuncFacts
 	for _, fp := range ext.Funcs {
 		fp := fp
-		var guards []patterns.GuardClauseHit
-		for _, g := range fp.GuardClauses {
-			guards = append(guards, patterns.GuardClauseHit{
-				Line:      g.Line,
-				BodyStmts: g.BodyStmts,
-			})
-		}
-		var dispatches []patterns.EnumDispatchHit
-		for _, d := range fp.EnumDispatches {
-			dispatches = append(dispatches, patterns.EnumDispatchHit{
-				Line:     d.Line,
-				NumCases: d.NumCases,
-			})
-		}
-		var tss []patterns.TypeSwitchHit
-		for _, t := range fp.TypeSwitches {
-			tss = append(tss, patterns.TypeSwitchHit{
-				Line:   t.Line,
-				Bound:  t.Bound,
-				Expr:   t.Expr,
-				Method: t.Method,
-				Types:  t.Types,
-				Args:   t.Args,
-			})
-		}
-		var params []patterns.ParamInfo
-		for _, p := range fp.Params {
-			params = append(params, patterns.ParamInfo{
-				Name: p.Name,
-				Type: p.Type,
-			})
-		}
 		facts = append(facts, &patterns.FuncFacts{
 			ID:               fp.Name,
 			Name:             fp.Name,
@@ -638,17 +606,54 @@ func toFacts(ext *gopatterns.Extraction) ([]*patterns.FuncFacts, []patterns.Anem
 			Line:             fp.Line,
 			EndLine:          fp.EndLine,
 			Pdg:              &fp.Pdg,
-			GuardClauses:     guards,
-			EnumDispatches:   dispatches,
-			TypeSwitches:     tss,
+			SigKey:           gopatterns.SigKeyOf(fp),
+			SelfTy:           fp.SelfTy,
+			GuardClauses:     guardHits(fp.GuardClauses),
+			EnumDispatches:   dispatchHits(fp.EnumDispatches),
+			TypeSwitches:     typeSwitchHits(fp.TypeSwitches),
 			EntityIdentities: fp.EntityIdentities,
 			MutableIdentities: fp.MutableIdentities,
 			AggregateMods:    fp.AggregateMods,
 			DbCalls:          fp.DbCalls,
 			FactoryLits:      fp.FactoryLits,
 			SpecRules:        fp.SpecRules,
-			Params:           params,
+			Params:           paramInfos(fp.Params),
 		})
 	}
 	return facts, ext.AnemicModels, ext.MissingIdentities, ext.DomainServices
+}
+
+func guardHits(hits []gopatterns.GuardClauseHit) []patterns.GuardClauseHit {
+	var out []patterns.GuardClauseHit
+	for _, h := range hits {
+		out = append(out, patterns.GuardClauseHit{Line: h.Line, BodyStmts: h.BodyStmts})
+	}
+	return out
+}
+
+func dispatchHits(hits []gopatterns.EnumDispatchHit) []patterns.EnumDispatchHit {
+	var out []patterns.EnumDispatchHit
+	for _, h := range hits {
+		out = append(out, patterns.EnumDispatchHit{Line: h.Line, NumCases: h.NumCases})
+	}
+	return out
+}
+
+func typeSwitchHits(hits []gopatterns.TypeSwitchHit) []patterns.TypeSwitchHit {
+	var out []patterns.TypeSwitchHit
+	for _, h := range hits {
+		out = append(out, patterns.TypeSwitchHit{
+			Line: h.Line, Bound: h.Bound, Expr: h.Expr,
+			Method: h.Method, Types: h.Types, Args: h.Args,
+		})
+	}
+	return out
+}
+
+func paramInfos(params []patterns.ParamInfo) []patterns.ParamInfo {
+	var out []patterns.ParamInfo
+	for _, p := range params {
+		out = append(out, patterns.ParamInfo{Name: p.Name, Type: p.Type})
+	}
+	return out
 }

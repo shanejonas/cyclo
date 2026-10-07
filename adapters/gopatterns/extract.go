@@ -31,6 +31,10 @@ type FuncPdg struct {
 	// EndLine is the function's closing line.
 	EndLine int
 	Pdg     patterns.Pdg
+	// SelfTy is the receiver's named type for methods ("pkg.Type"), empty
+	// for free functions. The miner needs it: signature groups require two
+	// or more distinct self types, and facts without SelfTy are skipped.
+	SelfTy string
 	// GuardClauses are inverted conditionals in this function that want
 	// to be guard clauses (AST-level finding, not PDG-derived).
 	GuardClauses []GuardClauseHit
@@ -207,10 +211,27 @@ func patternInput(root, input string) (string, error) {
 	return "file=" + abs, nil
 }
 
+// SigKeyOf returns the normalized signature key for signature mining:
+// "fn(" + parameter type classes + ")". Functions with the same shape of
+// signature block together in sigmine; the receiver counts as a parameter
+// but normalizes away for user-defined types, so methods on different
+// types can still group.
+func SigKeyOf(fp FuncPdg) string {
+	var params []string
+	for _, node := range fp.Pdg.Nodes {
+		if node.Kind == patterns.Param {
+			params = append(params, node.TyClass)
+		}
+	}
+	return "fn(" + strings.Join(params, ",") + ")"
+}
+
 func extractFunc(pkg *packages.Package, fn *ast.FuncDecl, path string, ctx extractCtx) FuncPdg {
 	name := fn.Name.Name
+	selfTy := ""
 	if object, ok := pkg.TypesInfo.Defs[fn.Name].(*types.Func); ok {
 		name = patterns.FuncID(object)
+		selfTy = patterns.ReceiverType(object)
 	}
 	pos := pkg.Fset.PositionFor(fn.Pos(), false)
 	end := pkg.Fset.PositionFor(fn.End(), false)
@@ -222,11 +243,12 @@ func extractFunc(pkg *packages.Package, fn *ast.FuncDecl, path string, ctx extra
 	b.params(fn)
 	b.stmt(fn.Body)
 	return FuncPdg{
-		Name:         name,
-		Path:         path,
-		Line:         pos.Line,
-		EndLine:      end.Line,
-		Pdg:          patterns.Pdg{Nodes: b.nodes, Edges: b.edges},
+		Name:           name,
+		Path:           path,
+		Line:           pos.Line,
+		EndLine:        end.Line,
+		Pdg:            patterns.Pdg{Nodes: b.nodes, Edges: b.edges},
+		SelfTy:         selfTy,
 		GuardClauses:   findGuardClauses(fn, pkg.Fset),
 		EnumDispatches: findEnumDispatches(fn, pkg.Fset),
 		TypeSwitches:   findTypeSwitches(fn, pkg.Fset),
