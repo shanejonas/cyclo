@@ -19,7 +19,7 @@ import (
 // minCloneNodes and maxCloneNodes bound the subgraph enumeration.
 // Smaller = more candidates but noisier; larger = fewer but more meaningful.
 const (
-	minCloneNodes = 8
+	minCloneNodes = 10
 	maxCloneNodes = 12
 	// maxSubgraphsPerFunc caps enumeration to prevent combinatorial explosion
 	// on large functions. The BFS can generate exponentially many connected
