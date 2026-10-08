@@ -30,7 +30,10 @@ type FuncPdg struct {
 	Line int
 	// EndLine is the function's closing line.
 	EndLine int
-	Pdg     patterns.Pdg
+	// SuppressedKinds are pattern kinds suppressed via //lint:ignore or
+	// // cyclo-allow on this function.
+	SuppressedKinds []string
+	Pdg             patterns.Pdg
 	// SelfTy is the receiver's named type for methods ("pkg.Type"), empty
 	// for free functions. The miner needs it: signature groups require two
 	// or more distinct self types, and facts without SelfTy are skipped.
@@ -61,6 +64,12 @@ type FuncPdg struct {
 	FactoryLits []patterns.FactoryHit
 	// SpecRules are boolean business-rule expressions (2+ conditions).
 	SpecRules []patterns.SpecificationHit
+	// NilErrHits are `if err != nil { return nil }` sites (gostaticanalysis).
+	NilErrHits []patterns.NilErrHit
+	// ForceTypeAssertHits are unchecked `x.(T)` (gostaticanalysis).
+	ForceTypeAssertHits []patterns.ForceTypeAssertHit
+	// TypedNilHits are typed-nil comparisons (gostaticanalysis).
+	TypedNilHits []patterns.TypedNilHit
 }
 
 // Extraction is the full result of package analysis: per-function PDGs
@@ -243,12 +252,13 @@ func extractFunc(pkg *packages.Package, fn *ast.FuncDecl, path string, ctx extra
 	b.params(fn)
 	b.stmt(fn.Body)
 	return FuncPdg{
-		Name:           name,
-		Path:           path,
-		Line:           pos.Line,
-		EndLine:        end.Line,
-		Pdg:            patterns.Pdg{Nodes: b.nodes, Edges: b.edges},
-		SelfTy:         selfTy,
+		Name:            name,
+		Path:            path,
+		Line:            pos.Line,
+		EndLine:         end.Line,
+		SuppressedKinds: findSuppressedKinds(fn),
+		Pdg:             patterns.Pdg{Nodes: b.nodes, Edges: b.edges},
+		SelfTy:          selfTy,
 		GuardClauses:   findGuardClauses(fn, pkg.Fset),
 		EnumDispatches: findEnumDispatches(fn, pkg.Fset),
 		TypeSwitches:   findTypeSwitches(fn, pkg.Fset),
@@ -275,6 +285,12 @@ func extractFunc(pkg *packages.Package, fn *ast.FuncDecl, path string, ctx extra
 		FactoryLits: findFactoryLits(fn, pkg.Fset, pkg.TypesInfo, pkg.Types),
 		// SpecRules are boolean business-rule expressions (2+ conditions).
 		SpecRules: findSpecificationHits(fn, pkg.Fset, pkg.TypesInfo),
+		// NilErrHits are `if err != nil { return nil }` (gostaticanalysis).
+		NilErrHits: findNilErrHits(fn, pkg.Fset, pkg.TypesInfo),
+		// ForceTypeAssertHits are unchecked `x.(T)` (gostaticanalysis).
+		ForceTypeAssertHits: findForceTypeAssertHits(fn, pkg.Fset, pkg.TypesInfo),
+		// TypedNilHits are typed-nil comparisons (gostaticanalysis).
+		TypedNilHits: findTypedNilHits(fn, pkg.Fset, pkg.TypesInfo),
 	}
 }
 

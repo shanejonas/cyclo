@@ -126,6 +126,10 @@ func funcFactsOf(fp gopatterns.FuncPdg) *patterns.FuncFacts {
 		DbCalls:           fp.DbCalls,
 		FactoryLits:       fp.FactoryLits,
 		SpecRules:         fp.SpecRules,
+		NilErrHits:        fp.NilErrHits,
+		ForceTypeAssertHits: fp.ForceTypeAssertHits,
+		TypedNilHits:       fp.TypedNilHits,
+		SuppressedKinds:   fp.SuppressedKinds,
 		Params:            fp.Params,
 	}
 }

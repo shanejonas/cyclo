@@ -22,6 +22,9 @@ type FuncFacts struct {
 	Line int
 	// EndLine is the function's closing line.
 	EndLine int
+	// SuppressedKinds are pattern kinds suppressed via //lint:ignore or
+	// // cyclo-allow on this function.
+	SuppressedKinds []string
 	// Pdg is the function's program dependence graph. Nil means the body
 	// was not extracted (filtered out of mining, like rstyle's pdg: None).
 	Pdg *Pdg
@@ -66,6 +69,12 @@ type FuncFacts struct {
 	// &&/||) in this function. Rules repeated across functions want a
 	// Specification type (Evans).
 	SpecRules []SpecificationHit
+	// NilErrHits are `if err != nil { return nil }` sites (gostaticanalysis).
+	NilErrHits []NilErrHit
+	// ForceTypeAssertHits are unchecked `x.(T)` assertions (gostaticanalysis).
+	ForceTypeAssertHits []ForceTypeAssertHit
+	// TypedNilHits are typed-nil vs untyped-nil comparisons (gostaticanalysis).
+	TypedNilHits []TypedNilHit
 	// Params are the function's primitive-typed parameters (name and type).
 	// Used for data-clump detection (value object proposals). Empty when the
 	// function has no primitive params or params were not extracted.
