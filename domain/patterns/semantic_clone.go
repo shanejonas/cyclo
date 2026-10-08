@@ -438,7 +438,7 @@ func SemanticCloneCandidates(groups [][]Subgraph, facts []*FuncFacts) []Candidat
 	sort.Slice(bestByPair, func(i, j int) bool {
 		return len(bestByPair[i][0].Nodes) > len(bestByPair[j][0].Nodes)
 	})
-	const maxCandidates = 20
+	const maxCandidates = 10
 	if len(bestByPair) > maxCandidates {
 		bestByPair = bestByPair[:maxCandidates]
 	}
