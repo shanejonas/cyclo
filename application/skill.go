@@ -114,6 +114,8 @@ Use ` + "`cyclo fix --phased --apply [paths...]`" + ` when fixes interact: it mi
 
 **Workflow:** Run ` + "`cyclo patterns`" + ` first, then ` + "`cyclo fix --apply`" + ` to clear the mechanical issues. This saves tokens — don't hand-rewrite what the fixer handles. In an agent loop, use ` + "`cyclo fix --changed --apply`" + ` to fix only candidates in functions your diff touched (against ` + "`--base REF`" + `, defaulting to the merge-base with main/master).
 
+**One at a time:** ` + "`cyclo next [paths...]`" + ` shows the single highest-impact candidate with fix instructions — the one thing to fix now. ` + "`cyclo score [paths...]`" + ` gives a 0-100 north-star (100 = clean, weighted by severity). Suppressed items show separately, so you can't suppress your way to 100.
+
 ## Check quality guardrails (needs your judgment)
 
 Run ` + "`cyclo check --format json [paths...]`" + ` for typed Go mutation and side-effect diagnostics without a TUI. Directories scan packages recursively; Go file arguments report only those files after loading their enclosing packages. Run from the repository root. Use ` + "`--config PATH`" + ` for TOML policy, ` + "`--tests`" + ` to include tests, and ` + "`--tags TAGS`" + ` for build tags. Use ` + "`--changed`" + ` to report only findings in functions the git diff touches (against ` + "`--base REF`" + `, defaulting to the merge-base with main/master), so an agent loop can gate on what its own edits introduced; untracked files count as fully changed.
