@@ -133,6 +133,12 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 		violations := FindViolations(sets, rules)
 		return MinedRuleCandidates(violations, prepared)
 	}},
+	{DeviantBehavior, func(prepared []*FuncFacts, options Options) []Candidate {
+		// TODO: populate ErrorCheckSites from the extractor.
+		// The mining logic is tested; the site extraction needs
+		// per-call error-check tracking in gopatterns.
+		return nil
+	}},
 }
 
 // addSingleFunctionCandidates appends fixed-score candidates that need no

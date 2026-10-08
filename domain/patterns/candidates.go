@@ -135,6 +135,10 @@ const (
 	// repo, functions that call `lock` also call `unlock`". A function that
 	// calls `lock` but not `unlock` is a bug. Detection-only.
 	MinedRule CandidateKind = "mined_rule"
+	// DeviantBehavior flags call sites that deviate from the codebase's
+	// own beliefs about error handling (Engler et al., SOSP 2001). If 95%
+	// of callers check an error, the 5% that don't are bugs. Detection-only.
+	DeviantBehavior CandidateKind = "deviant_behavior"
 	// DomainService identifies a free function operating on two or more
 	// domain types without belonging to any of them. Per Evans, such
 	// stateless coordination is a Domain Service, not misplaced behavior:
