@@ -139,6 +139,10 @@ const (
 	// own beliefs about error handling (Engler et al., SOSP 2001). If 95%
 	// of callers check an error, the 5% that don't are bugs. Detection-only.
 	DeviantBehavior CandidateKind = "deviant_behavior"
+	// InconsistentClone flags clones with asymmetric bugs (CP-Miner, Li et
+	// al. OSDI 2004). If one copy has a nilerr bug and its siblings don't,
+	// the edit was inconsistent. Detection-only.
+	InconsistentClone CandidateKind = "inconsistent_clone"
 	// DomainService identifies a free function operating on two or more
 	// domain types without belonging to any of them. Per Evans, such
 	// stateless coordination is a Domain Service, not misplaced behavior:

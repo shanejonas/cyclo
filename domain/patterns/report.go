@@ -139,6 +139,11 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 		// per-call error-check tracking in gopatterns.
 		return nil
 	}},
+	{InconsistentClone, func(prepared []*FuncFacts, options Options) []Candidate {
+		groups := FindSemanticClones(prepared)
+		edits := FindInconsistentEdits(groups, prepared)
+		return InconsistentCloneCandidates(edits, prepared)
+	}},
 }
 
 // addSingleFunctionCandidates appends fixed-score candidates that need no
