@@ -20,17 +20,85 @@ func findNilErrHits(fn *ast.FuncDecl, fset *token.FileSet, info *types.Info) []p
 	if fn.Body == nil {
 		return out
 	}
+	errPos := errorResultPosition(fn, info)
 	ast.Inspect(fn.Body, func(n ast.Node) bool {
 		ifStmt, ok := n.(*ast.IfStmt)
 		if !ok {
 			return true
 		}
-		if hit := checkNilErrIf(ifStmt, fset, info); hit != nil {
+		if hit := checkNilErrIf(ifStmt, fset, info, errPos); hit != nil {
 			out = append(out, *hit)
 		}
 		return true
 	})
 	return out
+}
+
+// errorResultPosition returns the index of the error-typed result in the
+// function's signature, or -1 if there is none. For `return nil, err` in a
+// `(T, error)` function, position 1 is the error — the nil at position 0
+// is the value, not a swallowed error.
+func errorResultPosition(fn *ast.FuncDecl, info *types.Info) int {
+	if fn.Type == nil || fn.Type.Results == nil {
+		return -1
+	}
+	if pos := errorPosFromTypes(fn, info); pos >= 0 {
+		return pos
+	}
+	return errorPosFromAST(fn)
+}
+
+// errorPosFromTypes resolves the error position via types.Info.
+func errorPosFromTypes(fn *ast.FuncDecl, info *types.Info) int {
+	if info == nil {
+		return -1
+	}
+	sig, ok := info.TypeOf(fn.Name).(*types.Signature)
+	if !ok {
+		return -1
+	}
+	results := sig.Results()
+	for i := 0; i < results.Len(); i++ {
+		if isNilErrErrorType(results.At(i).Type()) {
+			return i
+		}
+	}
+	return -1
+}
+
+// errorPosFromAST falls back to inspecting AST result types for `error`.
+func errorPosFromAST(fn *ast.FuncDecl) int {
+	pos := 0
+	for _, field := range fn.Type.Results.List {
+		count := len(field.Names)
+		if count == 0 {
+			count = 1
+		}
+		if isErrorASTType(field.Type) {
+			return pos
+		}
+		pos += count
+	}
+	return -1
+}
+
+// isNilErrErrorType reports whether t is the error interface type.
+func isNilErrErrorType(t types.Type) bool {
+	if t == nil {
+		return false
+	}
+	iface, ok := t.Underlying().(*types.Interface)
+	if !ok {
+		return false
+	}
+	// error is the interface with exactly the Error() string method.
+	return iface.NumMethods() == 1 && iface.Method(0).Name() == "Error"
+}
+
+// isErrorASTType reports whether the AST type expression is `error`.
+func isErrorASTType(e ast.Expr) bool {
+	ident, ok := e.(*ast.Ident)
+	return ok && ident.Name == "error"
 }
 
 // nilErrCheck holds the parsed `if err != nil` / `if err == nil` condition.
@@ -40,7 +108,7 @@ type nilErrCheck struct {
 }
 
 // checkNilErrIf checks one if statement for the nilerr pattern.
-func checkNilErrIf(ifStmt *ast.IfStmt, fset *token.FileSet, info *types.Info) *patterns.NilErrHit {
+func checkNilErrIf(ifStmt *ast.IfStmt, fset *token.FileSet, info *types.Info, errPos int) *patterns.NilErrHit {
 	check := parseNilErrCond(ifStmt.Cond, info)
 	if check == nil {
 		return nil
@@ -54,14 +122,14 @@ func checkNilErrIf(ifStmt *ast.IfStmt, fset *token.FileSet, info *types.Info) *p
 		return nil
 	}
 	if check.isNotNil {
-		return checkNotNilReturn(ifStmt, fset, ret, branch, check, info)
+		return checkNotNilReturn(ifStmt, fset, ret, branch, check, info, errPos)
 	}
-	return checkNilReturn(ifStmt, fset, ret, check, info)
+	return checkNilReturn(ifStmt, fset, ret, check, info, errPos)
 }
 
 // checkNotNilReturn checks `if err != nil { return nil }`.
-func checkNotNilReturn(ifStmt *ast.IfStmt, fset *token.FileSet, ret *ast.ReturnStmt, branch ast.Stmt, check *nilErrCheck, info *types.Info) *patterns.NilErrHit {
-	if returnsNilError(ret, info) && !usesErrorValue(branch, check.errVal, info) {
+func checkNotNilReturn(ifStmt *ast.IfStmt, fset *token.FileSet, ret *ast.ReturnStmt, branch ast.Stmt, check *nilErrCheck, info *types.Info, errPos int) *patterns.NilErrHit {
+	if returnsNilError(ret, errPos) && !usesErrorValue(branch, check.errVal, info) {
 		return &patterns.NilErrHit{
 			Line:     fset.Position(ifStmt.Pos()).Line,
 			CondText: condText(fset, ifStmt.Cond),
@@ -72,8 +140,8 @@ func checkNotNilReturn(ifStmt *ast.IfStmt, fset *token.FileSet, ret *ast.ReturnS
 }
 
 // checkNilReturn checks `if err == nil { return err }`.
-func checkNilReturn(ifStmt *ast.IfStmt, fset *token.FileSet, ret *ast.ReturnStmt, check *nilErrCheck, info *types.Info) *patterns.NilErrHit {
-	if returnsErrValue(ret, check.errVal, info) {
+func checkNilReturn(ifStmt *ast.IfStmt, fset *token.FileSet, ret *ast.ReturnStmt, check *nilErrCheck, info *types.Info, errPos int) *patterns.NilErrHit {
+	if returnsErrValueAt(ret, check.errVal, errPos, info) {
 		return &patterns.NilErrHit{
 			Line:     fset.Position(ifStmt.Pos()).Line,
 			CondText: condText(fset, ifStmt.Cond),
@@ -152,31 +220,24 @@ func findReturnInBranch(branch ast.Stmt) *ast.ReturnStmt {
 	return ret
 }
 
-// returnsNilError reports whether ret returns nil for an error result.
-func returnsNilError(ret *ast.ReturnStmt, info *types.Info) bool {
-	for _, res := range ret.Results {
-		if isNilIdent(res) && isErrorExpr(info, res) {
-			return true
-		}
-		// Also check if it's a nil constant for error type.
-		if isNilIdent(res) {
-			// The result is nil; if the function returns error, this is it.
-			// We check the type via info if available.
-			return true
-		}
+// returnsNilError reports whether ret returns nil at the error result
+// position. errPos is the index of the error-typed result (-1 if none).
+// For `return nil, err` in a `(T, error)` function, the nil is at position 0
+// (the value), not the error — so this returns false.
+func returnsNilError(ret *ast.ReturnStmt, errPos int) bool {
+	if errPos < 0 || errPos >= len(ret.Results) {
+		return false
 	}
-	return false
+	return isNilIdent(ret.Results[errPos])
 }
 
-// returnsErrValue reports whether ret returns the errVal.
-func returnsErrValue(ret *ast.ReturnStmt, errVal ast.Expr, info *types.Info) bool {
-	errName := exprName(errVal)
-	for _, res := range ret.Results {
-		if exprName(res) == errName {
-			return true
-		}
+// returnsErrValueAt reports whether ret returns the errVal at the error
+// result position.
+func returnsErrValueAt(ret *ast.ReturnStmt, errVal ast.Expr, errPos int, info *types.Info) bool {
+	if errPos < 0 || errPos >= len(ret.Results) {
+		return false
 	}
-	return false
+	return exprName(ret.Results[errPos]) == exprName(errVal)
 }
 
 // usesErrorValue reports whether the error value is used in the branch
