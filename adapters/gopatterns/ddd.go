@@ -665,7 +665,16 @@ func specNamedType(t types.Type) string {
 		return ""
 	}
 	if named, ok := derefNamed(t); ok {
-		return named.Obj().Name()
+		obj := named.Obj()
+		// Include the package qualifier for non-local types:
+		// "apidomain.AgentArgs", not just "AgentArgs".
+		if pkg := obj.Pkg(); pkg != nil && pkg.Name() != "" {
+			// Only qualify if it's not the current package. We can't know
+			// the current package here, so always qualify; the fixer
+			// strips it back for local types via baseTypeName.
+			return pkg.Name() + "." + obj.Name()
+		}
+		return obj.Name()
 	}
 	return ""
 }

@@ -167,3 +167,56 @@ func TestSpecificationDistinctThresholds(t *testing.T) {
 		t.Errorf("keys should not be empty: %q, %q", key1, key2)
 	}
 }
+
+func TestPredicateNameEmptyString(t *testing.T) {
+	// `token.AccessToken == "" || token.Error != ""` should not produce IsIs.
+	parse := func(s string) ast.Expr {
+		e, err := parser.ParseExpr(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return e
+	}
+	name := predicateName(parse(`token.AccessToken == "" || token.Error != ""`))
+	if name != "IsAccessTokenEmptyOrErrorNotEmpty" {
+		t.Errorf("got %q, want IsAccessTokenEmptyOrErrorNotEmpty", name)
+	}
+}
+
+func TestApplySpecificationFixSkipsUnqualifiedExternal(t *testing.T) {
+	// Type without qualifier and not declared locally: skip, don't emit broken code.
+	src := `package test
+
+func check1(r Response) bool {
+	if r.StatusCode < 200 || r.StatusCode >= 300 {
+		return true
+	}
+	return false
+}
+
+func check2(r Response) bool {
+	if r.StatusCode < 200 || r.StatusCode >= 300 {
+		return true
+	}
+	return false
+}
+`
+	spec := &patterns.FixSpec{
+		Kind: patterns.Specification,
+		File: "test.go",
+		Line: 5,
+		Params: map[string]string{
+			"type":    "Response",
+			"varname": "r",
+			"rulekey": "Response|StatusCode:<:200,StatusCode:>=:300",
+		},
+	}
+	out, err := ApplyFix(spec, []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Should be unchanged: no qualifier means we can't generate a safe signature.
+	if string(out) != src {
+		t.Errorf("should skip unqualified external type, got:\n%s", string(out))
+	}
+}
