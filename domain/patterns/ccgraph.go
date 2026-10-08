@@ -1,6 +1,10 @@
 package patterns
 
-import "sort"
+import (
+	"fmt"
+	"sort"
+	"strings"
+)
 
 // CCGraph-style clone detection (Zou et al., ASE 2020) with LSH scaling.
 //
@@ -289,4 +293,70 @@ func commonPrefixLen(s1, s2 string, max int) int {
 		out++
 	}
 	return out
+}
+
+// CCGraphCloneCandidates converts CCGraph clone groups (function ID lists)
+// into pattern candidates for the report pipeline.
+func CCGraphCloneCandidates(groups [][]string, facts []*FuncFacts) []Candidate {
+	factByID := buildFactMap(facts)
+	var out []Candidate
+	for _, group := range groups {
+		if c, ok := makeCCGraphCandidate(group, factByID); ok {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// makeCCGraphCandidate builds one candidate from a clone group. Groups with
+// fewer than two resolvable sites are dropped.
+func makeCCGraphCandidate(group []string, factByID map[string]*FuncFacts) (Candidate, bool) {
+	var sites []Site
+	for _, id := range group {
+		f := factByID[id]
+		if f == nil {
+			continue
+		}
+		sites = append(sites, Site{
+			Path: f.Path,
+			Line: f.Line,
+			Name: f.Name,
+		})
+	}
+	if len(sites) < 2 {
+		return Candidate{}, false
+	}
+	return Candidate{
+		Kind:             CCGraphClone,
+		ScoreMilli:       750,
+		Observation:      ccObservation(sites),
+		Inference:        "these functions have similar PDGs and similar names: they likely implement the same logic",
+		PossibleRefactor: "review the group; extract a shared helper if the logic is truly duplicated",
+		Sites:            sites,
+	}, true
+}
+
+// ccObservation describes a CCGraph clone group for the report.
+func ccObservation(sites []Site) string {
+	names := make([]string, 0, len(sites))
+	for _, s := range sites {
+		names = append(names, s.Name)
+	}
+	sort.Strings(names)
+	return fmt.Sprintf("CCGraph found %d similar functions: %s", len(sites), strings.Join(names, ", "))
+}
+
+// ccGraphInputs builds the PDG and name maps CCGraphClones needs from facts.
+// Functions without a PDG are skipped.
+func ccGraphInputs(facts []*FuncFacts) (map[string]*Pdg, map[string]string) {
+	pdgs := make(map[string]*Pdg, len(facts))
+	names := make(map[string]string, len(facts))
+	for _, f := range facts {
+		if f == nil || f.Pdg == nil {
+			continue
+		}
+		pdgs[f.ID] = f.Pdg
+		names[f.ID] = f.Name
+	}
+	return pdgs, names
 }

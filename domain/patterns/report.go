@@ -152,6 +152,11 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 		edits := FindInconsistentEdits(groups, prepared)
 		return InconsistentCloneCandidates(edits, prepared)
 	}},
+	{CCGraphClone, func(prepared []*FuncFacts, options Options) []Candidate {
+		pdgs, names := ccGraphInputs(prepared)
+		groups := CCGraphClones(pdgs, names)
+		return CCGraphCloneCandidates(groups, prepared)
+	}},
 }
 
 // addSingleFunctionCandidates appends fixed-score candidates that need no
