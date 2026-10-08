@@ -16,7 +16,15 @@ import (
 // The template + substitutions can reconstruct both originals, and any
 // other common generalization is less specific.
 func AntiUnify(a, b ast.Node) (template ast.Node, subs []Substitution) {
-	au := &antiUnifier{subs: []Substitution{}}
+	return AntiUnifyWithRenames(a, b, nil)
+}
+
+// AntiUnifyWithRenames is AntiUnify with an optional variable rename map.
+// renames maps identifiers in `a` to their counterparts in `b`; renamed
+// identifiers are treated as identical, not as holes. This is used by the
+// parameterize fixer, which normalizes local variable names before diffing.
+func AntiUnifyWithRenames(a, b ast.Node, renames map[string]string) (template ast.Node, subs []Substitution) {
+	au := &antiUnifier{subs: []Substitution{}, renames: renames}
 	tmpl := au.unify(a, b)
 	return tmpl, au.subs
 }
@@ -33,6 +41,9 @@ type Substitution struct {
 
 type antiUnifier struct {
 	subs []Substitution
+	// renames maps identifiers in `a` to their counterparts in `b`.
+	// Nil means no renames.
+	renames map[string]string
 }
 
 func (au *antiUnifier) freshHole(a, b ast.Node) *ast.Ident {
@@ -89,6 +100,15 @@ func (au *antiUnifier) unifyDispatchComplex(a ast.Node, b ast.Node) ast.Node {
 
 // unifyDispatchStmt handles statement node types.
 func (au *antiUnifier) unifyDispatchStmt(a ast.Node, b ast.Node) ast.Node {
+	// Split dispatch to keep complexity under ceiling.
+	if tmpl := au.unifyStmtCommon(a, b); tmpl != nil {
+		return tmpl
+	}
+	return au.unifyStmtUncommon(a, b)
+}
+
+// unifyStmtCommon handles the most frequent statement types.
+func (au *antiUnifier) unifyStmtCommon(a ast.Node, b ast.Node) ast.Node {
 	switch at := a.(type) {
 	case *ast.ExprStmt:
 		return au.unifyExprStmt(at, b)
@@ -102,12 +122,162 @@ func (au *antiUnifier) unifyDispatchStmt(a ast.Node, b ast.Node) ast.Node {
 	return nil
 }
 
+// unifyStmtUncommon handles less frequent statement types.
+func (au *antiUnifier) unifyStmtUncommon(a ast.Node, b ast.Node) ast.Node {
+	switch at := a.(type) {
+	case *ast.DeclStmt:
+		return au.unifyDeclStmt(at, b)
+	case *ast.ForStmt:
+		return au.unifyForStmt(at, b)
+	case *ast.IncDecStmt:
+		return au.unifyIncDecStmt(at, b)
+	}
+	return nil
+}
+
+// unifyIncDecStmt handles `i++` / `i--`.
+func (au *antiUnifier) unifyIncDecStmt(at *ast.IncDecStmt, b ast.Node) ast.Node {
+	bt, ok := b.(*ast.IncDecStmt)
+	if !ok {
+		return nil
+	}
+	if at.Tok != bt.Tok {
+		return au.freshHole(at, b)
+	}
+	x := au.unifyExpr(at.X, bt.X)
+	return &ast.IncDecStmt{X: x, Tok: at.Tok}
+}
+
+// unifyForStmt handles `for` loops. Unifies init, cond, post, and body.
+func (au *antiUnifier) unifyForStmt(at *ast.ForStmt, b ast.Node) ast.Node {
+	bt, ok := b.(*ast.ForStmt)
+	if !ok {
+		return nil
+	}
+	parts := au.unifyForParts(at, bt)
+	if parts == nil {
+		return au.freshHole(at, b)
+	}
+	return &ast.ForStmt{Init: parts.init, Cond: parts.cond, Post: parts.post, Body: parts.body}
+}
+
+type forParts struct {
+	init ast.Stmt
+	cond ast.Expr
+	post ast.Stmt
+	body *ast.BlockStmt
+}
+
+// unifyForParts unifies the components of two for loops.
+// Returns nil if they can't be unified.
+func (au *antiUnifier) unifyForParts(at, bt *ast.ForStmt) *forParts {
+	init := au.unifyStmt(at.Init, bt.Init)
+	if init == nil && at.Init != nil {
+		return nil
+	}
+	post := au.unifyStmt(at.Post, bt.Post)
+	if post == nil && at.Post != nil {
+		return nil
+	}
+	body := au.unifyBlock(at.Body, bt.Body)
+	if body == nil {
+		return nil
+	}
+	return &forParts{
+		init: init,
+		cond: au.unifyExpr(at.Cond, bt.Cond),
+		post: post,
+		body: body,
+	}
+}
+
+// unifyDeclStmt handles `var x T` declarations. If the declarations are
+// structurally identical (same names and types), they're identical;
+// otherwise it's a hole.
+func (au *antiUnifier) unifyDeclStmt(at *ast.DeclStmt, b ast.Node) ast.Node {
+	bt, ok := b.(*ast.DeclStmt)
+	if !ok {
+		return nil
+	}
+	// For simplicity: if both are GenDecl with identical structure, keep it.
+	// A full implementation would unify the ValueSpecs.
+	if declsEqual(at, bt) {
+		return at
+	}
+	return au.freshHole(at, b)
+}
+
+// declsEqual reports whether two DeclStmts are structurally identical.
+// For parameterize, we only need the common case: `var x T` with the same
+// names and types. Uses a simple syntactic check.
+func declsEqual(a, b *ast.DeclStmt) bool {
+	ag, okA := a.Decl.(*ast.GenDecl)
+	bg, okB := b.Decl.(*ast.GenDecl)
+	if !okA || !okB {
+		return false
+	}
+	return genDeclsEqual(ag, bg)
+}
+
+// genDeclsEqual compares two GenDecls.
+func genDeclsEqual(ag, bg *ast.GenDecl) bool {
+	if ag.Tok != bg.Tok || len(ag.Specs) != len(bg.Specs) {
+		return false
+	}
+	for i := range ag.Specs {
+		if !valueSpecsEqual(ag.Specs[i], bg.Specs[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// valueSpecsEqual compares two Specs (must be ValueSpecs).
+func valueSpecsEqual(a, b ast.Spec) bool {
+	as, okA := a.(*ast.ValueSpec)
+	bs, okB := b.(*ast.ValueSpec)
+	if !okA || !okB {
+		return false
+	}
+	return namesEqual(as.Names, bs.Names) && typesEqual(as.Type, bs.Type)
+}
+
+// namesEqual compares identifier lists.
+func namesEqual(a, b []*ast.Ident) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i].Name != b[i].Name {
+			return false
+		}
+	}
+	return true
+}
+
+// typesEqual compares type expressions (nil-safe, Ident-only).
+func typesEqual(a, b ast.Expr) bool {
+	if (a == nil) != (b == nil) {
+		return false
+	}
+	if a == nil {
+		return true
+	}
+	at, okA := a.(*ast.Ident)
+	bt, okB := b.(*ast.Ident)
+	return okA && okB && at.Name == bt.Name
+}
+
 func (au *antiUnifier) unifyIdent(at *ast.Ident, b ast.Node) ast.Node {
 	bt, ok := b.(*ast.Ident)
 	if !ok {
 		return nil
 	}
 	if at.Name == bt.Name {
+		return &ast.Ident{Name: at.Name}
+	}
+	// Check renames: if at.Name maps to bt.Name, they're the same variable.
+	if au.renames != nil && au.renames[at.Name] == bt.Name {
 		return &ast.Ident{Name: at.Name}
 	}
 	return au.freshHole(at, b)
