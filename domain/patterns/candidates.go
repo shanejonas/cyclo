@@ -125,6 +125,11 @@ const (
 	// fragments are meaningful computations, ideal extract-function
 	// candidates. Uses WL-hash bucketing to avoid NP-hard isomorphism.
 	SemanticClone CandidateKind = "semantic_clone"
+	// DependenceCluster flags functions whose PDG contains a large
+	// strongly-connected region — "everything affects everything"
+	// spaghetti that resists testing. Following Binkley & Harman.
+	// Detection-only: the fix is human judgment (break the cycle).
+	DependenceCluster CandidateKind = "dependence_cluster"
 	// DomainService identifies a free function operating on two or more
 	// domain types without belonging to any of them. Per Evans, such
 	// stateless coordination is a Domain Service, not misplaced behavior:

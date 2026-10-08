@@ -123,6 +123,10 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 		groups := FindSemanticClones(prepared)
 		return SemanticCloneCandidates(groups, prepared)
 	}},
+	{DependenceCluster, func(prepared []*FuncFacts, options Options) []Candidate {
+		clusters := FindDepClusters(prepared)
+		return DepClusterCandidates(clusters, prepared)
+	}},
 }
 
 // addSingleFunctionCandidates appends fixed-score candidates that need no
