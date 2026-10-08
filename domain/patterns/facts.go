@@ -66,6 +66,12 @@ type FuncFacts struct {
 	// &&/||) in this function. Rules repeated across functions want a
 	// Specification type (Evans).
 	SpecRules []SpecificationHit
+	// NilErrHits are `if err != nil { return nil }` sites (gostaticanalysis).
+	NilErrHits []NilErrHit
+	// ForceTypeAssertHits are unchecked `x.(T)` assertions (gostaticanalysis).
+	ForceTypeAssertHits []ForceTypeAssertHit
+	// TypedNilHits are typed-nil vs untyped-nil comparisons (gostaticanalysis).
+	TypedNilHits []TypedNilHit
 	// Params are the function's primitive-typed parameters (name and type).
 	// Used for data-clump detection (value object proposals). Empty when the
 	// function has no primitive params or params were not extracted.

@@ -61,6 +61,12 @@ type FuncPdg struct {
 	FactoryLits []patterns.FactoryHit
 	// SpecRules are boolean business-rule expressions (2+ conditions).
 	SpecRules []patterns.SpecificationHit
+	// NilErrHits are `if err != nil { return nil }` sites (gostaticanalysis).
+	NilErrHits []patterns.NilErrHit
+	// ForceTypeAssertHits are unchecked `x.(T)` (gostaticanalysis).
+	ForceTypeAssertHits []patterns.ForceTypeAssertHit
+	// TypedNilHits are typed-nil comparisons (gostaticanalysis).
+	TypedNilHits []patterns.TypedNilHit
 }
 
 // Extraction is the full result of package analysis: per-function PDGs
@@ -275,6 +281,12 @@ func extractFunc(pkg *packages.Package, fn *ast.FuncDecl, path string, ctx extra
 		FactoryLits: findFactoryLits(fn, pkg.Fset, pkg.TypesInfo, pkg.Types),
 		// SpecRules are boolean business-rule expressions (2+ conditions).
 		SpecRules: findSpecificationHits(fn, pkg.Fset, pkg.TypesInfo),
+		// NilErrHits are `if err != nil { return nil }` (gostaticanalysis).
+		NilErrHits: findNilErrHits(fn, pkg.Fset, pkg.TypesInfo),
+		// ForceTypeAssertHits are unchecked `x.(T)` (gostaticanalysis).
+		ForceTypeAssertHits: findForceTypeAssertHits(fn, pkg.Fset, pkg.TypesInfo),
+		// TypedNilHits are typed-nil comparisons (gostaticanalysis).
+		TypedNilHits: findTypedNilHits(fn, pkg.Fset, pkg.TypesInfo),
 	}
 }
 

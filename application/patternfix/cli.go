@@ -617,6 +617,9 @@ func toFacts(ext *gopatterns.Extraction) ([]*patterns.FuncFacts, []patterns.Anem
 			DbCalls:          fp.DbCalls,
 			FactoryLits:      fp.FactoryLits,
 			SpecRules:        fp.SpecRules,
+			NilErrHits:       fp.NilErrHits,
+			ForceTypeAssertHits: fp.ForceTypeAssertHits,
+			TypedNilHits:       fp.TypedNilHits,
 			Params:           paramInfos(fp.Params),
 		})
 	}

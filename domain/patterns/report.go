@@ -116,6 +116,9 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 	{MutableIdentity, func(prepared []*FuncFacts, options Options) []Candidate { return mutableIdentityCandidates(prepared) }},
 	{Aggregate, func(prepared []*FuncFacts, options Options) []Candidate { return aggregateCandidates(prepared) }},
 	{Repository, func(prepared []*FuncFacts, options Options) []Candidate { return repositoryCandidates(prepared) }},
+	{NilErr, func(prepared []*FuncFacts, options Options) []Candidate { return nilErrCandidates(prepared) }},
+	{ForceTypeAssert, func(prepared []*FuncFacts, options Options) []Candidate { return forceTypeAssertCandidates(prepared) }},
+	{TypedNil, func(prepared []*FuncFacts, options Options) []Candidate { return typedNilCandidates(prepared) }},
 }
 
 // addSingleFunctionCandidates appends fixed-score candidates that need no

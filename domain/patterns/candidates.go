@@ -105,6 +105,20 @@ const (
 	// a method on the type when local, a function otherwise. Idiomatic Go;
 	// the Evans struct is not used. DDD-inspired; the transform is mechanical.
 	Specification CandidateKind = "specification"
+	// NilErr flags `if err != nil { return nil }`: the error was checked
+	// but swallowed by returning nil. Also the inverse: `if err == nil`
+	// returning err. Ported from gostaticanalysis/nilerr. Detection-only:
+	// the fix depends on intent (return err? wrap it?).
+	NilErr CandidateKind = "nilerr"
+	// ForceTypeAssert flags unchecked `x.(T)` type assertions that panic
+	// on mismatch. The fix is the comma-ok form. Ported from
+	// gostaticanalysis/forcetypeassert. Detection-only: the fix needs
+	// judgment about what to do on failure.
+	ForceTypeAssert CandidateKind = "forcetypeassert"
+	// TypedNil flags comparisons between typed nil and untyped nil, e.g.
+	// an error interface holding (*T)(nil) compared to nil — always false.
+	// Ported from gostaticanalysis/typednil. Detection-only.
+	TypedNil CandidateKind = "typednil"
 	// DomainService identifies a free function operating on two or more
 	// domain types without belonging to any of them. Per Evans, such
 	// stateless coordination is a Domain Service, not misplaced behavior:
@@ -155,6 +169,9 @@ var FixKindOrder = []CandidateKind{
 	MutableIdentity,
 	Aggregate,
 	Repository,
+	NilErr,
+	ForceTypeAssert,
+	TypedNil,
 }
 
 // FixKindRank returns the application-order rank for a pattern kind.
