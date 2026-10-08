@@ -66,28 +66,33 @@ func (w *errorCheckWalker) visitCall(call *ast.CallExpr) {
 }
 
 // isChecked determines if the error from a call was checked.
-// Returns false if assigned to `_`, true otherwise (heuristic).
+// Returns false if assigned to `_` or result ignored, true otherwise.
 func (w *errorCheckWalker) isChecked(call *ast.CallExpr) bool {
 	if len(w.stack) < 2 {
 		return true
 	}
 	parent := w.stack[len(w.stack)-2]
-	// Check if parent is an assignment to `_`.
-	if assign, ok := parent.(*ast.AssignStmt); ok {
-		// Find which result corresponds to the error.
-		// For simplicity: if any LHS is `_`, and the call returns error,
-		// assume the error was discarded.
-		for _, lhs := range assign.Lhs {
-			if ident, ok := lhs.(*ast.Ident); ok && ident.Name == "_" {
-				return false
-			}
-		}
-	}
-	// Check if parent is an ExprStmt (result ignored): `f()` without assignment.
-	if _, ok := parent.(*ast.ExprStmt); ok {
+	if isBlankAssignment(parent) {
 		return false
 	}
+	if _, ok := parent.(*ast.ExprStmt); ok {
+		return false // Result ignored: `f()` without assignment.
+	}
 	return true
+}
+
+// isBlankAssignment checks if a node is an assignment with `_` on the LHS.
+func isBlankAssignment(n ast.Node) bool {
+	assign, ok := n.(*ast.AssignStmt)
+	if !ok {
+		return false
+	}
+	for _, lhs := range assign.Lhs {
+		if ident, ok := lhs.(*ast.Ident); ok && ident.Name == "_" {
+			return true
+		}
+	}
+	return false
 }
 
 // calleeName extracts the called function name from a call expression.

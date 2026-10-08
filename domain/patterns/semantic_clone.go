@@ -136,28 +136,30 @@ func buildAdjMatrix(pdg *Pdg) [][]bool {
 
 func backtrack(idx, n int, mapping []int, used []bool, a, b *Pdg, adjA, adjB [][]bool) bool {
 	if idx == n {
-		return true // Found a valid mapping.
+		return true
 	}
-	// Try each unused node in B for node idx in A.
 	for j := 0; j < n; j++ {
-		if used[j] {
-			continue
-		}
-		// Check node labels match.
-		if !nodesMatch(a.Nodes[idx], b.Nodes[j]) {
-			continue
-		}
-		// Check edge consistency with already-mapped nodes.
-		if !edgesConsistent(idx, j, mapping, adjA, adjB) {
-			continue
-		}
-		mapping[idx] = j
-		used[j] = true
-		if backtrack(idx+1, n, mapping, used, a, b, adjA, adjB) {
+		if tryMap(idx, j, n, mapping, used, a, b, adjA, adjB) {
 			return true
 		}
-		used[j] = false
 	}
+	return false
+}
+
+// tryMap attempts to map node idx in A to node j in B.
+func tryMap(idx, j, n int, mapping []int, used []bool, a, b *Pdg, adjA, adjB [][]bool) bool {
+	if used[j] || !nodesMatch(a.Nodes[idx], b.Nodes[j]) {
+		return false
+	}
+	if !edgesConsistent(idx, j, mapping, adjA, adjB) {
+		return false
+	}
+	mapping[idx] = j
+	used[j] = true
+	if backtrack(idx+1, n, mapping, used, a, b, adjA, adjB) {
+		return true
+	}
+	used[j] = false
 	return false
 }
 
@@ -205,40 +207,6 @@ func filterMaximal(buckets map[string][]Subgraph) map[string][]Subgraph {
 	}
 	_ = seenPair
 	return out
-}
-
-func filterMaximalGroup(group []Subgraph) []Subgraph {
-	var out []Subgraph
-	for i, sg := range group {
-		contained := false
-		for j, other := range group {
-			if i == j {
-				continue
-			}
-			if nodesSubset(sg.Nodes, other.Nodes) && len(other.Nodes) > len(sg.Nodes) {
-				contained = true
-				break
-			}
-		}
-		if !contained {
-			out = append(out, sg)
-		}
-	}
-	return out
-}
-
-// isSubset checks if a is a subset of b.
-func nodesSubset(a, b []int) bool {
-	setB := map[int]bool{}
-	for _, x := range b {
-		setB[x] = true
-	}
-	for _, x := range a {
-		if !setB[x] {
-			return false
-		}
-	}
-	return true
 }
 
 // collectSubgraphs enumerates connected subgraphs for all functions.
@@ -463,13 +431,29 @@ func wlHash(wl *Wl) string {
 
 // SemanticCloneCandidates converts clone groups to pattern candidates.
 func SemanticCloneCandidates(groups [][]Subgraph, facts []*FuncFacts) []Candidate {
-	factByID := map[string]*FuncFacts{}
-	for _, f := range facts {
-		factByID[f.ID] = f
+	factByID := buildFactMap(facts)
+	bestByPair := deduplicateByPair(groups)
+	var out []Candidate
+	for _, group := range bestByPair {
+		if c, ok := makeCloneCandidate(group, factByID); ok {
+			out = append(out, c)
+		}
 	}
-	// Deduplicate by function pair: keep only the largest subgraph per pair.
-	// This prevents the flood of overlapping candidates from the same pair.
-	bestByPair := map[string]struct {
+	return out
+}
+
+// buildFactMap indexes facts by ID.
+func buildFactMap(facts []*FuncFacts) map[string]*FuncFacts {
+	out := map[string]*FuncFacts{}
+	for _, f := range facts {
+		out[f.ID] = f
+	}
+	return out
+}
+
+// deduplicateByPair keeps only the largest subgraph per function pair.
+func deduplicateByPair(groups [][]Subgraph) [][]Subgraph {
+	best := map[string]struct {
 		group []Subgraph
 		size  int
 	}{}
@@ -477,47 +461,55 @@ func SemanticCloneCandidates(groups [][]Subgraph, facts []*FuncFacts) []Candidat
 		if len(group) < 2 {
 			continue
 		}
-		// Build a canonical pair key (sorted function IDs).
-		var ids []string
-		for _, sg := range group {
-			ids = append(ids, sg.FuncID)
-		}
-		sort.Strings(ids)
-		key := strings.Join(ids, "|")
+		key := pairKey(group)
 		size := len(group[0].Nodes)
-		if existing, ok := bestByPair[key]; !ok || size > existing.size {
-			bestByPair[key] = struct {
+		if existing, ok := best[key]; !ok || size > existing.size {
+			best[key] = struct {
 				group []Subgraph
 				size  int
 			}{group, size}
 		}
 	}
-	var out []Candidate
-	for _, entry := range bestByPair {
-		group := entry.group
-		var sites []Site
-		for _, sg := range group {
-			f := factByID[sg.FuncID]
-			if f == nil {
-				continue
-			}
-			sites = append(sites, Site{
-				Path: f.Path,
-				Line: sg.Lines[0],
-				Name: f.Name,
-			})
-		}
-		if len(sites) < 2 {
-			continue
-		}
-		out = append(out, Candidate{
-			Kind:             SemanticClone,
-			ScoreMilli:       700,
-			Observation:      fmt.Sprintf("%d functions share an isomorphic PDG subgraph (%d nodes)", len(sites), len(group[0].Nodes)),
-			Inference:        "the same computation is written out once per site (possibly reordered)",
-			PossibleRefactor: "extract one helper; use anti-unification to derive the parameters",
-			Sites:            sites,
-		})
+	var out [][]Subgraph
+	for _, entry := range best {
+		out = append(out, entry.group)
 	}
 	return out
+}
+
+// pairKey builds a canonical key from sorted function IDs.
+func pairKey(group []Subgraph) string {
+	var ids []string
+	for _, sg := range group {
+		ids = append(ids, sg.FuncID)
+	}
+	sort.Strings(ids)
+	return strings.Join(ids, "|")
+}
+
+// makeCloneCandidate builds a Candidate from a clone group.
+func makeCloneCandidate(group []Subgraph, factByID map[string]*FuncFacts) (Candidate, bool) {
+	var sites []Site
+	for _, sg := range group {
+		f := factByID[sg.FuncID]
+		if f == nil {
+			continue
+		}
+		sites = append(sites, Site{
+			Path: f.Path,
+			Line: sg.Lines[0],
+			Name: f.Name,
+		})
+	}
+	if len(sites) < 2 {
+		return Candidate{}, false
+	}
+	return Candidate{
+		Kind:             SemanticClone,
+		ScoreMilli:       700,
+		Observation:      fmt.Sprintf("%d functions share an isomorphic PDG subgraph (%d nodes)", len(sites), len(group[0].Nodes)),
+		Inference:        "the same computation is written out once per site (possibly reordered)",
+		PossibleRefactor: "extract one helper; use anti-unification to derive the parameters",
+		Sites:            sites,
+	}, true
 }
