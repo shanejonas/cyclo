@@ -143,6 +143,13 @@ const (
 	// al. OSDI 2004). If one copy has a nilerr bug and its siblings don't,
 	// the edit was inconsistent. Detection-only.
 	InconsistentClone CandidateKind = "inconsistent_clone"
+	// CCGraphClone finds function-level clones via CCGraph (Zou et al.,
+	// ASE 2020): two-stage filtering (characteristic vectors + Jaro-Winkler
+	// name similarity), LSH-clustered WL vectors, and WL kernel similarity.
+	// Unlike semantic_clone (subgraph-level), this finds whole functions
+	// that do the same thing. Detection-only: the LLM judges whether to
+	// merge.
+	CCGraphClone CandidateKind = "ccgraph_clone"
 	// DomainService identifies a free function operating on two or more
 	// domain types without belonging to any of them. Per Evans, such
 	// stateless coordination is a Domain Service, not misplaced behavior:
@@ -201,6 +208,7 @@ var FixKindOrder = []CandidateKind{
 	MinedRule,
 	DeviantBehavior,
 	InconsistentClone,
+	CCGraphClone,
 }
 
 // FixKindRank returns the application-order rank for a pattern kind.
