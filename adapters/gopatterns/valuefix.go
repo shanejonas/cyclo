@@ -55,6 +55,10 @@ func FixValueObjects(fset *token.FileSet, f *ast.File, src []byte) ([]byte, []Va
 	if len(clumps) == 0 {
 		return src, nil, nil
 	}
+	// Save function doc comments before AST modification: format.Node on a
+	// modified AST can misplace them (e.g. moving a // cyclo-allow annotation
+	// into a rewritten return expression).
+	docComments := saveFuncDocs(f, fset, src)
 	fixes, structTexts := applyClumps(fset, f, clumps)
 	if len(fixes) == 0 {
 		return src, nil, nil
@@ -67,7 +71,88 @@ func FixValueObjects(fset *token.FileSet, f *ast.File, src []byte) ([]byte, []Va
 	if err != nil {
 		return nil, nil, err
 	}
+	out = restoreFuncDocs(out, docComments)
 	return out, fixes, nil
+}
+
+// funcDoc records a function's doc comment for restoration.
+type funcDoc struct {
+	funcName string
+	docText  string
+}
+
+// saveFuncDocs captures doc comments of all functions in the file.
+func saveFuncDocs(f *ast.File, fset *token.FileSet, src []byte) []funcDoc {
+	var docs []funcDoc
+	for _, decl := range f.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Doc == nil {
+			continue
+		}
+		start := fset.Position(fn.Doc.Pos()).Offset
+		end := fset.Position(fn.Doc.End()).Offset
+		docs = append(docs, funcDoc{
+			funcName: fn.Name.Name,
+			docText:  string(src[start:end]),
+		})
+	}
+	return docs
+}
+
+// restoreFuncDocs ensures each saved doc comment is immediately above its
+// function. If format.Node misplaced a doc (e.g. into a rewritten expression),
+// remove the misplaced copy and re-insert it above the function.
+func restoreFuncDocs(src []byte, docs []funcDoc) []byte {
+	out := src
+	for _, d := range docs {
+		out = ensureDocAboveFunc(out, d)
+	}
+	return out
+}
+
+// ensureDocAboveFunc moves d.docText to immediately above `func d.funcName`
+// if it isn't already there.
+func ensureDocAboveFunc(src []byte, d funcDoc) []byte {
+	// Find the function declaration.
+	funcIdx := indexFuncDecl(src, d.funcName)
+	if funcIdx < 0 {
+		return src
+	}
+	// Check if doc is already immediately above (allowing whitespace).
+	before := src[:funcIdx]
+	trimmed := bytes.TrimRight(before, " \t\n")
+	if bytes.HasSuffix(trimmed, []byte(d.docText)) {
+		return src // Already correct.
+	}
+	// Remove misplaced doc occurrences (but keep one for re-insertion).
+	cleaned := bytes.ReplaceAll(src, []byte(d.docText), []byte(""))
+	// Re-find func after removal (positions shifted).
+	funcIdx = indexFuncDecl(cleaned, d.funcName)
+	if funcIdx < 0 {
+		return src
+	}
+	// Insert doc above func.
+	insert := []byte(d.docText + "\n")
+	out := make([]byte, 0, len(cleaned)+len(insert))
+	out = append(out, cleaned[:funcIdx]...)
+	out = append(out, insert...)
+	out = append(out, cleaned[funcIdx:]...)
+	return out
+}
+
+// indexFuncDecl finds the offset of `func <name>(` or `func <name>[` in src.
+func indexFuncDecl(src []byte, name string) int {
+	// Match "func name(" with word boundary.
+	pattern := []byte("func " + name + "(")
+	if idx := bytes.Index(src, pattern); idx >= 0 {
+		return idx
+	}
+	// Generic function: "func name[".
+	pattern = []byte("func " + name + "[")
+	if idx := bytes.Index(src, pattern); idx >= 0 {
+		return idx
+	}
+	return -1
 }
 
 // applyClumps applies each clump, collecting fixes and struct texts.
@@ -693,9 +778,13 @@ func rewriteBodyIdents(body *ast.BlockStmt, params []ClumpParam, paramName strin
 		if isSelectorOrFieldName(c, ident) {
 			return true
 		}
+		// Preserve position for the printer: format.Node on a modified AST
+		// misplaces comments and breaks formatting when new nodes lack positions.
+		newX := &ast.Ident{Name: paramName, NamePos: ident.NamePos}
+		newSel := &ast.Ident{Name: field, NamePos: ident.NamePos}
 		c.Replace(&ast.SelectorExpr{
-			X:   &ast.Ident{Name: paramName},
-			Sel: &ast.Ident{Name: field},
+			X:   newX,
+			Sel: newSel,
 		})
 		return true
 	}, nil)
@@ -767,18 +856,34 @@ func callArgsSafe(call *ast.CallExpr, positions []int) bool {
 }
 
 // buildStructLiteral builds TypeName{Field: arg, ...} from the clump args.
+// buildStructLiteral builds TypeName{Field: arg, ...} from the clump args.
+// Positions are copied from the original args so format.Node places the
+// literal correctly.
 func buildStructLiteral(call *ast.CallExpr, positions []int, clump ValueClump, typeName string) *ast.CompositeLit {
 	var elts []ast.Expr
 	for i, p := range positions {
+		arg := call.Args[p]
+		key := &ast.Ident{Name: capitalize(clump.Params[i].Name)}
+		// Copy position from the arg for the key.
+		if ident, ok := arg.(*ast.Ident); ok {
+			key.NamePos = ident.NamePos
+		}
 		elts = append(elts, &ast.KeyValueExpr{
-			Key:   &ast.Ident{Name: capitalize(clump.Params[i].Name)},
-			Value: call.Args[p],
+			Key:   key,
+			Value: arg,
 		})
 	}
-	return &ast.CompositeLit{
+	// Position the literal at the first arg.
+	lit := &ast.CompositeLit{
 		Type: &ast.Ident{Name: typeName},
 		Elts: elts,
 	}
+	if len(positions) > 0 {
+		if ident, ok := call.Args[positions[0]].(*ast.Ident); ok {
+			lit.Type.(*ast.Ident).NamePos = ident.NamePos
+		}
+	}
+	return lit
 }
 
 // spliceStructArg replaces the clump args with the struct literal.

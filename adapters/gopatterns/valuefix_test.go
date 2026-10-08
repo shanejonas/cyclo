@@ -197,3 +197,62 @@ func TestFindValueClumps(t *testing.T) {
 		t.Fatalf("expected 3 funcs, got %d", len(c.Funcs))
 	}
 }
+
+func TestValueObjectPreservesFuncAnnotation(t *testing.T) {
+	// Regression: grouping pid/windowID must not move the // cyclo-allow
+	// annotation for performCalculatorStep into the rewritten return.
+	src := `package test
+
+import "context"
+
+// cyclo-allow(side_effect_density): Obtains a fresh observation.
+func performCalculatorStep(ctx context.Context, pid int, windowID int) error {
+	return saveCalculatorScreenshot(ctx, pid, windowID)
+}
+
+// cyclo-allow(side_effect_density): Another function.
+func anotherStep(ctx context.Context, pid int, windowID int) error {
+	return saveCalculatorScreenshot(ctx, pid, windowID)
+}
+
+func saveCalculatorScreenshot(ctx context.Context, pid int, windowID int) error {
+	return nil
+}
+`
+	out, _ := fixValueSource(t, src)
+	// The annotation must be immediately above performCalculatorStep, not
+	// inside the return expression.
+	lines := strings.Split(out, "\n")
+	for i, line := range lines {
+		if strings.Contains(line, "func performCalculatorStep") {
+			if i == 0 || !strings.Contains(lines[i-1], "cyclo-allow") {
+				t.Errorf("annotation not above performCalculatorStep:\n%s", out)
+			}
+		}
+	}
+	// The return expression must not contain a misplaced annotation.
+	// Find the return line for performCalculatorStep and check until the
+	// closing brace of that function.
+	inPerform := false
+	braceDepth := 0
+	for _, line := range lines {
+		if strings.Contains(line, "func performCalculatorStep") {
+			inPerform = true
+		}
+		if inPerform {
+			braceDepth += strings.Count(line, "{") - strings.Count(line, "}")
+			if strings.Contains(line, "cyclo-allow") && !strings.Contains(line, "func ") {
+				// Annotation inside function body = misplaced (should be above func).
+				t.Errorf("annotation inside performCalculatorStep body:\n%s", out)
+				break
+			}
+			if braceDepth == 0 && strings.Contains(line, "}") {
+				break
+			}
+		}
+	}
+	// The struct literal must be well-formed (no broken line splits).
+	if strings.Contains(out, "pidWindowID.\n") {
+		t.Errorf("broken struct literal formatting:\n%s", out)
+	}
+}

@@ -901,7 +901,8 @@ func specFixPlan(f *ast.File, typeName string, matches []specMatch) (predName st
 	// Method on local type, function for external types.
 	// If the type isn't local and has no package qualifier, we can't
 	// generate a correct signature — skip rather than emit broken code.
-	isLocal = hasTypeDecl(f, baseTypeName(typeName))
+	// Strip pointer for the local-type check: `*User` is local if `User` is.
+	isLocal = hasTypeDecl(f, strings.TrimPrefix(baseTypeName(typeName), "*"))
 	if !isLocal && !strings.Contains(typeName, ".") {
 		return "", false, false
 	}
@@ -909,11 +910,17 @@ func specFixPlan(f *ast.File, typeName string, matches []specMatch) (predName st
 }
 
 // baseTypeName strips a package qualifier: "apidomain.AgentArgs" -> "AgentArgs".
+// Preserves a leading "*" for pointer types: "*http.Response" -> "*Response".
 func baseTypeName(typeName string) string {
-	if i := strings.LastIndex(typeName, "."); i >= 0 {
-		return typeName[i+1:]
+	star := ""
+	if strings.HasPrefix(typeName, "*") {
+		star = "*"
+		typeName = typeName[1:]
 	}
-	return typeName
+	if i := strings.LastIndex(typeName, "."); i >= 0 {
+		return star + typeName[i+1:]
+	}
+	return star + typeName
 }
 
 // uniquePredName ensures the predicate name doesn't collide with an existing

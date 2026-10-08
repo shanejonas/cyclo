@@ -664,17 +664,39 @@ func specNamedType(t types.Type) string {
 	if t == nil {
 		return ""
 	}
-	if named, ok := derefNamed(t); ok {
-		obj := named.Obj()
-		// Include the package qualifier for non-local types:
-		// "apidomain.AgentArgs", not just "AgentArgs".
-		if pkg := obj.Pkg(); pkg != nil && pkg.Name() != "" {
-			// Only qualify if it's not the current package. We can't know
-			// the current package here, so always qualify; the fixer
-			// strips it back for local types via baseTypeName.
-			return pkg.Name() + "." + obj.Name()
-		}
-		return obj.Name()
+	// Preserve pointer: `*http.Response`, not `http.Response`.
+	star, t := specPointerPrefix(t)
+	named, ok := t.(*types.Named)
+	if !ok {
+		return ""
 	}
-	return ""
+	return star + specQualifiedName(named)
+}
+
+// specPointerPrefix strips pointer layers, returning the "*" prefix and the
+// underlying type.
+func specPointerPrefix(t types.Type) (string, types.Type) {
+	star := ""
+	for {
+		p, ok := t.(*types.Pointer)
+		if !ok {
+			return star, t
+		}
+		star += "*"
+		t = p.Elem()
+	}
+}
+
+// specQualifiedName returns the package-qualified name for a named type:
+// "apidomain.AgentArgs", not just "AgentArgs".
+func specQualifiedName(named *types.Named) string {
+	obj := named.Obj()
+	// Include the package qualifier for non-local types.
+	// Only qualify if it's not the current package. We can't know
+	// the current package here, so always qualify; the fixer
+	// strips it back for local types via baseTypeName.
+	if pkg := obj.Pkg(); pkg != nil && pkg.Name() != "" {
+		return pkg.Name() + "." + obj.Name()
+	}
+	return obj.Name()
 }
