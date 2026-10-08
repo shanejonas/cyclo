@@ -205,12 +205,14 @@ func paramEdit(fset *token.FileSet, a, b *ast.FuncDecl, src []byte) (textEdit, P
 }
 
 // diffPair builds renames and diffs the bodies, validating holes.
+// Uses anti-unification (Bulychev & Minea 2008) for the principled
+// most-specific template instead of heuristic diffing.
 func diffPair(a, b *ast.FuncDecl) (*renames, []hole, bool) {
 	r, ok := buildRenames(a, b)
 	if !ok {
 		return nil, nil, false
 	}
-	holes, ok := diffBlock(a.Body, b.Body, r)
+	holes, ok := antiUnifyHoles(a.Body, b.Body, r)
 	if !ok || len(holes) == 0 || len(holes) > maxParamHoles {
 		return nil, nil, false
 	}
@@ -1316,4 +1318,34 @@ func paramString(fset *token.FileSet, fn *ast.FuncDecl) string {
 		}
 	}
 	return strings.Join(parts, ", ")
+}
+
+// antiUnifyHoles uses anti-unification to find the differing parts between
+// two function bodies. Returns the holes (differing expressions) for
+// parameter extraction. This is the principled replacement for the
+// heuristic diffBlock: anti-unification gives the most specific template.
+func antiUnifyHoles(a, b *ast.BlockStmt, r *renames) ([]hole, bool) {
+	// Build the rename map for anti-unification.
+	renameMap := map[string]string{}
+	for aName, bName := range r.aToB {
+		renameMap[aName] = bName
+	}
+	_, subs := patterns.AntiUnifyWithRenames(a, b, renameMap)
+	if len(subs) == 0 {
+		return nil, false // Identical bodies; nothing to parameterize.
+	}
+	var holes []hole
+	for _, sub := range subs {
+		// Holes must be expressions to become parameters.
+		// If anti-unification produced a non-expression hole (e.g., a
+		// statement), the bodies differ structurally and can't be
+		// parameterized.
+		aExpr, okA := sub.A.(ast.Expr)
+		bExpr, okB := sub.B.(ast.Expr)
+		if !okA || !okB {
+			return nil, false
+		}
+		holes = append(holes, hole{aExpr: aExpr, bExpr: bExpr})
+	}
+	return holes, true
 }

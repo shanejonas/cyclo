@@ -119,6 +119,12 @@ const (
 	// an error interface holding (*T)(nil) compared to nil — always false.
 	// Ported from gostaticanalysis/typednil. Detection-only.
 	TypedNil CandidateKind = "typednil"
+	// SemanticClone finds isomorphic PDG subgraphs across functions —
+	// non-contiguous, reordered, or intertwined clones that token-based
+	// detectors miss. Following Komondoor & Horwitz (SAS 2001): the
+	// fragments are meaningful computations, ideal extract-function
+	// candidates. Uses WL-hash bucketing to avoid NP-hard isomorphism.
+	SemanticClone CandidateKind = "semantic_clone"
 	// DomainService identifies a free function operating on two or more
 	// domain types without belonging to any of them. Per Evans, such
 	// stateless coordination is a Domain Service, not misplaced behavior:
