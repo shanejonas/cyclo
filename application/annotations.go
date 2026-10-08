@@ -87,6 +87,8 @@ func (m Model) sourceDisplayRowCount(start int, end int) int {
 type sourceRowCounter struct {
 	function        domain.Function
 	annotations     []Annotation
+	patterns        []PatternMarker
+	patternPath     string
 	width           int
 	lastSourceIndex int
 }
@@ -96,6 +98,8 @@ func (m Model) sourceRowCounter() sourceRowCounter {
 	return sourceRowCounter{
 		function:        function,
 		annotations:     m.visibleAnnotations(),
+		patterns:        m.visiblePatternMarkers(),
+		patternPath:     m.selectedFilePath(),
 		width:           paneContentWidth(m.sourcePaneWidth()),
 		lastSourceIndex: sourceLineCount(function.Source) - 1,
 	}
@@ -110,6 +114,7 @@ func (c sourceRowCounter) count(start int, end int) int {
 	firstLine, lastLine := c.function.Line+start, c.function.Line+end
 	count += sourceDeletedRowCount(c.function.DiffLines, firstLine, lastLine)
 	count += sourceAnnotationRowCount(c.annotations, firstLine, lastLine, c.width)
+	count += sourcePatternRowCount(c.patterns, c.patternPath, firstLine, lastLine, c.width)
 	if start <= c.lastSourceIndex && c.lastSourceIndex <= end {
 		count += sourceDeletedRowCount(c.function.DiffLines, c.function.EndLine+1, c.function.EndLine+1)
 	}

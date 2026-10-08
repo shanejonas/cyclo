@@ -54,6 +54,9 @@ type Model struct {
 	nextAnnotationID int
 	annotationStore  AnnotationStore
 	annotationError  error
+	showPatterns     bool
+	patternMarkers   []PatternMarker
+	patternsLoading  bool
 }
 
 func NewModel(analyzer Analyzer, paths []string) Model {
@@ -78,6 +81,9 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	switch message := message.(type) {
 	case reportMsg:
 		m = m.withReport(message)
+	case patternsMsg:
+		m.patternMarkers = message.markers
+		m.patternsLoading = false
 	case controlCommand:
 		m, command = m.updateControl(message)
 	case changeWaiterTimeoutMsg:
@@ -179,10 +185,24 @@ func (m Model) updateGlobalKey(key string) (Model, tea.Cmd, bool) {
 		m.refreshing = true
 		m.revision++
 		return m, m.analyze(), true
+	case "p":
+		return m.togglePatternsKey()
+
 	default:
 		next, handled = m.updateFocusKey(key)
 		return next, nil, handled
 	}
+}
+
+// togglePatternsKey flips pattern visibility, lazily starting background
+// pattern detection on first enable.
+func (m Model) togglePatternsKey() (Model, tea.Cmd, bool) {
+	m = m.togglePatterns()
+	if m.showPatterns && !m.patternsLoading && len(m.patternMarkers) == 0 {
+		m.patternsLoading = true
+		return m, m.loadPatternsCmd(), true
+	}
+	return m, nil, true
 }
 
 func (m Model) updateFocusKey(key string) (Model, bool) {
