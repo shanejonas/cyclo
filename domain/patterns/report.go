@@ -127,6 +127,12 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 		clusters := FindDepClusters(prepared)
 		return DepClusterCandidates(clusters, prepared)
 	}},
+	{MinedRule, func(prepared []*FuncFacts, options Options) []Candidate {
+		sets := BuildCallSets(prepared)
+		rules := MineRules(sets)
+		violations := FindViolations(sets, rules)
+		return MinedRuleCandidates(violations, prepared)
+	}},
 }
 
 // addSingleFunctionCandidates appends fixed-score candidates that need no

@@ -130,6 +130,11 @@ const (
 	// spaghetti that resists testing. Following Binkley & Harman.
 	// Detection-only: the fix is human judgment (break the cycle).
 	DependenceCluster CandidateKind = "dependence_cluster"
+	// MinedRule flags violations of implicit programming rules mined from
+	// the codebase itself (PR-Miner, Li & Zhou FSE 2005). Example: "in this
+	// repo, functions that call `lock` also call `unlock`". A function that
+	// calls `lock` but not `unlock` is a bug. Detection-only.
+	MinedRule CandidateKind = "mined_rule"
 	// DomainService identifies a free function operating on two or more
 	// domain types without belonging to any of them. Per Evans, such
 	// stateless coordination is a Domain Service, not misplaced behavior:
