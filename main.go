@@ -15,6 +15,7 @@ import (
 	"github.com/shanejonas/cyclo/adapters/sqlite"
 	"github.com/shanejonas/cyclo/application"
 	"github.com/shanejonas/cyclo/application/bugreducer"
+	"github.com/shanejonas/cyclo/application/nextscore"
 	"github.com/shanejonas/cyclo/application/patterncheck"
 	"github.com/shanejonas/cyclo/application/patternfix"
 	"github.com/shanejonas/cyclo/application/qualitycheck"
@@ -86,6 +87,19 @@ func runSubcommand(ctx context.Context, args []string, output io.Writer) error {
 		return patterncheck.Run(ctx, args[1:], output)
 	case "fix":
 		return patternfix.Run(ctx, args[1:], output)
+	default:
+		return runSubcommandExtra(ctx, args, output)
+	}
+}
+
+// runSubcommandExtra handles the remaining subcommands to keep
+// runSubcommand under the complexity ceiling.
+func runSubcommandExtra(ctx context.Context, args []string, output io.Writer) error {
+	switch args[0] {
+	case "next":
+		return nextscore.Run(ctx, args[1:], output)
+	case "score":
+		return nextscore.Score(ctx, args[1:], output)
 	default:
 		return runDefault(args, output)
 	}

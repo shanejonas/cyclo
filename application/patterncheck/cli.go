@@ -45,19 +45,42 @@ type options struct {
 // how few) candidates the miner finds; only extraction, analysis, or IO
 // failures are errors.
 func Run(ctx context.Context, args []string, output io.Writer) error {
+	report, err := GetReport(ctx, args)
+	if err != nil {
+		return err
+	}
 	opts, err := parseOptions(args)
 	if err != nil {
 		return err
 	}
+	if opts.format == "json" {
+		out, err := patterns.JSON(report)
+		if err != nil {
+			return err
+		}
+		_, err = io.WriteString(output, out+"\n")
+		return err
+	}
+	_, err = io.WriteString(output, patterns.Text(report)+"\n")
+	return err
+}
+
+// GetReport runs the pattern pipeline and returns the report.
+// Exported for `cyclo next` and `cyclo score`.
+func GetReport(ctx context.Context, args []string) (*patterns.PatternsReport, error) {
+	opts, err := parseOptions(args)
+	if err != nil {
+		return nil, err
+	}
 	pdgs, err := gopatterns.Extract(ctx, "", opts.paths)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	params := patterns.DefaultParams()
 	params.ThresholdMilli = uint32(opts.threshold)
 	cache, saveCache, err := openWlCache(opts.useCache)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer saveCache()
 	report := patterns.Run(toFacts(pdgs.Funcs), patterns.Options{
@@ -67,16 +90,7 @@ func Run(ctx context.Context, args []string, output io.Writer) error {
 		DomainServices:    pdgs.DomainServices,
 		WlCache:           cache,
 	})
-	if opts.format == "json" {
-		out, err := patterns.JSON(&report)
-		if err != nil {
-			return err
-		}
-		_, err = io.WriteString(output, out+"\n")
-		return err
-	}
-	_, err = io.WriteString(output, patterns.Text(&report)+"\n")
-	return err
+	return &report, nil
 }
 
 // openWlCache loads the WL cache when enabled, returning the cache and a
