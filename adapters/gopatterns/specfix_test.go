@@ -1,6 +1,7 @@
 package gopatterns
 
 import (
+	"go/format"
 	"go/ast"
 	"go/parser"
 	"strings"
@@ -218,5 +219,51 @@ func check2(r Response) bool {
 	// Should be unchanged: no qualifier means we can't generate a safe signature.
 	if string(out) != src {
 		t.Errorf("should skip unqualified external type, got:\n%s", string(out))
+	}
+}
+
+func TestApplySpecificationFixPreservesPointerType(t *testing.T) {
+	// Pointer to external type: the predicate must take *http.Response,
+	// not http.Response, or the call sites won't compile.
+	src := `package test
+
+import "net/http"
+
+func check1(response *http.Response) bool {
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return true
+	}
+	return false
+}
+
+func check2(response *http.Response) bool {
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return true
+	}
+	return false
+}
+`
+	spec := &patterns.FixSpec{
+		Kind: patterns.Specification,
+		File: "test.go",
+		Line: 5,
+		Params: map[string]string{
+			"type":    "*http.Response",
+			"varname": "response",
+			"rulekey": "*http.Response|StatusCode:<:200,StatusCode:>=:300",
+		},
+	}
+	out, err := ApplyFix(spec, []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	outStr := string(out)
+	// The generated predicate must have the pointer type.
+	if !strings.Contains(outStr, "response *http.Response") {
+		t.Errorf("predicate should take *http.Response, got:\n%s", outStr)
+	}
+	// And it must compile (parse + typecheck via gofmt at least).
+	if _, err := format.Source(out); err != nil {
+		t.Errorf("output not gofmt-clean: %v", err)
 	}
 }
