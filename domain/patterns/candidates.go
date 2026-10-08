@@ -157,6 +157,12 @@ const (
 	// suggestion for functions that cannot be methods. Detection-only:
 	// choosing the service name and home is design.
 	DomainService CandidateKind = "domain_service"
+	// TaintFlow tracks untrusted data from sources (HTTP input, CLI args,
+	// ...) through propagators to dangerous sinks (SQL, shell, ...).
+	// Flags when tainted data reaches a sink without sanitization.
+	// Detection-only: the fix depends on context (parameterize? escape?
+	// validate?), so the LLM judges.
+	TaintFlowKind CandidateKind = "taint_flow"
 )
 
 // FixKindOrder defines the order in which pattern fixes are applied when
