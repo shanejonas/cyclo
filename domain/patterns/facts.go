@@ -22,6 +22,9 @@ type FuncFacts struct {
 	Line int
 	// EndLine is the function's closing line.
 	EndLine int
+	// SuppressedKinds are pattern kinds suppressed via //lint:ignore or
+	// // cyclo-allow on this function.
+	SuppressedKinds []string
 	// Pdg is the function's program dependence graph. Nil means the body
 	// was not extracted (filtered out of mining, like rstyle's pdg: None).
 	Pdg *Pdg

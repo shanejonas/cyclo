@@ -620,6 +620,7 @@ func toFacts(ext *gopatterns.Extraction) ([]*patterns.FuncFacts, []patterns.Anem
 			NilErrHits:       fp.NilErrHits,
 			ForceTypeAssertHits: fp.ForceTypeAssertHits,
 			TypedNilHits:       fp.TypedNilHits,
+			SuppressedKinds:  fp.SuppressedKinds,
 			Params:           paramInfos(fp.Params),
 		})
 	}

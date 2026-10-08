@@ -402,3 +402,67 @@ func isTypedNilable(info *types.Info, e ast.Expr) bool {
 	}
 	return false
 }
+
+// findSuppressedKinds extracts suppressed pattern kinds from the function's
+// doc comment. Supports both //lint:ignore and // cyclo-allow syntax.
+func findSuppressedKinds(fn *ast.FuncDecl) []string {
+	if fn.Doc == nil {
+		return nil
+	}
+	var kinds []string
+	for _, c := range fn.Doc.List {
+		kinds = append(kinds, parseSuppressComment(c.Text)...)
+	}
+	return kinds
+}
+
+// parseSuppressComment extracts kind IDs from one comment line.
+func parseSuppressComment(text string) []string {
+	if strings.HasPrefix(text, "//lint:ignore") {
+		return parseLintIgnoreKinds(text)
+	}
+	if strings.HasPrefix(text, "// cyclo-allow(") {
+		return parseCycloAllowKinds(text)
+	}
+	return nil
+}
+
+// parseLintIgnoreKinds extracts kinds from `//lint:ignore k1, k2 reason`.
+func parseLintIgnoreKinds(text string) []string {
+	rest := strings.TrimSpace(strings.TrimPrefix(text, "//lint:ignore"))
+	var kinds []string
+	for _, p := range strings.Fields(rest) {
+		clean := strings.TrimSuffix(p, ",")
+		if !isPatternKind(clean) {
+			break // Reason starts.
+		}
+		kinds = append(kinds, clean)
+	}
+	return kinds
+}
+
+// parseCycloAllowKinds extracts kinds from `// cyclo-allow(k1, k2): reason`.
+func parseCycloAllowKinds(text string) []string {
+	inner := strings.TrimPrefix(text, "// cyclo-allow(")
+	idx := strings.Index(inner, "):")
+	if idx < 0 {
+		return nil
+	}
+	var kinds []string
+	for _, r := range strings.Split(inner[:idx], ",") {
+		r = strings.TrimSpace(r)
+		if isPatternKind(r) {
+			kinds = append(kinds, r)
+		}
+	}
+	return kinds
+}
+
+// isPatternKind reports whether s is a known pattern kind ID.
+func isPatternKind(s string) bool {
+	switch s {
+	case "nilerr", "forcetypeassert", "typednil":
+		return true
+	}
+	return false
+}

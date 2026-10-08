@@ -30,7 +30,10 @@ type FuncPdg struct {
 	Line int
 	// EndLine is the function's closing line.
 	EndLine int
-	Pdg     patterns.Pdg
+	// SuppressedKinds are pattern kinds suppressed via //lint:ignore or
+	// // cyclo-allow on this function.
+	SuppressedKinds []string
+	Pdg             patterns.Pdg
 	// SelfTy is the receiver's named type for methods ("pkg.Type"), empty
 	// for free functions. The miner needs it: signature groups require two
 	// or more distinct self types, and facts without SelfTy are skipped.
@@ -249,12 +252,13 @@ func extractFunc(pkg *packages.Package, fn *ast.FuncDecl, path string, ctx extra
 	b.params(fn)
 	b.stmt(fn.Body)
 	return FuncPdg{
-		Name:           name,
-		Path:           path,
-		Line:           pos.Line,
-		EndLine:        end.Line,
-		Pdg:            patterns.Pdg{Nodes: b.nodes, Edges: b.edges},
-		SelfTy:         selfTy,
+		Name:            name,
+		Path:            path,
+		Line:            pos.Line,
+		EndLine:         end.Line,
+		SuppressedKinds: findSuppressedKinds(fn),
+		Pdg:             patterns.Pdg{Nodes: b.nodes, Edges: b.edges},
+		SelfTy:          selfTy,
 		GuardClauses:   findGuardClauses(fn, pkg.Fset),
 		EnumDispatches: findEnumDispatches(fn, pkg.Fset),
 		TypeSwitches:   findTypeSwitches(fn, pkg.Fset),

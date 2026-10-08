@@ -37,6 +37,9 @@ const (
 func nilErrCandidates(facts []*FuncFacts) []Candidate {
 	var out []Candidate
 	for _, f := range facts {
+		if isSuppressed(f.SuppressedKinds, NilErr) {
+			continue
+		}
 		for _, h := range f.NilErrHits {
 			out = append(out, Candidate{
 				Kind:       NilErr,
@@ -67,6 +70,9 @@ func nilErrCandidates(facts []*FuncFacts) []Candidate {
 func forceTypeAssertCandidates(facts []*FuncFacts) []Candidate {
 	var out []Candidate
 	for _, f := range facts {
+		if isSuppressed(f.SuppressedKinds, ForceTypeAssert) {
+			continue
+		}
 		for _, h := range f.ForceTypeAssertHits {
 			out = append(out, Candidate{
 				Kind:       ForceTypeAssert,
@@ -97,6 +103,9 @@ func forceTypeAssertCandidates(facts []*FuncFacts) []Candidate {
 func typedNilCandidates(facts []*FuncFacts) []Candidate {
 	var out []Candidate
 	for _, f := range facts {
+		if isSuppressed(f.SuppressedKinds, TypedNil) {
+			continue
+		}
 		for _, h := range f.TypedNilHits {
 			out = append(out, Candidate{
 				Kind:       TypedNil,
@@ -121,4 +130,14 @@ func typedNilCandidates(facts []*FuncFacts) []Candidate {
 		return out[i].Sites[0].Line < out[j].Sites[0].Line
 	})
 	return out
+}
+
+// isSuppressed reports whether kind is in the suppressed list.
+func isSuppressed(suppressed []string, kind CandidateKind) bool {
+	for _, s := range suppressed {
+		if s == string(kind) {
+			return true
+		}
+	}
+	return false
 }
