@@ -170,12 +170,23 @@ func matchAcquisition(calleeID string) (obligationRule, bool) {
 // deferredCallNodes returns the Call node indices wrapped by a Defer node.
 // `defer f()` lowers to a Call node with a Data edge into a Defer node.
 func deferredCallNodes(pdg *Pdg) map[int]bool {
-	deferNodes := map[int]bool{}
+	deferNodes := collectDeferNodes(pdg)
+	return collectDeferredCalls(pdg, deferNodes)
+}
+
+// collectDeferNodes returns the indices of all Defer nodes.
+func collectDeferNodes(pdg *Pdg) map[int]bool {
+	out := map[int]bool{}
 	for i, n := range pdg.Nodes {
 		if n.Kind == Defer {
-			deferNodes[i] = true
+			out[i] = true
 		}
 	}
+	return out
+}
+
+// collectDeferredCalls returns Call nodes with a Data edge into a Defer node.
+func collectDeferredCalls(pdg *Pdg, deferNodes map[int]bool) map[int]bool {
 	out := map[int]bool{}
 	for _, e := range pdg.Edges {
 		if e.Kind == Data && deferNodes[e.To] && pdg.Nodes[e.From].Kind == Call {
