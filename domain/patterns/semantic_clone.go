@@ -433,6 +433,15 @@ func wlHash(wl *Wl) string {
 func SemanticCloneCandidates(groups [][]Subgraph, facts []*FuncFacts) []Candidate {
 	factByID := buildFactMap(facts)
 	bestByPair := deduplicateByPair(groups)
+	// Rank by subgraph size (larger = more meaningful) and cap the output.
+	// The LLM can judge precision, but 265 candidates is too many to sift through.
+	sort.Slice(bestByPair, func(i, j int) bool {
+		return len(bestByPair[i][0].Nodes) > len(bestByPair[j][0].Nodes)
+	})
+	const maxCandidates = 20
+	if len(bestByPair) > maxCandidates {
+		bestByPair = bestByPair[:maxCandidates]
+	}
 	var out []Candidate
 	for _, group := range bestByPair {
 		if c, ok := makeCloneCandidate(group, factByID); ok {
