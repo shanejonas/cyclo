@@ -55,34 +55,33 @@ func MineRules(sets []CallSet) []MinedRuleDef {
 	if len(sets) == 0 {
 		return nil
 	}
-	// Count single items and pairs for rule generation.
-	// For simplicity: mine rules of form {A} -> B and {A,B} -> C.
-	single := countSingles(sets)
-	triples := countTriples(sets)
 	var rules []MinedRuleDef
-	// {A} -> B
+	rules = append(rules, mineSingleAntecedent(sets)...)
+	rules = append(rules, mineDoubleAntecedent(sets)...)
+	return rules
+}
+
+// mineSingleAntecedent mines rules of form {A} -> B.
+func mineSingleAntecedent(sets []CallSet) []MinedRuleDef {
+	single := countSingles(sets)
+	var rules []MinedRuleDef
 	for a, cntA := range single {
 		for b := range single {
 			if a == b {
 				continue
 			}
-			cntAB := countCoOccur(sets, []string{a, b})
-			if cntAB == 0 {
-				continue
-			}
-			support := float64(cntAB) / float64(len(sets))
-			confidence := float64(cntAB) / float64(cntA)
-			if support >= minSupport && confidence >= minConfidence {
-				rules = append(rules, MinedRuleDef{
-					Antecedent: []string{a},
-					Consequent: b,
-					Support:    support,
-					Confidence: confidence,
-				})
+			if r, ok := makeRule(sets, []string{a}, b, cntA); ok {
+				rules = append(rules, r)
 			}
 		}
 	}
-	// {A,B} -> C (using triples)
+	return rules
+}
+
+// mineDoubleAntecedent mines rules of form {A,B} -> C.
+func mineDoubleAntecedent(sets []CallSet) []MinedRuleDef {
+	triples := countTriples(sets)
+	var rules []MinedRuleDef
 	for key, cntABC := range triples {
 		parts := parseTripleKey(key)
 		if len(parts) != 3 {
@@ -90,45 +89,66 @@ func MineRules(sets []CallSet) []MinedRuleDef {
 		}
 		a, b, c := parts[0], parts[1], parts[2]
 		cntAB := countCoOccur(sets, []string{a, b})
-		if cntAB == 0 {
-			continue
-		}
-		support := float64(cntABC) / float64(len(sets))
-		confidence := float64(cntABC) / float64(cntAB)
-		if support >= minSupport && confidence >= minConfidence {
-			rules = append(rules, MinedRuleDef{
-				Antecedent: []string{a, b},
-				Consequent: c,
-				Support:    support,
-				Confidence: confidence,
-			})
+		if r, ok := makeRuleFromCounts(len(sets), cntAB, cntABC, []string{a, b}, c); ok {
+			rules = append(rules, r)
 		}
 	}
 	return rules
 }
 
+// makeRule creates a rule if support and confidence thresholds are met.
+// cntA is the count of the antecedent, cntAB is the count of antecedent+consequent.
+func makeRule(sets []CallSet, antecedent []string, consequent string, cntA int) (MinedRuleDef, bool) {
+	cntAB := countCoOccur(sets, append(antecedent, consequent))
+	return makeRuleFromCounts(len(sets), cntA, cntAB, antecedent, consequent)
+}
+
+// makeRuleFromCounts creates a rule from precomputed counts.
+func makeRuleFromCounts(total, cntA, cntAB int, antecedent []string, consequent string) (MinedRuleDef, bool) {
+	if cntAB == 0 || cntA == 0 {
+		return MinedRuleDef{}, false
+	}
+	support := float64(cntAB) / float64(total)
+	confidence := float64(cntAB) / float64(cntA)
+	if support < minSupport || confidence < minConfidence {
+		return MinedRuleDef{}, false
+	}
+	return MinedRuleDef{
+		Antecedent: antecedent,
+		Consequent: consequent,
+		Support:    support,
+		Confidence: confidence,
+	}, true
+}
+
 // FindViolations finds functions that have the antecedent but not the consequent.
 func FindViolations(sets []CallSet, rules []MinedRuleDef) []RuleViolation {
-	setByID := map[string]CallSet{}
-	for _, s := range sets {
-		setByID[s.FuncID] = s
-	}
 	var out []RuleViolation
 	for _, rule := range rules {
-		for _, s := range sets {
-			hasAntecedent := true
-			for _, a := range rule.Antecedent {
-				if !s.Calls[a] {
-					hasAntecedent = false
-					break
-				}
-			}
-			if hasAntecedent && !s.Calls[rule.Consequent] {
-				out = append(out, RuleViolation{FuncID: s.FuncID, Rule: rule})
-			}
+		out = append(out, violationsForRule(sets, rule)...)
+	}
+	return out
+}
+
+// violationsForRule finds functions violating one rule.
+func violationsForRule(sets []CallSet, rule MinedRuleDef) []RuleViolation {
+	var out []RuleViolation
+	for _, s := range sets {
+		if hasAntecedent(s, rule.Antecedent) && !s.Calls[rule.Consequent] {
+			out = append(out, RuleViolation{FuncID: s.FuncID, Rule: rule})
 		}
 	}
 	return out
+}
+
+// hasAntecedent reports whether the call set contains all antecedent items.
+func hasAntecedent(s CallSet, antecedent []string) bool {
+	for _, a := range antecedent {
+		if !s.Calls[a] {
+			return false
+		}
+	}
+	return true
 }
 
 func countSingles(sets []CallSet) map[string]int {
@@ -232,18 +252,23 @@ func MinedRuleCandidates(violations []RuleViolation, facts []*FuncFacts) []Candi
 func BuildCallSets(facts []*FuncFacts) []CallSet {
 	var out []CallSet
 	for _, f := range facts {
-		if f.Pdg == nil {
-			continue
-		}
-		calls := map[string]bool{}
-		for _, n := range f.Pdg.Nodes {
-			if n.Kind == Call && n.CalleeID != "" {
-				calls[n.CalleeID] = true
-			}
-		}
-		if len(calls) > 0 {
+		if calls := extractCalls(f); len(calls) > 0 {
 			out = append(out, CallSet{FuncID: f.ID, Calls: calls})
 		}
 	}
 	return out
+}
+
+// extractCalls returns the set of callee IDs from a function's PDG.
+func extractCalls(f *FuncFacts) map[string]bool {
+	calls := map[string]bool{}
+	if f.Pdg == nil {
+		return calls
+	}
+	for _, n := range f.Pdg.Nodes {
+		if n.Kind == Call && n.CalleeID != "" {
+			calls[n.CalleeID] = true
+		}
+	}
+	return calls
 }

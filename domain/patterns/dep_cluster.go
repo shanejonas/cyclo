@@ -84,8 +84,14 @@ func clusterLines(pdg *Pdg, nodes []int) []int {
 // stronglyConnected finds all strongly connected components using Tarjan's
 // algorithm. Returns components with 2+ nodes (singletons aren't clusters).
 func stronglyConnected(pdg *Pdg) [][]int {
+	t := newTarjan(pdg)
+	t.run()
+	return filterSCCs(t.sccs)
+}
+
+// newTarjan creates a Tarjan state for the PDG.
+func newTarjan(pdg *Pdg) *tarjan {
 	n := len(pdg.Nodes)
-	// Build adjacency list.
 	adj := make([][]int, n)
 	for _, e := range pdg.Edges {
 		adj[e.From] = append(adj[e.From], e.To)
@@ -99,14 +105,22 @@ func stronglyConnected(pdg *Pdg) [][]int {
 	for i := range t.index {
 		t.index[i] = -1
 	}
-	for v := 0; v < n; v++ {
+	return t
+}
+
+// run executes Tarjan's algorithm.
+func (t *tarjan) run() {
+	for v := 0; v < len(t.index); v++ {
 		if t.index[v] == -1 {
 			t.visit(v)
 		}
 	}
-	// Filter to 2+ nodes.
+}
+
+// filterSCCs keeps components with 2+ nodes.
+func filterSCCs(sccs [][]int) [][]int {
 	var out [][]int
-	for _, scc := range t.sccs {
+	for _, scc := range sccs {
 		if len(scc) >= 2 {
 			out = append(out, scc)
 		}
@@ -131,30 +145,40 @@ func (t *tarjan) visit(v int) {
 	t.stack = append(t.stack, v)
 	t.onStack[v] = true
 	for _, w := range t.adj[v] {
-		if t.index[w] == -1 {
-			t.visit(w)
-			if t.lowlink[w] < t.lowlink[v] {
-				t.lowlink[v] = t.lowlink[w]
-			}
-		} else if t.onStack[w] {
-			if t.index[w] < t.lowlink[v] {
-				t.lowlink[v] = t.index[w]
-			}
-		}
+		t.visitEdge(v, w)
 	}
 	if t.lowlink[v] == t.index[v] {
-		var scc []int
-		for {
-			w := t.stack[len(t.stack)-1]
-			t.stack = t.stack[:len(t.stack)-1]
-			t.onStack[w] = false
-			scc = append(scc, w)
-			if w == v {
-				break
-			}
-		}
-		t.sccs = append(t.sccs, scc)
+		t.popSCC(v)
 	}
+}
+
+// visitEdge processes one edge v->w in Tarjan's algorithm.
+func (t *tarjan) visitEdge(v, w int) {
+	if t.index[w] == -1 {
+		t.visit(w)
+		if t.lowlink[w] < t.lowlink[v] {
+			t.lowlink[v] = t.lowlink[w]
+		}
+	} else if t.onStack[w] {
+		if t.index[w] < t.lowlink[v] {
+			t.lowlink[v] = t.index[w]
+		}
+	}
+}
+
+// popSCC pops a strongly connected component off the stack.
+func (t *tarjan) popSCC(v int) {
+	var scc []int
+	for {
+		w := t.stack[len(t.stack)-1]
+		t.stack = t.stack[:len(t.stack)-1]
+		t.onStack[w] = false
+		scc = append(scc, w)
+		if w == v {
+			break
+		}
+	}
+	t.sccs = append(t.sccs, scc)
 }
 
 // DepClusterCandidates converts clusters to pattern candidates.

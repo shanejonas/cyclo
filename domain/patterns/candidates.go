@@ -196,6 +196,11 @@ var FixKindOrder = []CandidateKind{
 	NilErr,
 	ForceTypeAssert,
 	TypedNil,
+	SemanticClone,
+	DependenceCluster,
+	MinedRule,
+	DeviantBehavior,
+	InconsistentClone,
 }
 
 // FixKindRank returns the application-order rank for a pattern kind.

@@ -53,33 +53,54 @@ type ErrorCheckSite struct {
 // MineErrorBeliefs tallies error-checking behavior per callee.
 // Returns beliefs where >=90% of sites check the error.
 func MineErrorBeliefs(sites []ErrorCheckSite) []CallBelief {
-	byCallee := map[string][]ErrorCheckSite{}
-	for _, s := range sites {
-		byCallee[s.Callee] = append(byCallee[s.Callee], s)
-	}
+	byCallee := groupByCallee(sites)
 	var beliefs []CallBelief
 	for callee, ss := range byCallee {
-		if len(ss) < minBeliefSupport {
-			continue
-		}
-		checked := 0
-		for _, s := range ss {
-			if s.Checked {
-				checked++
-			}
-		}
-		conf := float64(checked) / float64(len(ss))
-		if conf >= minBeliefConfidence {
-			beliefs = append(beliefs, CallBelief{
-				Callee:     callee,
-				Belief:     "error checked",
-				Confidence: conf,
-				Support:    len(ss),
-			})
+		if b, ok := beliefForCallee(callee, ss); ok {
+			beliefs = append(beliefs, b)
 		}
 	}
 	return beliefs
 }
+
+// groupByCallee groups sites by callee name.
+func groupByCallee(sites []ErrorCheckSite) map[string][]ErrorCheckSite {
+	out := map[string][]ErrorCheckSite{}
+	for _, s := range sites {
+		out[s.Callee] = append(out[s.Callee], s)
+	}
+	return out
+}
+
+// beliefForCallee creates a belief if the callee meets thresholds.
+func beliefForCallee(callee string, ss []ErrorCheckSite) (CallBelief, bool) {
+	if len(ss) < minBeliefSupport {
+		return CallBelief{}, false
+	}
+	conf := checkedFraction(ss)
+	if conf < minBeliefConfidence {
+		return CallBelief{}, false
+	}
+	return CallBelief{
+		Callee:     callee,
+		Belief:     "error checked",
+		Confidence: conf,
+		Support:    len(ss),
+	}, true
+}
+
+// checkedFraction returns the fraction of sites that check the error.
+func checkedFraction(ss []ErrorCheckSite) float64 {
+	checked := 0
+	for _, s := range ss {
+		if s.Checked {
+			checked++
+		}
+	}
+	return float64(checked) / float64(len(ss))
+}
+
+// FindBeliefViolations finds sites that deviate from mined beliefs.
 
 // FindBeliefViolations finds sites that deviate from mined beliefs.
 func FindBeliefViolations(sites []ErrorCheckSite, beliefs []CallBelief) []BeliefViolation {

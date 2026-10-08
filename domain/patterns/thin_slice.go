@@ -14,28 +14,39 @@ package patterns
 // Follows only Data edges backward, skipping control dependences.
 // Returns node indices, ordered from seed backward to producers.
 func ThinSlice(pdg *Pdg, seed int) []int {
+	radj := buildProducerGraph(pdg)
 	visited := map[int]bool{seed: true}
 	queue := []int{seed}
 	var result []int
-	// Build reverse data-edge adjacency (producers only).
+	for len(queue) > 0 {
+		n := queue[0]
+		queue = queue[1:]
+		result = append(result, n)
+		queue = visitProducers(queue, visited, radj[n], pdg)
+	}
+	return result
+}
+
+// buildProducerGraph builds reverse data-edge adjacency (producers only).
+func buildProducerGraph(pdg *Pdg) map[int][]int {
 	radj := map[int][]int{}
 	for _, e := range pdg.Edges {
 		if e.Kind == Data {
 			radj[e.To] = append(radj[e.To], e.From)
 		}
 	}
-	for len(queue) > 0 {
-		n := queue[0]
-		queue = queue[1:]
-		result = append(result, n)
-		for _, prod := range radj[n] {
-			if !visited[prod] && isProducer(pdg.Nodes[prod]) {
-				visited[prod] = true
-				queue = append(queue, prod)
-			}
+	return radj
+}
+
+// visitProducers adds unvisited producer nodes to the queue.
+func visitProducers(queue []int, visited map[int]bool, prods []int, pdg *Pdg) []int {
+	for _, prod := range prods {
+		if !visited[prod] && isProducer(pdg.Nodes[prod]) {
+			visited[prod] = true
+			queue = append(queue, prod)
 		}
 	}
-	return result
+	return queue
 }
 
 // isProducer reports whether a node is a value producer (not control flow

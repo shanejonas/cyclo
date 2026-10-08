@@ -134,10 +134,18 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 		return MinedRuleCandidates(violations, prepared)
 	}},
 	{DeviantBehavior, func(prepared []*FuncFacts, options Options) []Candidate {
-		// TODO: populate ErrorCheckSites from the extractor.
-		// The mining logic is tested; the site extraction needs
-		// per-call error-check tracking in gopatterns.
-		return nil
+		// Collect all error check sites across functions.
+		var allSites []ErrorCheckSite
+		for _, f := range prepared {
+			// Fix up FuncID (extractor uses simple name; we need the full ID).
+			for _, s := range f.ErrorCheckSites {
+				s.FuncID = f.ID
+				allSites = append(allSites, s)
+			}
+		}
+		beliefs := MineErrorBeliefs(allSites)
+		violations := FindBeliefViolations(allSites, beliefs)
+		return DeviantBehaviorCandidates(violations, prepared)
 	}},
 	{InconsistentClone, func(prepared []*FuncFacts, options Options) []Candidate {
 		groups := FindSemanticClones(prepared)
