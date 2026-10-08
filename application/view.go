@@ -166,6 +166,7 @@ func (m Model) footer(width int) string {
 		green.Render(",/.") + muted.Render(" files · ") +
 		green.Render("[/]") + muted.Render(m.annotationNavigationLabel()+" · ") +
 		green.Render("r") + muted.Render(" refresh · ") +
+		green.Render("p") + muted.Render(" patterns · ") +
 		green.Render("q") + muted.Render(" quit")
 	if m.focus == detailsPane {
 		keys += muted.Render(" · ") + green.Render("v") + muted.Render(" select · ") +
@@ -323,6 +324,11 @@ func (m Model) sourceTitle(title string, function domain.Function) string {
 		}
 		line += muted.Render(" · ") + amber.Bold(true).Render(fmt.Sprintf("◆ %d %s", count, noun))
 	}
+	if m.patternsLoading {
+		line += muted.Render(" · ") + amber.Render("▲ patterns loading…")
+	} else if pcount := len(m.visiblePatternMarkers()); pcount > 0 && m.showPatterns {
+		line += muted.Render(" · ") + amber.Bold(true).Render(fmt.Sprintf("▲ %d patterns", pcount))
+	}
 	return line + qualityBadge(function) + diffTitle(m.report.DiffBase, function.DiffLines)
 }
 
@@ -354,8 +360,12 @@ func (m Model) selectedSourceCodeLines(function domain.Function) []string {
 		return lines
 	}
 	annotations := m.visibleAnnotations()
+	path := m.selectedFilePath()
+	pmarks := m.visiblePatternMarkers()
 	for index := range lines {
-		lines[index] = m.highlightSourceLine(function.Line+index, lines[index], annotations)
+		lineNumber := function.Line + index
+		lines[index] = highlightPatternLine(lines[index], patternMarkersAtLine(pmarks, path, lineNumber))
+		lines[index] = m.highlightSourceLine(lineNumber, lines[index], annotations)
 	}
 	return lines
 }
@@ -445,9 +455,12 @@ func (m Model) sourceDisplayWindow(lines []string, function domain.Function, wid
 
 	result := make([]string, 0, height)
 	annotations := m.visibleAnnotations()
+	path := m.selectedFilePath()
+	patterns := m.patternMarkersForDisplay()
 	for index := min(m.sourceOffset, len(lines)); index < len(lines) && len(result) < height; index++ {
 		lineNumber := function.Line + index
 		rows := sourceRowsAtLine(function, lineNumber, lines[index], width, index == len(lines)-1, annotations)
+		rows = appendPatternRows(rows, patterns, path, lineNumber, width)
 		remaining := height - len(result)
 		if len(rows) > remaining {
 			return append(result, rows[:remaining]...)
@@ -455,6 +468,23 @@ func (m Model) sourceDisplayWindow(lines []string, function domain.Function, wid
 		result = append(result, rows...)
 	}
 	return result
+}
+
+// patternMarkersForDisplay returns markers for row rendering, or nil when
+// pattern highlights are disabled.
+func (m Model) patternMarkersForDisplay() []PatternMarker {
+	if !m.showPatterns {
+		return nil
+	}
+	return m.patternMarkers
+}
+
+// appendPatternRows appends the pattern label row for the line, if any.
+func appendPatternRows(rows []string, markers []PatternMarker, path string, line int, width int) []string {
+	if len(markers) == 0 {
+		return rows
+	}
+	return append(rows, sourcePatternRows(patternMarkersStartingAt(markers, path, line), width)...)
 }
 
 func sourceRowsAtLine(
