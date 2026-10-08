@@ -75,6 +75,9 @@ type FuncFacts struct {
 	ForceTypeAssertHits []ForceTypeAssertHit
 	// TypedNilHits are typed-nil vs untyped-nil comparisons (gostaticanalysis).
 	TypedNilHits []TypedNilHit
+	// ErrorCheckSites tracks per-call error checking for deviant_behavior
+	// mining (Engler et al., SOSP 2001).
+	ErrorCheckSites []ErrorCheckSite
 	// Params are the function's primitive-typed parameters (name and type).
 	// Used for data-clump detection (value object proposals). Empty when the
 	// function has no primitive params or params were not extracted.

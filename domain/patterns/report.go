@@ -123,6 +123,35 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 		groups := FindSemanticClones(prepared)
 		return SemanticCloneCandidates(groups, prepared)
 	}},
+	{DependenceCluster, func(prepared []*FuncFacts, options Options) []Candidate {
+		clusters := FindDepClusters(prepared)
+		return DepClusterCandidates(clusters, prepared)
+	}},
+	{MinedRule, func(prepared []*FuncFacts, options Options) []Candidate {
+		sets := BuildCallSets(prepared)
+		rules := MineRules(sets)
+		violations := FindViolations(sets, rules)
+		return MinedRuleCandidates(violations, prepared)
+	}},
+	{DeviantBehavior, func(prepared []*FuncFacts, options Options) []Candidate {
+		// Collect all error check sites across functions.
+		var allSites []ErrorCheckSite
+		for _, f := range prepared {
+			// Fix up FuncID (extractor uses simple name; we need the full ID).
+			for _, s := range f.ErrorCheckSites {
+				s.FuncID = f.ID
+				allSites = append(allSites, s)
+			}
+		}
+		beliefs := MineErrorBeliefs(allSites)
+		violations := FindBeliefViolations(allSites, beliefs)
+		return DeviantBehaviorCandidates(violations, prepared)
+	}},
+	{InconsistentClone, func(prepared []*FuncFacts, options Options) []Candidate {
+		groups := FindSemanticClones(prepared)
+		edits := FindInconsistentEdits(groups, prepared)
+		return InconsistentCloneCandidates(edits, prepared)
+	}},
 }
 
 // addSingleFunctionCandidates appends fixed-score candidates that need no

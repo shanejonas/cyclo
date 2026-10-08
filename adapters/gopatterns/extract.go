@@ -70,6 +70,9 @@ type FuncPdg struct {
 	ForceTypeAssertHits []patterns.ForceTypeAssertHit
 	// TypedNilHits are typed-nil comparisons (gostaticanalysis).
 	TypedNilHits []patterns.TypedNilHit
+	// ErrorCheckSites tracks per-call error checking for deviant_behavior
+	// mining (Engler et al., SOSP 2001).
+	ErrorCheckSites []patterns.ErrorCheckSite
 }
 
 // Extraction is the full result of package analysis: per-function PDGs
@@ -291,6 +294,8 @@ func extractFunc(pkg *packages.Package, fn *ast.FuncDecl, path string, ctx extra
 		ForceTypeAssertHits: findForceTypeAssertHits(fn, pkg.Fset, pkg.TypesInfo),
 		// TypedNilHits are typed-nil comparisons (gostaticanalysis).
 		TypedNilHits: findTypedNilHits(fn, pkg.Fset, pkg.TypesInfo),
+		// ErrorCheckSites tracks per-call error checking for deviant_behavior.
+		ErrorCheckSites: findErrorCheckSites(fn, pkg.Fset, pkg.TypesInfo),
 	}
 }
 

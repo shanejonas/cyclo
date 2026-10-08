@@ -125,6 +125,24 @@ const (
 	// fragments are meaningful computations, ideal extract-function
 	// candidates. Uses WL-hash bucketing to avoid NP-hard isomorphism.
 	SemanticClone CandidateKind = "semantic_clone"
+	// DependenceCluster flags functions whose PDG contains a large
+	// strongly-connected region — "everything affects everything"
+	// spaghetti that resists testing. Following Binkley & Harman.
+	// Detection-only: the fix is human judgment (break the cycle).
+	DependenceCluster CandidateKind = "dependence_cluster"
+	// MinedRule flags violations of implicit programming rules mined from
+	// the codebase itself (PR-Miner, Li & Zhou FSE 2005). Example: "in this
+	// repo, functions that call `lock` also call `unlock`". A function that
+	// calls `lock` but not `unlock` is a bug. Detection-only.
+	MinedRule CandidateKind = "mined_rule"
+	// DeviantBehavior flags call sites that deviate from the codebase's
+	// own beliefs about error handling (Engler et al., SOSP 2001). If 95%
+	// of callers check an error, the 5% that don't are bugs. Detection-only.
+	DeviantBehavior CandidateKind = "deviant_behavior"
+	// InconsistentClone flags clones with asymmetric bugs (CP-Miner, Li et
+	// al. OSDI 2004). If one copy has a nilerr bug and its siblings don't,
+	// the edit was inconsistent. Detection-only.
+	InconsistentClone CandidateKind = "inconsistent_clone"
 	// DomainService identifies a free function operating on two or more
 	// domain types without belonging to any of them. Per Evans, such
 	// stateless coordination is a Domain Service, not misplaced behavior:
@@ -178,6 +196,11 @@ var FixKindOrder = []CandidateKind{
 	NilErr,
 	ForceTypeAssert,
 	TypedNil,
+	SemanticClone,
+	DependenceCluster,
+	MinedRule,
+	DeviantBehavior,
+	InconsistentClone,
 }
 
 // FixKindRank returns the application-order rank for a pattern kind.
