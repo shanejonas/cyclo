@@ -119,6 +119,10 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 	{NilErr, func(prepared []*FuncFacts, options Options) []Candidate { return nilErrCandidates(prepared) }},
 	{ForceTypeAssert, func(prepared []*FuncFacts, options Options) []Candidate { return forceTypeAssertCandidates(prepared) }},
 	{TypedNil, func(prepared []*FuncFacts, options Options) []Candidate { return typedNilCandidates(prepared) }},
+	{SemanticClone, func(prepared []*FuncFacts, options Options) []Candidate {
+		groups := FindSemanticClones(prepared)
+		return SemanticCloneCandidates(groups, prepared)
+	}},
 }
 
 // addSingleFunctionCandidates appends fixed-score candidates that need no

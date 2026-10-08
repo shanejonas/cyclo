@@ -72,8 +72,25 @@ func TestPatternsReportsGuardClauses(t *testing.T) {
 	if !strings.Contains(text, "parseFlag") {
 		t.Fatalf("expected the inverted parseFlag to be flagged, got:\n%s", text)
 	}
-	if strings.Contains(text, "parseOther") {
-		t.Fatalf("proper guard clause parseOther must not be flagged, got:\n%s", text)
+	// parseOther has a proper guard clause and must not be flagged as
+	// guard_clause. (It may appear in semantic_clone output — that's a
+	// different kind.)
+	if strings.Contains(text, "guard_clause") && strings.Contains(text, "parseOther") {
+		// Check if parseOther is in a guard_clause section specifically.
+		// Simple heuristic: look for guard_clause followed by parseOther
+		// before the next candidate header.
+		lines := strings.Split(text, "\n")
+		inGuardClause := false
+		for _, line := range lines {
+			if strings.Contains(line, "guard_clause") && strings.HasPrefix(strings.TrimSpace(line), "#") {
+				inGuardClause = true
+			} else if strings.HasPrefix(strings.TrimSpace(line), "#") {
+				inGuardClause = false
+			}
+			if inGuardClause && strings.Contains(line, "parseOther") {
+				t.Fatalf("proper guard clause parseOther must not be flagged as guard_clause, got:\n%s", text)
+			}
+		}
 	}
 }
 
