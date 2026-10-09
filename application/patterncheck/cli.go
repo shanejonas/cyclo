@@ -29,6 +29,9 @@ Informational only: always exits 0, never a quality gate.
   --subsystem-mining
                     mine PR-Miner rules per call-graph subsystem instead of
                     per-repo; idioms live at the subsystem level
+  --group-mining
+                    mine PR-Miner rules within CCGraph similarity groups;
+                    differences between similar functions reveal patterns
 
 Exit 0: always, on success (even with no candidates). Exit 2: extraction or
 analysis failure.
@@ -41,6 +44,7 @@ type options struct {
 	threshold       uint
 	useCache        bool
 	subsystemMining bool
+	groupMining     bool
 	paths           []string
 }
 
@@ -94,6 +98,7 @@ func GetReport(ctx context.Context, args []string) (*patterns.PatternsReport, er
 		DomainServices:    pdgs.DomainServices,
 		WlCache:           cache,
 		SubsystemMining:   opts.subsystemMining,
+		GroupMining:       opts.groupMining,
 	})
 	return &report, nil
 }
@@ -208,10 +213,11 @@ func parseOptions(args []string) (options, error) {
 	threshold := flags.Uint("threshold", 600, "minimum WL similarity (0-1000)")
 	useCache := flags.Bool("cache", false, "reuse WL refinements from .cyclo/patterns-cache.json")
 	subsystemMining := flags.Bool("subsystem-mining", false, "mine PR-Miner rules per call-graph subsystem")
+	groupMining := flags.Bool("group-mining", false, "mine PR-Miner rules within CCGraph similarity groups")
 	if err := flags.Parse(args); err != nil {
 		return options{}, err
 	}
-	result := options{format: *format, threshold: *threshold, useCache: *useCache, subsystemMining: *subsystemMining, paths: flags.Args()}
+	result := options{format: *format, threshold: *threshold, useCache: *useCache, subsystemMining: *subsystemMining, groupMining: *groupMining, paths: flags.Args()}
 	return result, result.validate()
 }
 

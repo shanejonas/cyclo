@@ -56,6 +56,11 @@ type Options struct {
 	// (connected components) instead of the whole repo. Idioms live at the
 	// subsystem level; whole-repo mining dilutes them to nothing.
 	SubsystemMining bool
+	// GroupMining scopes PR-Miner rule mining to CCGraph similarity groups
+	// instead of the whole repo. Within a group of similar functions, the
+	// differences reveal the interesting patterns: 19 handlers that all
+	// send a response and 1 that forgot to.
+	GroupMining bool
 }
 
 // Build keeps groups at or above minScoreMilli, then the first top (all when
@@ -136,6 +141,9 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 		return DepClusterCandidates(clusters, prepared)
 	}},
 	{MinedRule, func(prepared []*FuncFacts, options Options) []Candidate {
+		if options.GroupMining {
+			return minedRuleGroupCandidates(prepared)
+		}
 		if options.SubsystemMining {
 			return minedRuleSubsystemCandidates(prepared)
 		}
