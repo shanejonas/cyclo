@@ -119,10 +119,6 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 	{NilErr, func(prepared []*FuncFacts, options Options) []Candidate { return nilErrCandidates(prepared) }},
 	{ForceTypeAssert, func(prepared []*FuncFacts, options Options) []Candidate { return forceTypeAssertCandidates(prepared) }},
 	{TypedNil, func(prepared []*FuncFacts, options Options) []Candidate { return typedNilCandidates(prepared) }},
-	{SemanticClone, func(prepared []*FuncFacts, options Options) []Candidate {
-		groups := FindSemanticClones(prepared)
-		return SemanticCloneCandidates(groups, prepared)
-	}},
 	{DependenceCluster, func(prepared []*FuncFacts, options Options) []Candidate {
 		clusters := FindDepClusters(prepared)
 		return DepClusterCandidates(clusters, prepared)
@@ -146,11 +142,6 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 		beliefs := MineErrorBeliefs(allSites)
 		violations := FindBeliefViolations(allSites, beliefs)
 		return DeviantBehaviorCandidates(violations, prepared)
-	}},
-	{InconsistentClone, func(prepared []*FuncFacts, options Options) []Candidate {
-		groups := FindSemanticClones(prepared)
-		edits := FindInconsistentEdits(groups, prepared)
-		return InconsistentCloneCandidates(edits, prepared)
 	}},
 	{CCGraphClone, func(prepared []*FuncFacts, options Options) []Candidate {
 		pdgs, names := ccGraphInputs(prepared)

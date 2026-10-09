@@ -73,8 +73,7 @@ func TestPatternsReportsGuardClauses(t *testing.T) {
 		t.Fatalf("expected the inverted parseFlag to be flagged, got:\n%s", text)
 	}
 	// parseOther has a proper guard clause and must not be flagged as
-	// guard_clause. (It may appear in semantic_clone output — that's a
-	// different kind.)
+	// guard_clause.
 	if strings.Contains(text, "guard_clause") && strings.Contains(text, "parseOther") {
 		// Check if parseOther is in a guard_clause section specifically.
 		// Simple heuristic: look for guard_clause followed by parseOther

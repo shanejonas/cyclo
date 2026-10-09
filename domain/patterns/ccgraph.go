@@ -295,6 +295,15 @@ func commonPrefixLen(s1, s2 string, max int) int {
 	return out
 }
 
+// buildFactMap indexes facts by ID for candidate construction.
+func buildFactMap(facts []*FuncFacts) map[string]*FuncFacts {
+	out := map[string]*FuncFacts{}
+	for _, f := range facts {
+		out[f.ID] = f
+	}
+	return out
+}
+
 // CCGraphCloneCandidates converts CCGraph clone groups (function ID lists)
 // into pattern candidates for the report pipeline.
 func CCGraphCloneCandidates(groups [][]string, facts []*FuncFacts) []Candidate {
