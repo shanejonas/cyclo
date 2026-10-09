@@ -2,6 +2,7 @@ package patterns
 
 import (
 	"encoding/binary"
+	"math"
 	"sort"
 	"strings"
 )
@@ -314,16 +315,7 @@ func cosineSimilarity(a, b []float64) float64 {
 	if normA == 0 || normB == 0 {
 		return 0
 	}
-	return dot / (sqrt(normA) * sqrt(normB))
-}
-
-func sqrt(x float64) float64 {
-	// Newton's method, sufficient for similarity thresholding
-	z := x
-	for i := 0; i < 10; i++ {
-		z = z - (z*z-x)/(2*z)
-	}
-	return z
+	return dot / (math.Sqrt(normA) * math.Sqrt(normB))
 }
 
 // charVecSimilar reports whether two graphs are characteristically similar
