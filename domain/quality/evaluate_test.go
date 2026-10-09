@@ -214,13 +214,13 @@ func TestCalleeNormalizationPreservesPlainAndMalformedNames(t *testing.T) {
 
 func TestStrictLimitsAndMinimumStatements(t *testing.T) {
 	f := fact("limits", 1)
-	f.Params, f.CodeLines, f.Statements = 4, 50, 2
+	f.Params, f.CodeLines, f.Statements = 4, 200, 2
 	f.Effects = []Effect{{Kind: IO, Detail: "write", Line: 2}}
 	c := DefaultConfig()
 	if len(evaluate(t, f, c).Diagnostics) != 0 {
 		t.Fatal("limits are strict and minimum statements applies")
 	}
-	f.Params, f.CodeLines, f.Statements, f.HasSelf = 5, 51, 3, true
+	f.Params, f.CodeLines, f.Statements, f.HasSelf = 5, 201, 3, true
 	report := evaluate(t, f, c)
 	if len(report.Diagnostics) != 3 {
 		t.Fatalf("diagnostics: %+v", report.Diagnostics)
