@@ -118,7 +118,7 @@ func typedNilCandidates(facts []*FuncFacts) []Candidate {
 					"typed nil compared to nil: `%s`",
 					h.ExprText,
 				),
-				Inference: "typed nil in interface is never == nil",
+				Inference: "interface nil checks do not test whether the contained value is nil",
 				Sites: []Site{{
 					Path: f.Path, Line: h.Line, EndLine: h.Line,
 					ID: f.ID, Name: f.Name,
