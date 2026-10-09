@@ -178,7 +178,7 @@ func TestPredicateNameEmptyString(t *testing.T) {
 		}
 		return e
 	}
-	name := predicateName(parse(`token.AccessToken == "" || token.Error != ""`))
+	name := predicateName(parse(`token.AccessToken == "" || token.Error != ""`), nil)
 	if name != "IsAccessTokenEmptyOrErrorNotEmpty" {
 		t.Errorf("got %q, want IsAccessTokenEmptyOrErrorNotEmpty", name)
 	}
