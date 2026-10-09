@@ -46,19 +46,9 @@ func CCGraphClones(pdgs map[string]*Pdg, names map[string]string) [][]string {
 	return ccGraphGroups(pdgs, names, ccMatchThreshold)
 }
 
-// CCGraphCohorts finds cohort groups using the CCGraph pipeline with a
-// caller-chosen WL kernel match threshold (in thousandths, like
-// ccMatchThreshold). Lower thresholds find looser cohorts — functions
-// solving similar problems rather than near-duplicate clones. Used by
-// group mining: cohorts are big enough and diverse enough for PR-Miner
-// to find interesting within-group patterns.
-func CCGraphCohorts(pdgs map[string]*Pdg, names map[string]string, matchMilli uint32) [][]string {
-	return ccGraphGroups(pdgs, names, matchMilli)
-}
-
 // ccGraphGroups runs the shared CCGraph pipeline with a parameterized
 // Stage-4 WL similarity threshold. The paper-exact path passes
-// ccMatchThreshold; cohort detection passes a lower value.
+// ccMatchThreshold.
 func ccGraphGroups(pdgs map[string]*Pdg, names map[string]string, matchMilli uint32) [][]string {
 	ids := ccSortableIDs(pdgs)
 	if len(ids) < 2 {

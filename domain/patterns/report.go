@@ -52,29 +52,6 @@ type Options struct {
 	// WlCache memoizes WL refinements across runs for incremental mining.
 	// Nil computes every refinement fresh.
 	WlCache *WlCache
-	// SubsystemMining scopes PR-Miner rule mining to call-graph subsystems
-	// (connected components) instead of the whole repo. Idioms live at the
-	// subsystem level; whole-repo mining dilutes them to nothing.
-	SubsystemMining bool
-	// GroupMining scopes PR-Miner rule mining to CCGraph similarity groups
-	// instead of the whole repo. Within a group of similar functions, the
-	// differences reveal the interesting patterns: 19 handlers that all
-	// send a response and 1 that forgot to.
-	GroupMining bool
-	// CohortThreshold is the WL kernel similarity threshold for group
-	// mining cohort detection, in [0, 1]. Lower than the paper's 0.9 clone
-	// threshold: cohorts are functions solving similar problems, not
-	// near-duplicate clones. Zero means the default (0.65).
-	CohortThreshold float64
-}
-
-// cohortThresholdMilli converts Options.CohortThreshold to thousandths
-// for CCGraphCohorts. Zero means the default cohort threshold.
-func cohortThresholdMilli(options Options) uint32 {
-	if options.CohortThreshold <= 0 {
-		return defaultCohortThresholdMilli
-	}
-	return uint32(options.CohortThreshold * 1000)
 }
 
 // Build keeps groups at or above minScoreMilli, then the first top (all when
@@ -155,12 +132,6 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 		return DepClusterCandidates(clusters, prepared)
 	}},
 	{MinedRule, func(prepared []*FuncFacts, options Options) []Candidate {
-		if options.GroupMining {
-			return minedRuleGroupCandidates(prepared, cohortThresholdMilli(options))
-		}
-		if options.SubsystemMining {
-			return minedRuleSubsystemCandidates(prepared)
-		}
 		sets := BuildCallSets(prepared)
 		rules := MineRules(sets)
 		violations := FindViolations(sets, rules)
