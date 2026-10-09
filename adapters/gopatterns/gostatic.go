@@ -373,8 +373,9 @@ func isEmptyInterface(info *types.Info, e ast.Expr) bool {
 	return ok && iface.Empty()
 }
 
-// findTypedNilHits finds interface nil checks after a concrete nil-able
-// value is boxed. It records possible typed nils, not control-flow proofs.
+// findTypedNilHits finds typed-nil vs untyped-nil comparisons.
+// Tracks when a typed nil-able (pointer, etc.) is assigned to an interface
+// and later compared to nil — the comparison is always false.
 func findTypedNilHits(fn *ast.FuncDecl, fset *token.FileSet, info *types.Info) []patterns.TypedNilHit {
 	var out []patterns.TypedNilHit
 	if fn.Body == nil || info == nil {
@@ -382,7 +383,7 @@ func findTypedNilHits(fn *ast.FuncDecl, fset *token.FileSet, info *types.Info) [
 	}
 	typedVars := collectTypedVars(fn.Body, info)
 	ast.Inspect(fn.Body, func(n ast.Node) bool {
-		if hit := checkTypedNilCompare(n, fset, info, typedVars); hit != nil {
+		if hit := checkTypedNilCompare(n, fset, typedVars); hit != nil {
 			out = append(out, *hit)
 		}
 		return true
@@ -390,9 +391,9 @@ func findTypedNilHits(fn *ast.FuncDecl, fset *token.FileSet, info *types.Info) [
 	return out
 }
 
-// collectTypedVars tracks interface objects, so shadowed names stay separate.
-func collectTypedVars(body ast.Node, info *types.Info) map[types.Object]bool {
-	typedVars := map[types.Object]bool{}
+// collectTypedVars finds variables assigned a typed nil-able value.
+func collectTypedVars(body ast.Node, info *types.Info) map[string]bool {
+	typedVars := map[string]bool{}
 	ast.Inspect(body, func(n ast.Node) bool {
 		collectValueSpecVars(n, info, typedVars)
 		collectAssignVars(n, info, typedVars)
@@ -401,101 +402,76 @@ func collectTypedVars(body ast.Node, info *types.Info) map[types.Object]bool {
 	return typedVars
 }
 
-func collectValueSpecVars(n ast.Node, info *types.Info, typedVars map[types.Object]bool) {
+// collectValueSpecVars tracks `var x any = p` where p is nil-able.
+func collectValueSpecVars(n ast.Node, info *types.Info, typedVars map[string]bool) {
 	vs, ok := n.(*ast.ValueSpec)
 	if !ok {
 		return
 	}
 	for i, name := range vs.Names {
-		if i < len(vs.Values) {
-			trackTypedNilAssignment(name, vs.Values[i], info, typedVars)
+		if i < len(vs.Values) && isTypedNilable(info, vs.Values[i]) {
+			typedVars[name.Name] = true
 		}
 	}
 }
 
-func collectAssignVars(n ast.Node, info *types.Info, typedVars map[types.Object]bool) {
+// collectAssignVars tracks `x := p` or `x = p` where p is nil-able.
+func collectAssignVars(n ast.Node, info *types.Info, typedVars map[string]bool) {
 	assign, ok := n.(*ast.AssignStmt)
 	if !ok {
 		return
 	}
 	for i, lhs := range assign.Lhs {
-		if i < len(assign.Rhs) {
-			trackTypedNilAssignment(lhs, assign.Rhs[i], info, typedVars)
+		if id, ok := lhs.(*ast.Ident); ok && i < len(assign.Rhs) {
+			if isTypedNilable(info, assign.Rhs[i]) {
+				typedVars[id.Name] = true
+			}
 		}
 	}
 }
 
-func trackTypedNilAssignment(lhs, rhs ast.Expr, info *types.Info, typedVars map[types.Object]bool) {
-	id, ok := lhs.(*ast.Ident)
-	if !ok {
-		return
-	}
-	object := info.ObjectOf(id)
-	if object == nil {
-		return
-	}
-	if _, ok := object.Type().Underlying().(*types.Interface); !ok {
-		return
-	}
-	if isTypedNilable(info, rhs) {
-		typedVars[object] = true
-	}
-}
-
-func checkTypedNilCompare(n ast.Node, fset *token.FileSet, info *types.Info, typedVars map[types.Object]bool) *patterns.TypedNilHit {
+// checkTypedNilCompare checks one node for a typed-nil comparison.
+func checkTypedNilCompare(n ast.Node, fset *token.FileSet, typedVars map[string]bool) *patterns.TypedNilHit {
 	bin, ok := n.(*ast.BinaryExpr)
 	if !ok || (bin.Op != token.EQL && bin.Op != token.NEQ) {
 		return nil
 	}
-	name := typedNilVar(bin.X, bin.Y, info, typedVars)
-	if name == "" {
-		name = typedNilVar(bin.Y, bin.X, info, typedVars)
+	if name := typedNilVar(bin.X, bin.Y, typedVars); name != "" {
+		return &patterns.TypedNilHit{
+			Line:     fset.Position(bin.Pos()).Line,
+			ExprText: name + " may hold typed nil",
+		}
 	}
-	if name == "" {
-		return nil
+	if name := typedNilVar(bin.Y, bin.X, typedVars); name != "" {
+		return &patterns.TypedNilHit{
+			Line:     fset.Position(bin.Pos()).Line,
+			ExprText: name + " may hold typed nil",
+		}
 	}
-	return &patterns.TypedNilHit{
-		Line:     fset.Position(bin.Pos()).Line,
-		ExprText: name + " may hold typed nil",
-	}
+	return nil
 }
 
-func typedNilVar(v, other ast.Expr, info *types.Info, typedVars map[types.Object]bool) string {
+// typedNilVar returns the var name if v is a tracked var and other is nil.
+func typedNilVar(v, other ast.Expr, typedVars map[string]bool) string {
 	id, ok := v.(*ast.Ident)
-	if ok && typedVars[info.ObjectOf(id)] && isNilIdent(other) {
+	if ok && typedVars[id.Name] && isNilIdent(other) {
 		return id.Name
 	}
 	return ""
 }
 
-// isTypedNilable requires a concrete nil-able source. An interface-returning
-// call alone is not evidence of a boxed typed nil. Named types use Underlying.
+// isTypedNilable reports whether e has a type that can hold a typed nil
+// (pointer, interface, slice, map, chan, func).
 func isTypedNilable(info *types.Info, e ast.Expr) bool {
 	t := info.TypeOf(e)
 	if t == nil {
 		return false
 	}
-	switch t.Underlying().(type) {
-	case *types.Pointer, *types.Slice, *types.Map, *types.Chan, *types.Signature:
+	switch t.(type) {
+	case *types.Pointer, *types.Interface, *types.Slice, *types.Map, *types.Chan, *types.Signature:
 		return true
-	case *types.Interface:
-		return isTypedNilConversion(info, e)
 	}
 	return false
-}
-
-func isTypedNilConversion(info *types.Info, e ast.Expr) bool {
-	if paren, ok := e.(*ast.ParenExpr); ok {
-		return isTypedNilable(info, paren.X)
-	}
-	call, ok := e.(*ast.CallExpr)
-	if !ok || len(call.Args) != 1 {
-		return false
-	}
-	if !info.Types[call.Fun].IsType() {
-		return false
-	}
-	return isTypedNilable(info, call.Args[0])
 }
 
 // findSuppressedKinds extracts suppressed pattern kinds from the function's
