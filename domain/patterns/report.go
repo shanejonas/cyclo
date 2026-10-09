@@ -154,6 +154,10 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 		divergent := FindInconsistentClones(groups, pdgs)
 		return InconsistentCloneCandidates(divergent, prepared)
 	}},
+	{TaintFlowKind, func(prepared []*FuncFacts, options Options) []Candidate {
+		flows := FindTaintFlows(prepared)
+		return TaintFlowCandidates(flows, prepared)
+	}},
 }
 
 // addSingleFunctionCandidates appends fixed-score candidates that need no
