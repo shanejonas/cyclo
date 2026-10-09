@@ -890,8 +890,8 @@ func applySpecificationFix(spec *patterns.FixSpec, src []byte) ([]byte, error) {
 // a method (local type) or function (external type). Returns false when the
 // fix cannot be generated safely.
 func specFixPlan(f *ast.File, typeName string, matches []specMatch) (predName string, isLocal, ok bool) {
-	// Derive the predicate name from the first match's condition.
-	predName = predicateName(matches[0].stmt.Cond)
+	// Derive the predicate name from the first match's condition in context.
+	predName = predicateName(matches[0].stmt.Cond, matches[0].stmt)
 	if predName == "" {
 		return "", false, false
 	}
@@ -935,26 +935,199 @@ func uniquePredName(f *ast.File, name string) string {
 	}
 }
 
-// predicateName derives an idiomatic predicate name from a boolean condition:
-// `u.Age > 18 && u.Active` -> `IsAgeOver18AndActive`.
-func predicateName(cond ast.Expr) string {
-	operands, connector := splitBoolOps(cond)
-	if len(operands) == 0 {
+// predicateName derives an idiomatic predicate name from a boolean condition
+// in context. Layered: an error consequence names the failure (`IsErrorResponse`);
+// otherwise structural transliteration when it's clean (`IsAgeOver18AndActive`);
+// a valid-consequence fallback (`IsValidAnswer`) when transliteration would be
+// junk. Returns "" when no clean name is available.
+func predicateName(cond ast.Expr, ifStmt *ast.IfStmt) string {
+	if ifStmt != nil {
+		if name := errorConsequenceName(cond, ifStmt); name != "" {
+			return name
+		}
+	}
+	if name := structuralPredName(cond); name != "" {
+		return name
+	}
+	if ifStmt != nil {
+		return validConsequenceName(cond, ifStmt)
+	}
+	return ""
+}
+
+// errorConsequenceName names a compound condition whose body returns an error:
+// `if response.StatusCode < 200 || ... { return err }` -> `IsErrorResponse`.
+// Returns "" when the pattern doesn't apply.
+func errorConsequenceName(cond ast.Expr, ifStmt *ast.IfStmt) string {
+	operands, _ := splitBoolOps(cond)
+	if len(operands) < 2 {
 		return ""
 	}
-	var parts []string
-	for _, op := range operands {
-		part := operandPredName(op)
-		if part == "" {
+	subject := condSubject(cond)
+	if subject == "" || !blockReturnsError(ifStmt.Body) {
+		return ""
+	}
+	return "IsError" + capitalize(subject)
+}
+
+// validConsequenceName is the last resort for compound conditions guarding a
+// happy path: `if answer.Choice != "none" && ... { use(answer) }` ->
+// `IsValidAnswer`. Returns "" when the pattern doesn't apply.
+func validConsequenceName(cond ast.Expr, ifStmt *ast.IfStmt) string {
+	operands, _ := splitBoolOps(cond)
+	if len(operands) < 2 {
+		return ""
+	}
+	subject := condSubject(cond)
+	if subject == "" || blockReturnsError(ifStmt.Body) {
+		return ""
+	}
+	return "IsValid" + capitalize(subject)
+}
+
+// condSubject returns the common root variable of a condition's operands:
+// `response.StatusCode < 200 || response.StatusCode >= 300` -> "response".
+// Returns "" when operands use different variables.
+func condSubject(cond ast.Expr) string {
+	operands, _ := splitBoolOps(cond)
+	var subject string
+	for i, op := range operands {
+		s := operandSubject(op)
+		if s == "" {
 			return ""
 		}
-		parts = append(parts, part)
+		if i == 0 {
+			subject = s
+		} else if s != subject {
+			return ""
+		}
+	}
+	return subject
+}
+
+// operandSubject extracts the root identifier of one boolean operand.
+func operandSubject(op ast.Expr) string {
+	op = specUnwrapParens(op)
+	if unary, ok := op.(*ast.UnaryExpr); ok && unary.Op == token.NOT {
+		return operandSubject(unary.X)
+	}
+	if bin, ok := op.(*ast.BinaryExpr); ok {
+		if s := exprRoot(bin.X); s != "" {
+			return s
+		}
+		return exprRoot(bin.Y)
+	}
+	return exprRoot(op)
+}
+
+// exprRoot returns the base identifier of a selector chain or identifier.
+func exprRoot(e ast.Expr) string {
+	for {
+		switch n := e.(type) {
+		case *ast.Ident:
+			return n.Name
+		case *ast.SelectorExpr:
+			e = n.X
+		default:
+			return ""
+		}
+	}
+}
+
+// blockReturnsError reports whether the block returns an error value.
+func blockReturnsError(block *ast.BlockStmt) bool {
+	found := false
+	ast.Inspect(block, func(n ast.Node) bool {
+		if found {
+			return false
+		}
+		// Don't descend into nested function literals.
+		if _, ok := n.(*ast.FuncLit); ok {
+			return false
+		}
+		ret, ok := n.(*ast.ReturnStmt)
+		if !ok {
+			return true
+		}
+		for _, res := range ret.Results {
+			if isErrorValue(res) {
+				found = true
+				return false
+			}
+		}
+		return true
+	})
+	return found
+}
+
+// isErrorValue heuristically reports whether an expression is an error:
+// an `err` identifier or a fmt.Errorf/errors.New call.
+func isErrorValue(e ast.Expr) bool {
+	if id, ok := e.(*ast.Ident); ok {
+		return isErrIdent(id)
+	}
+	call, ok := e.(*ast.CallExpr)
+	return ok && isErrorConstructor(call)
+}
+
+// isErrIdent reports whether id looks like an error variable.
+func isErrIdent(id *ast.Ident) bool {
+	return id.Name == "err" || strings.HasSuffix(id.Name, "Err")
+}
+
+// isErrorConstructor reports whether call is fmt.Errorf or errors.New.
+func isErrorConstructor(call *ast.CallExpr) bool {
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+	pkg, ok := sel.X.(*ast.Ident)
+	if !ok {
+		return false
+	}
+	return (pkg.Name == "fmt" && sel.Sel.Name == "Errorf") ||
+		(pkg.Name == "errors" && sel.Sel.Name == "New")
+}
+
+// structuralPredName is the syntactic fallback: `u.Age > 18 && u.Active` ->
+// `IsAgeOver18AndActive`. Returns "" when the result would be a poor name.
+func structuralPredName(cond ast.Expr) string {
+	operands, connector := splitBoolOps(cond)
+	parts := operandNameParts(operands)
+	if len(parts) == 0 {
+		return ""
 	}
 	sep := "And"
 	if connector == token.LOR {
 		sep = "Or"
 	}
-	return "Is" + strings.Join(parts, sep)
+	return cleanPredName(strings.Join(parts, sep))
+}
+
+// operandNameParts converts each operand to a name fragment, or nil if any
+// operand can't be named.
+func operandNameParts(operands []ast.Expr) []string {
+	var parts []string
+	for _, op := range operands {
+		part := operandPredName(op)
+		if part == "" {
+			return nil
+		}
+		parts = append(parts, part)
+	}
+	return parts
+}
+
+// cleanPredName ensures the Is prefix (without stutter) and rejects names
+// that are just transliteration: too long to be a real name.
+func cleanPredName(name string) string {
+	if !strings.HasPrefix(name, "Is") {
+		name = "Is" + name
+	}
+	if len(name) > 35 {
+		return ""
+	}
+	return name
 }
 
 // splitBoolOps splits a boolean condition into operands and returns the
@@ -1049,11 +1222,13 @@ func sanitizeLiteral(value string) string {
 	return capitalize(stripNonAlnum(value))
 }
 
-// stripNonAlnum removes quotes and non-alphanumeric characters.
+// stripNonAlnum removes quotes and non-alphanumeric characters, preserving
+// decimal points as underscores so 0.70 doesn't become 070.
 func stripNonAlnum(value string) string {
+	value = strings.ReplaceAll(value, ".", "_")
 	var out strings.Builder
 	for _, r := range value {
-		if isAlnum(r) {
+		if isAlnum(r) || r == '_' {
 			out.WriteRune(r)
 		}
 	}
