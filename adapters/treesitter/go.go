@@ -11,7 +11,7 @@ import (
 	"os/exec"
 	"sort"
 
-	"github.com/shanejonas/cyclo/internal/reducer"
+	"github.com/shanejonas/cyclo/adapters/reducer"
 )
 
 type GoParser struct {

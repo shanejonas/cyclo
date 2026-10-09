@@ -22,8 +22,10 @@ func Evaluate(facts []Function, config Config) (Report, error) {
 	}
 	results := []FunctionResult{}
 	diagnostics := []Diagnostic{}
-	for _, function := range functions {
+	sites := stackSites(functions)
+	for idx, function := range functions {
 		result, findings := evaluateFunction(function, config)
+		planFindings(functions, sites, idx, findings)
 		results = append(results, result)
 		diagnostics = append(diagnostics, findings...)
 	}
@@ -38,6 +40,7 @@ func Evaluate(facts []Function, config Config) (Report, error) {
 		Functions:     results,
 		Diagnostics:   diagnostics,
 		Summary:       summarize(results),
+		FixGroups:     buildFixGroups(functions, diagnostics, config),
 	}, nil
 }
 
@@ -61,13 +64,11 @@ func canonicalFacts(facts []Function) ([]Function, error) {
 }
 
 func compareLocation(a, b Location) int {
-	if order := cmp.Compare(a.Path, b.Path); order != 0 {
-		return order
-	}
-	if order := cmp.Compare(a.Line, b.Line); order != 0 {
-		return order
-	}
-	return cmp.Compare(a.Column, b.Column)
+	return cmp.Or(
+		cmp.Compare(a.Path, b.Path),
+		cmp.Compare(a.Line, b.Line),
+		cmp.Compare(a.Column, b.Column),
+	)
 }
 
 func compareFunction(a, b Location) int {
@@ -112,7 +113,49 @@ func evaluateFunction(f Function, c Config) (FunctionResult, []Diagnostic) {
 			diagnostics = append(diagnostics, diagnostic)
 		}
 	}
+	diagnostics = appendDDDDiagnostics(diagnostics, f, c, allowed)
 	return result, diagnostics
+}
+
+// appendDDDDiagnostics evaluates DDD rule violations (Evans): aggregate
+// boundaries, repository bypasses, and mutable identities.
+func appendDDDDiagnostics(ds []Diagnostic, f Function, c Config, allowed []string) []Diagnostic {
+	aggTypes := distinctDDDTypes(f.DDD, "aggregate")
+	ds = appendRule(ds, f.Location,
+		ruleCheck{id: "aggregate", actual: int64(len(aggTypes)), rule: c.Aggregate}, allowed)
+	repoCalls := countDDD(f.DDD, "repository")
+	ds = appendRule(ds, f.Location,
+		ruleCheck{id: "repository", actual: int64(repoCalls), rule: c.Repository}, allowed)
+	mutIDs := countDDD(f.DDD, "mutable_identity")
+	ds = appendRule(ds, f.Location,
+		ruleCheck{id: "mutable_identity", actual: int64(mutIDs), rule: c.MutableIdentity}, allowed)
+	return ds
+}
+
+// distinctDDDTypes returns the unique detail strings for a DDD rule.
+func distinctDDDTypes(violations []DDDViolation, ruleID string) []string {
+	set := map[string]bool{}
+	for _, v := range violations {
+		if v.RuleID == ruleID {
+			set[v.Detail] = true
+		}
+	}
+	out := make([]string, 0, len(set))
+	for d := range set {
+		out = append(out, d)
+	}
+	return out
+}
+
+// countDDD counts violations of a DDD rule.
+func countDDD(violations []DDDViolation, ruleID string) int {
+	n := 0
+	for _, v := range violations {
+		if v.RuleID == ruleID {
+			n++
+		}
+	}
+	return n
 }
 
 func parameterBudget(f Function, c Config) int64 {
@@ -251,19 +294,17 @@ func mutationEffects(mutations []Mutation) []Effect {
 		if mutation.FieldPath != "" {
 			label += "." + mutation.FieldPath
 		}
-		effects = append(effects, Effect{kind, label, mutation.Line})
+		effects = append(effects, Effect{Kind: kind, Detail: label, Line: mutation.Line})
 	}
 	return effects
 }
 
 func compareEffects(a, b Effect) int {
-	if order := cmp.Compare(a.Line, b.Line); order != 0 {
-		return order
-	}
-	if order := cmp.Compare(a.Kind, b.Kind); order != 0 {
-		return order
-	}
-	return cmp.Compare(a.Detail, b.Detail)
+	return cmp.Or(
+		cmp.Compare(a.Line, b.Line),
+		cmp.Compare(a.Kind, b.Kind),
+		cmp.Compare(a.Detail, b.Detail),
+	)
 }
 
 func effectWeight(effects []Effect, weights Weights) (int64, bool) {

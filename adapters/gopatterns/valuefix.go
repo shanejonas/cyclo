@@ -1,0 +1,918 @@
+package gopatterns
+
+import (
+	"bytes"
+	"fmt"
+	"go/ast"
+	"go/format"
+	"go/token"
+	"sort"
+	"strings"
+	"unicode"
+
+	"golang.org/x/tools/go/ast/astutil"
+)
+
+// Value-object auto-fix: extract data clumps into immutable structs.
+// When the same primitive params travel together across functions, they
+// describe a domain concept that wants to be a value object. This fixer
+// performs the extraction mechanically: no LLM, no tokens.
+
+// ClumpParam is a parameter's name and primitive type name.
+type ClumpParam struct {
+	Name string
+	Type string
+}
+
+// ValueClump is a data clump: params shared by functions.
+type ValueClump struct {
+	Params []ClumpParam
+	Funcs  []*ast.FuncDecl
+}
+
+// ValueFix describes one applied value-object extraction.
+type ValueFix struct {
+	// Line is the line of the generated struct definition.
+	Line int
+	// TypeName is the generated struct name, e.g. "AmountCurrency".
+	TypeName string
+	// Kind is always "value_object".
+	Kind string
+}
+
+// valueObjectMinClump is the minimum params in a fixable clump.
+const valueObjectMinClump = 2
+
+// valueObjectMinFuncs is the minimum functions sharing a clump.
+const valueObjectMinFuncs = 3
+
+// FixValueObjects extracts data clumps into value-object structs.
+// It returns the rewritten source (gofmt-clean) and the fixes applied.
+// The transform is behavior-preserving when all safety checks pass;
+// clumps that fail any check are skipped.
+func FixValueObjects(fset *token.FileSet, f *ast.File, src []byte) ([]byte, []ValueFix, error) {
+	clumps := FindValueClumps(f)
+	if len(clumps) == 0 {
+		return src, nil, nil
+	}
+	// Save function doc comments before AST modification: format.Node on a
+	// modified AST can misplace them (e.g. moving a // cyclo-allow annotation
+	// into a rewritten return expression).
+	docComments := saveFuncDocs(f, fset, src)
+	fixes, structTexts := applyClumps(fset, f, clumps)
+	if len(fixes) == 0 {
+		return src, nil, nil
+	}
+	out, err := formatClumpAST(fset, f)
+	if err != nil {
+		return nil, nil, err
+	}
+	out, err = insertStructTexts(fset, f, out, structTexts, fixes)
+	if err != nil {
+		return nil, nil, err
+	}
+	out = restoreFuncDocs(out, docComments)
+	return out, fixes, nil
+}
+
+// funcDoc records a function's doc comment for restoration.
+type funcDoc struct {
+	funcName string
+	docText  string
+}
+
+// saveFuncDocs captures doc comments of all functions in the file.
+func saveFuncDocs(f *ast.File, fset *token.FileSet, src []byte) []funcDoc {
+	var docs []funcDoc
+	for _, decl := range f.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Doc == nil {
+			continue
+		}
+		start := fset.Position(fn.Doc.Pos()).Offset
+		end := fset.Position(fn.Doc.End()).Offset
+		docs = append(docs, funcDoc{
+			funcName: fn.Name.Name,
+			docText:  string(src[start:end]),
+		})
+	}
+	return docs
+}
+
+// restoreFuncDocs ensures each saved doc comment is immediately above its
+// function. If format.Node misplaced a doc (e.g. into a rewritten expression),
+// remove the misplaced copy and re-insert it above the function.
+func restoreFuncDocs(src []byte, docs []funcDoc) []byte {
+	out := src
+	for _, d := range docs {
+		out = ensureDocAboveFunc(out, d)
+	}
+	return out
+}
+
+// ensureDocAboveFunc moves d.docText to immediately above `func d.funcName`
+// if it isn't already there.
+func ensureDocAboveFunc(src []byte, d funcDoc) []byte {
+	// Find the function declaration.
+	funcIdx := indexFuncDecl(src, d.funcName)
+	if funcIdx < 0 {
+		return src
+	}
+	// Check if doc is already immediately above (allowing whitespace).
+	before := src[:funcIdx]
+	trimmed := bytes.TrimRight(before, " \t\n")
+	if bytes.HasSuffix(trimmed, []byte(d.docText)) {
+		return src // Already correct.
+	}
+	// Remove misplaced doc occurrences (but keep one for re-insertion).
+	cleaned := bytes.ReplaceAll(src, []byte(d.docText), []byte(""))
+	// Re-find func after removal (positions shifted).
+	funcIdx = indexFuncDecl(cleaned, d.funcName)
+	if funcIdx < 0 {
+		return src
+	}
+	// Insert doc above func.
+	insert := []byte(d.docText + "\n")
+	out := make([]byte, 0, len(cleaned)+len(insert))
+	out = append(out, cleaned[:funcIdx]...)
+	out = append(out, insert...)
+	out = append(out, cleaned[funcIdx:]...)
+	return out
+}
+
+// indexFuncDecl finds the offset of `func <name>(` or `func <name>[` in src.
+func indexFuncDecl(src []byte, name string) int {
+	// Match "func name(" with word boundary.
+	pattern := []byte("func " + name + "(")
+	if idx := bytes.Index(src, pattern); idx >= 0 {
+		return idx
+	}
+	// Generic function: "func name[".
+	pattern = []byte("func " + name + "[")
+	if idx := bytes.Index(src, pattern); idx >= 0 {
+		return idx
+	}
+	return -1
+}
+
+// applyClumps applies each clump, collecting fixes and struct texts.
+func applyClumps(fset *token.FileSet, f *ast.File, clumps []ValueClump) ([]ValueFix, []string) {
+	var fixes []ValueFix
+	var structTexts []string
+	for _, clump := range clumps {
+		fix, structText, ok := applyValueClump(fset, f, clump)
+		if !ok {
+			continue
+		}
+		fixes = append(fixes, fix)
+		structTexts = append(structTexts, structText)
+	}
+	return fixes, structTexts
+}
+
+// formatClumpAST prints the AST after clump rewrites.
+func formatClumpAST(fset *token.FileSet, f *ast.File) ([]byte, error) {
+	var buf bytes.Buffer
+	if err := format.Node(&buf, fset, f); err != nil {
+		return nil, fmt.Errorf("format after value_object fix: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+// insertStructTexts inserts struct declarations via text edit (avoids AST
+// comment misassociation), then gofmt-cleans the result.
+func insertStructTexts(fset *token.FileSet, f *ast.File, out []byte, structTexts []string, fixes []ValueFix) ([]byte, error) {
+	insertPos := valueStructInsertPos(fset, f, out)
+	for i := len(structTexts) - 1; i >= 0; i-- {
+		text := "\n" + structTexts[i] + "\n"
+		out = append(out[:insertPos], append([]byte(text), out[insertPos:]...)...)
+		setFixLines(out, insertPos, fixes)
+	}
+	formatted, err := format.Source(out)
+	if err != nil {
+		return nil, fmt.Errorf("gofmt after value_object struct insert: %w", err)
+	}
+	return formatted, nil
+}
+
+// setFixLines assigns line numbers to fixes (all structs at same insert point).
+func setFixLines(out []byte, insertPos int, fixes []ValueFix) {
+	for j := range fixes {
+		if fixes[j].Line == 0 {
+			fixes[j].Line = bytes.Count(out[:insertPos], []byte("\n")) + 2
+		}
+	}
+}
+
+// valueStructInsertPos finds the byte offset after the import declaration.
+func valueStructInsertPos(fset *token.FileSet, f *ast.File, src []byte) int {
+	for _, d := range f.Decls {
+		if gd, ok := d.(*ast.GenDecl); ok && gd.Tok == token.IMPORT {
+			return lineEnd(src, fset.Position(gd.End()).Offset)
+		}
+	}
+	// No imports: after package clause.
+	return lineEnd(src, fset.Position(f.Name.End()).Offset)
+}
+
+// FindValueClumps detects data clumps in f: groups of primitive params
+// shared by at least valueObjectMinFuncs functions.
+func FindValueClumps(f *ast.File) []ValueClump {
+	infos := collectFuncParams(f)
+	byKey := make(map[string]*ValueClump)
+	for i := 0; i < len(infos); i++ {
+		for j := i + 1; j < len(infos); j++ {
+			recordClumpIntersection(byKey, infos[i], infos[j])
+		}
+	}
+	var clumps []ValueClump
+	for _, c := range byKey {
+		if len(c.Funcs) >= valueObjectMinFuncs {
+			clumps = append(clumps, *c)
+		}
+	}
+	return maximalValueClumps(clumps)
+}
+
+// funcParamInfo pairs a function with its primitive param set.
+type funcParamInfo struct {
+	decl *ast.FuncDecl
+	keys map[string]ClumpParam
+}
+
+// collectFuncParams gathers primitive params for each function with enough.
+func collectFuncParams(f *ast.File) []funcParamInfo {
+	var infos []funcParamInfo
+	ast.Inspect(f, func(n ast.Node) bool {
+		fn, ok := n.(*ast.FuncDecl)
+		if !ok || !hasParamList(fn) {
+			return true
+		}
+		if keys := primitiveParamKeys(fn); len(keys) >= valueObjectMinClump {
+			infos = append(infos, funcParamInfo{decl: fn, keys: keys})
+		}
+		return true
+	})
+	return infos
+}
+
+// hasParamList reports whether fn has a non-nil param list and a body.
+func hasParamList(fn *ast.FuncDecl) bool {
+	return fn.Body != nil && fn.Type.Params != nil
+}
+
+// primitiveParamKeys builds the name:type key set for a function's params.
+func primitiveParamKeys(fn *ast.FuncDecl) map[string]ClumpParam {
+	keys := make(map[string]ClumpParam)
+	for _, field := range fn.Type.Params.List {
+		typeName, ok := primitiveTypeName(field.Type)
+		if !ok {
+			continue
+		}
+		for _, name := range field.Names {
+			key := name.Name + ":" + typeName
+			keys[key] = ClumpParam{Name: name.Name, Type: typeName}
+		}
+	}
+	return keys
+}
+
+// primitiveTypeName returns the type name if expr is a primitive type.
+func primitiveTypeName(expr ast.Expr) (string, bool) {
+	ident, ok := expr.(*ast.Ident)
+	if !ok {
+		return "", false
+	}
+	switch ident.Name {
+	case "bool", "string", "int", "int8", "int16", "int32", "int64",
+		"uint", "uint8", "uint16", "uint32", "uint64", "uintptr",
+		"float32", "float64", "complex64", "complex128", "byte", "rune":
+		return ident.Name, true
+	}
+	return "", false
+}
+
+// recordClumpIntersection adds the param intersection of two functions.
+func recordClumpIntersection(byKey map[string]*ValueClump, a, b funcParamInfo) {
+	keys := intersectSorted(a.keys, b.keys)
+	if len(keys) < valueObjectMinClump {
+		return
+	}
+	c := ensureClump(byKey, keys, a.keys)
+	c.Funcs = appendUniqueFunc(c.Funcs, a.decl)
+	c.Funcs = appendUniqueFunc(c.Funcs, b.decl)
+}
+
+// intersectSorted returns the sorted keys present in both sets.
+func intersectSorted(a, b map[string]ClumpParam) []string {
+	var keys []string
+	for k := range a {
+		if _, ok := b[k]; ok {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// ensureClump returns the clump for key, creating it if needed.
+func ensureClump(byKey map[string]*ValueClump, keys []string, params map[string]ClumpParam) *ValueClump {
+	key := strings.Join(keys, ",")
+	if c, ok := byKey[key]; ok {
+		return c
+	}
+	var plist []ClumpParam
+	for _, k := range keys {
+		plist = append(plist, params[k])
+	}
+	c := &ValueClump{Params: plist}
+	byKey[key] = c
+	return c
+}
+
+// appendUniqueFunc appends fn if not already present.
+func appendUniqueFunc(funcs []*ast.FuncDecl, fn *ast.FuncDecl) []*ast.FuncDecl {
+	for _, f := range funcs {
+		if f == fn {
+			return funcs
+		}
+	}
+	return append(funcs, fn)
+}
+
+// maximalValueClumps drops clumps that are strict subsets of another.
+func maximalValueClumps(clumps []ValueClump) []ValueClump {
+	var out []ValueClump
+	for i, c := range clumps {
+		if !isSubsetOfAnother(c, clumps, i) {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// isSubsetOfAnother reports whether c is a strict subset of another clump.
+func isSubsetOfAnother(c ValueClump, clumps []ValueClump, idx int) bool {
+	for j, other := range clumps {
+		if idx != j && isClumpSubset(c.Params, other.Params) {
+			return true
+		}
+	}
+	return false
+}
+
+// isClumpSubset reports whether a's params are a strict subset of b's.
+func isClumpSubset(a, b []ClumpParam) bool {
+	if len(a) >= len(b) {
+		return false
+	}
+	bkeys := make(map[string]bool, len(b))
+	for _, p := range b {
+		bkeys[p.Name+":"+p.Type] = true
+	}
+	for _, p := range a {
+		if !bkeys[p.Name+":"+p.Type] {
+			return false
+		}
+	}
+	return true
+}
+
+// applyValueClump extracts one clump into a struct. Returns false when any
+// applyValueClump applies one clump extraction. Returns the fix, the struct
+// source text (for text insertion), and whether it succeeded.
+func applyValueClump(fset *token.FileSet, f *ast.File, clump ValueClump) (ValueFix, string, bool) {
+	typeName := valueTypeName(clump.Params)
+	paramName := lowerFirst(typeName)
+	if !clumpSafe(clump, paramName) {
+		return ValueFix{}, "", false
+	}
+	if !rewriteClumpCallSites(f, clump, typeName) {
+		return ValueFix{}, "", false
+	}
+	for _, fn := range clump.Funcs {
+		if !rewriteFuncSignature(fn, clump.Params, paramName, typeName) {
+			return ValueFix{}, "", false
+		}
+		rewriteBodyIdents(fn.Body, clump.Params, paramName)
+	}
+	structText := buildValueStructText(typeName, clump.Params)
+	return ValueFix{TypeName: typeName, Kind: "value_object"}, structText, true
+}
+
+// buildValueStructText generates the struct declaration source text.
+func buildValueStructText(typeName string, params []ClumpParam) string {
+	var sb strings.Builder
+	sb.WriteString("// " + typeName + " groups " + paramList(params) + ".\n")
+	sb.WriteString("type " + typeName + " struct {\n")
+	for _, p := range params {
+		sb.WriteString("\t" + capitalize(p.Name) + " " + p.Type + "\n")
+	}
+	sb.WriteString("}")
+	return sb.String()
+}
+
+// paramList joins param names for the doc comment.
+func paramList(params []ClumpParam) string {
+	var names []string
+	for _, p := range params {
+		names = append(names, p.Name)
+	}
+	return strings.Join(names, ", ")
+}
+
+// clumpSafe runs all safety checks for a clump.
+func clumpSafe(clump ValueClump, paramName string) bool {
+	if !allUnexported(clump.Funcs) {
+		return false
+	}
+	paramNames := clumpParamNames(clump.Params)
+	for _, fn := range clump.Funcs {
+		if !funcSafe(fn, paramNames, paramName) {
+			return false
+		}
+	}
+	return true
+}
+
+// funcSafe runs the per-function safety checks.
+func funcSafe(fn *ast.FuncDecl, paramNames map[string]bool, paramName string) bool {
+	if fn.Recv != nil {
+		return false
+	}
+	if paramsModified(fn.Body, paramNames) {
+		return false
+	}
+	if shadowsParam(fn.Body, paramNames) {
+		return false
+	}
+	return !identUsed(fn.Body, paramName)
+}
+
+// rewriteClumpCallSites rewrites call sites for all functions in the clump.
+// It must run before signatures are rewritten (needs original positions).
+func rewriteClumpCallSites(f *ast.File, clump ValueClump, typeName string) bool {
+	for _, fn := range clump.Funcs {
+		positions := clumpParamPositions(fn, clump.Params)
+		if positions == nil {
+			return false
+		}
+		if !rewriteCallSites(f, fn.Name.Name, positions, clump, typeName) {
+			return false
+		}
+	}
+	return true
+}
+
+// clumpParamPositions returns the arg indices of clump params in fn's
+// signature, in clump order. Returns nil if not found.
+func clumpParamPositions(fn *ast.FuncDecl, params []ClumpParam) []int {
+	if fn.Type.Params == nil {
+		return nil
+	}
+	posByKey := paramPositionIndex(fn)
+	var positions []int
+	for _, p := range params {
+		pos, ok := posByKey[p.Name+":"+p.Type]
+		if !ok {
+			return nil
+		}
+		positions = append(positions, pos)
+	}
+	return positions
+}
+
+// paramPositionIndex maps name:type keys to flat param positions.
+func paramPositionIndex(fn *ast.FuncDecl) map[string]int {
+	posByKey := make(map[string]int)
+	idx := 0
+	for _, field := range fn.Type.Params.List {
+		idx = indexFieldParams(field, posByKey, idx)
+	}
+	return posByKey
+}
+
+// indexFieldParams records positions for one param field.
+func indexFieldParams(field *ast.Field, posByKey map[string]int, idx int) int {
+	typeName, ok := primitiveTypeName(field.Type)
+	for _, name := range field.Names {
+		if ok {
+			posByKey[name.Name+":"+typeName] = idx
+		}
+		idx++
+	}
+	return idx
+}
+
+// allUnexported reports whether all functions are unexported.
+func allUnexported(funcs []*ast.FuncDecl) bool {
+	for _, fn := range funcs {
+		if !isUnexportedFunc(fn) {
+			return false
+		}
+	}
+	return true
+}
+
+// valueTypeName builds "AmountCurrency" from params.
+func valueTypeName(params []ClumpParam) string {
+	var sb strings.Builder
+	for _, p := range params {
+		sb.WriteString(capitalize(p.Name))
+	}
+	return sb.String()
+}
+
+// capitalize uppercases the first rune.
+func capitalize(s string) string {
+	if s == "" {
+		return s
+	}
+	r := []rune(s)
+	r[0] = unicode.ToUpper(r[0])
+	return string(r)
+}
+
+// lowerFirst lowercases the first rune.
+func lowerFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	r := []rune(s)
+	r[0] = unicode.ToLower(r[0])
+	return string(r)
+}
+
+// clumpParamNames returns the param names as a set.
+func clumpParamNames(params []ClumpParam) map[string]bool {
+	out := make(map[string]bool, len(params))
+	for _, p := range params {
+		out[p.Name] = true
+	}
+	return out
+}
+
+// isUnexportedFunc reports whether the function name is unexported.
+func isUnexportedFunc(fn *ast.FuncDecl) bool {
+	name := fn.Name.Name
+	if name == "" {
+		return false
+	}
+	return unicode.IsLower([]rune(name)[0])
+}
+
+// paramsModified reports whether any param is assigned in the body.
+func paramsModified(body *ast.BlockStmt, params map[string]bool) bool {
+	modified := false
+	ast.Inspect(body, func(n ast.Node) bool {
+		if modified {
+			return false
+		}
+		if modifiesParam(n, params) {
+			modified = true
+			return false
+		}
+		return true
+	})
+	return modified
+}
+
+// modifiesParam reports whether n assigns to a clump param.
+func modifiesParam(n ast.Node, params map[string]bool) bool {
+	switch stmt := n.(type) {
+	case *ast.AssignStmt:
+		return assignTargetsParam(stmt, params)
+	case *ast.IncDecStmt:
+		if ident, ok := stmt.X.(*ast.Ident); ok {
+			return params[ident.Name]
+		}
+	}
+	return false
+}
+
+// assignTargetsParam reports whether an assignment targets a clump param.
+func assignTargetsParam(stmt *ast.AssignStmt, params map[string]bool) bool {
+	for _, lhs := range stmt.Lhs {
+		if ident, ok := lhs.(*ast.Ident); ok && params[ident.Name] {
+			return true
+		}
+	}
+	return false
+}
+
+// shadowsParam reports whether the body defines any identifier with a
+// clump param name (via :=, var, nested func params, range vars, ...).
+// Rewriting uses would be wrong under shadowing, so we skip.
+func shadowsParam(body *ast.BlockStmt, params map[string]bool) bool {
+	shadowed := false
+	ast.Inspect(body, func(n ast.Node) bool {
+		if shadowed {
+			return false
+		}
+		if definesParamName(n, params) {
+			shadowed = true
+			return false
+		}
+		return true
+	})
+	return shadowed
+}
+
+// definesParamName reports whether n defines an identifier with a param name.
+func definesParamName(n ast.Node, params map[string]bool) bool {
+	switch stmt := n.(type) {
+	case *ast.AssignStmt:
+		return assignDefines(stmt, params)
+	case *ast.ValueSpec:
+		return specDefines(stmt, params)
+	case *ast.FuncLit:
+		return funcLitDefines(stmt, params)
+	case *ast.RangeStmt:
+		return rangeDefines(stmt, params)
+	}
+	return false
+}
+
+// assignDefines checks := assignments.
+func assignDefines(stmt *ast.AssignStmt, params map[string]bool) bool {
+	if stmt.Tok != token.DEFINE {
+		return false
+	}
+	for _, lhs := range stmt.Lhs {
+		if ident, ok := lhs.(*ast.Ident); ok && params[ident.Name] {
+			return true
+		}
+	}
+	return false
+}
+
+// specDefines checks var declarations.
+func specDefines(stmt *ast.ValueSpec, params map[string]bool) bool {
+	for _, name := range stmt.Names {
+		if params[name.Name] {
+			return true
+		}
+	}
+	return false
+}
+
+// funcLitDefines checks nested function literal params.
+func funcLitDefines(stmt *ast.FuncLit, params map[string]bool) bool {
+	if stmt.Type.Params == nil {
+		return false
+	}
+	for _, field := range stmt.Type.Params.List {
+		for _, name := range field.Names {
+			if params[name.Name] {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// rangeDefines checks range variables.
+func rangeDefines(stmt *ast.RangeStmt, params map[string]bool) bool {
+	for _, e := range []ast.Expr{stmt.Key, stmt.Value} {
+		if ident, ok := e.(*ast.Ident); ok && params[ident.Name] {
+			return true
+		}
+	}
+	return false
+}
+
+// identUsed reports whether name appears as an identifier in the body.
+func identUsed(body *ast.BlockStmt, name string) bool {
+	used := false
+	ast.Inspect(body, func(n ast.Node) bool {
+		if used {
+			return false
+		}
+		if ident, ok := n.(*ast.Ident); ok && ident.Name == name {
+			used = true
+			return false
+		}
+		return true
+	})
+	return used
+}
+
+// buildValueStruct creates the struct declaration.
+// rewriteFuncSignature replaces clump params with the struct param.
+// Returns false if the params aren't found.
+func rewriteFuncSignature(fn *ast.FuncDecl, params []ClumpParam, paramName, structType string) bool {
+	if fn.Type.Params == nil {
+		return false
+	}
+	clumpKeys := make(map[string]bool, len(params))
+	for _, p := range params {
+		clumpKeys[p.Name+":"+p.Type] = true
+	}
+	builder := &sigBuilder{clumpKeys: clumpKeys, paramName: paramName, structType: structType}
+	for _, field := range fn.Type.Params.List {
+		builder.visitField(field)
+	}
+	if !builder.inserted {
+		return false
+	}
+	fn.Type.Params.List = builder.newList
+	return true
+}
+
+// sigBuilder accumulates the rewritten param list.
+type sigBuilder struct {
+	clumpKeys  map[string]bool
+	paramName  string
+	structType string
+	newList    []*ast.Field
+	inserted   bool
+}
+
+// visitField processes one param field, dropping clump params.
+func (b *sigBuilder) visitField(field *ast.Field) {
+	primType, ok := primitiveTypeName(field.Type)
+	var keep []*ast.Ident
+	for _, name := range field.Names {
+		if ok && b.clumpKeys[name.Name+":"+primType] {
+			b.insertStructParam()
+			continue
+		}
+		keep = append(keep, name)
+	}
+	if len(keep) > 0 {
+		field.Names = keep
+		b.newList = append(b.newList, field)
+	}
+}
+
+// insertStructParam adds the struct param once.
+func (b *sigBuilder) insertStructParam() {
+	if b.inserted {
+		return
+	}
+	b.newList = append(b.newList, &ast.Field{
+		Names: []*ast.Ident{{Name: b.paramName}},
+		Type:  &ast.Ident{Name: b.structType},
+	})
+	b.inserted = true
+}
+
+// rewriteBodyIdents replaces param uses with struct field accesses.
+// E.g. `amount` becomes `amountCurrency.Amount`.
+func rewriteBodyIdents(body *ast.BlockStmt, params []ClumpParam, paramName string) {
+	fieldByParam := make(map[string]string, len(params))
+	for _, p := range params {
+		fieldByParam[p.Name] = capitalize(p.Name)
+	}
+	astutil.Apply(body, func(c *astutil.Cursor) bool {
+		ident, ok := c.Node().(*ast.Ident)
+		if !ok {
+			return true
+		}
+		field, ok := fieldByParam[ident.Name]
+		if !ok {
+			return true
+		}
+		// Don't replace if this ident is a field name in a struct literal
+		// or a selector (already qualified).
+		if isSelectorOrFieldName(c, ident) {
+			return true
+		}
+		// Preserve position for the printer: format.Node on a modified AST
+		// misplaces comments and breaks formatting when new nodes lack positions.
+		newX := &ast.Ident{Name: paramName, NamePos: ident.NamePos}
+		newSel := &ast.Ident{Name: field, NamePos: ident.NamePos}
+		c.Replace(&ast.SelectorExpr{
+			X:   newX,
+			Sel: newSel,
+		})
+		return true
+	}, nil)
+}
+
+// isSelectorOrFieldName reports whether the ident is a selector or field name.
+func isSelectorOrFieldName(c *astutil.Cursor, ident *ast.Ident) bool {
+	parent := c.Parent()
+	if parent == nil {
+		return false
+	}
+	// If parent is a SelectorExpr and we're the Sel, don't replace.
+	if sel, ok := parent.(*ast.SelectorExpr); ok && sel.Sel == ident {
+		return true
+	}
+	// If parent is a KeyValueExpr and we're the Key, don't replace.
+	if kv, ok := parent.(*ast.KeyValueExpr); ok && kv.Key == ident {
+		return true
+	}
+	return false
+}
+
+// rewriteCallSites updates calls to funcName in f. positions are the arg
+// indices of the clump params. Returns false if any call cannot be safely
+// rewritten.
+func rewriteCallSites(f *ast.File, funcName string, positions []int, clump ValueClump, typeName string) bool {
+	var calls []*ast.CallExpr
+	ast.Inspect(f, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		if ident, ok := call.Fun.(*ast.Ident); ok && ident.Name == funcName {
+			calls = append(calls, call)
+		}
+		return true
+	})
+	for _, call := range calls {
+		if !rewriteOneCall(call, positions, clump, typeName) {
+			return false
+		}
+	}
+	return true
+}
+
+// rewriteOneCall rewrites a single call site, replacing the clump args with
+// a struct literal. Returns false if unsafe.
+func rewriteOneCall(call *ast.CallExpr, positions []int, clump ValueClump, typeName string) bool {
+	if !callArgsSafe(call, positions) {
+		return false
+	}
+	lit := buildStructLiteral(call, positions, clump, typeName)
+	call.Args = spliceStructArg(call.Args, positions, lit)
+	return true
+}
+
+// callArgsSafe reports whether the call's args can be safely rewritten.
+func callArgsSafe(call *ast.CallExpr, positions []int) bool {
+	if call.Ellipsis.IsValid() {
+		return false
+	}
+	maxPos := 0
+	for _, p := range positions {
+		if p > maxPos {
+			maxPos = p
+		}
+	}
+	return len(call.Args) > maxPos
+}
+
+// buildStructLiteral builds TypeName{Field: arg, ...} from the clump args.
+// buildStructLiteral builds TypeName{Field: arg, ...} from the clump args.
+// Positions are copied from the original args so format.Node places the
+// literal correctly.
+func buildStructLiteral(call *ast.CallExpr, positions []int, clump ValueClump, typeName string) *ast.CompositeLit {
+	var elts []ast.Expr
+	for i, p := range positions {
+		arg := call.Args[p]
+		key := &ast.Ident{Name: capitalize(clump.Params[i].Name)}
+		// Copy position from the arg for the key.
+		if ident, ok := arg.(*ast.Ident); ok {
+			key.NamePos = ident.NamePos
+		}
+		elts = append(elts, &ast.KeyValueExpr{
+			Key:   key,
+			Value: arg,
+		})
+	}
+	// Position the literal at the first arg.
+	lit := &ast.CompositeLit{
+		Type: &ast.Ident{Name: typeName},
+		Elts: elts,
+	}
+	if len(positions) > 0 {
+		if ident, ok := call.Args[positions[0]].(*ast.Ident); ok {
+			lit.Type.(*ast.Ident).NamePos = ident.NamePos
+		}
+	}
+	return lit
+}
+
+// spliceStructArg replaces the clump args with the struct literal.
+// The literal goes where the first clump arg was.
+func spliceStructArg(args []ast.Expr, positions []int, lit *ast.CompositeLit) []ast.Expr {
+	posSet := make(map[int]bool, len(positions))
+	for _, p := range positions {
+		posSet[p] = true
+	}
+	var newArgs []ast.Expr
+	inserted := false
+	for i, arg := range args {
+		if posSet[i] {
+			if !inserted {
+				newArgs = append(newArgs, lit)
+				inserted = true
+			}
+			continue
+		}
+		newArgs = append(newArgs, arg)
+	}
+	return newArgs
+}
+
+// rewriteBodyIdents replaces param uses with struct field accesses.
+// E.g. `amount` becomes `amountCurrency.Amount`.
+
+// FixLine implements gopatterns.Fix.
+func (v ValueFix) FixLine() int { return v.Line }
+
+// FixKind implements gopatterns.Fix.
+func (v ValueFix) FixKind() string { return v.Kind }

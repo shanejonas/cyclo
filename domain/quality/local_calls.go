@@ -97,11 +97,21 @@ func atCall(call Call, summary callSummary) callSummary {
 	if len(summary.effects) == 0 {
 		return summary
 	}
+	via := shortCallee(NormalizeCallee(call.Callee))
 	effects := make([]Effect, len(summary.effects))
 	for index, effect := range summary.effects {
-		effects[index] = Effect{Kind: effect.Kind, Detail: call.Callee + " → " + effect.Detail, Line: call.Line}
+		effects[index] = Effect{Kind: effect.Kind, Detail: call.Callee + " → " + effect.Detail, Line: call.Line, Via: via}
 	}
 	return callSummary{effects: effects, unclassified: summary.unclassified}
+}
+
+// shortCallee strips the module path from a callee for display, keeping the
+// package-qualified name: "example.com/mod/pkg.helper" → "pkg.helper".
+func shortCallee(callee string) string {
+	if i := strings.LastIndex(callee, "/"); i >= 0 {
+		return callee[i+1:]
+	}
+	return callee
 }
 
 func prefixKind(normalizedCallee string, prefixes []Prefix) (Kind, bool) {

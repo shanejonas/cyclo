@@ -183,3 +183,51 @@ func TestRecursiveHelperKeepsKnownEffects(t *testing.T) {
 		t.Fatalf("recursion erases established effects: %+v", result.Effects)
 	}
 }
+
+func TestInheritedEffectsNameImmediateHelper(t *testing.T) {
+	f := fact("caller", 1)
+	f.Calls = []Call{{Callee: "helper", Local: true, Line: 2}, {Callee: "fmt.Println", Line: 3}}
+	f.Helpers = []Helper{{Name: "helper", Calls: []Call{{Callee: "os.Write", Line: 20}}}}
+	result := evaluate(t, f, DefaultConfig()).Functions[0]
+	if len(result.Effects) != 2 {
+		t.Fatalf("effects: %+v", result.Effects)
+	}
+	for _, effect := range result.Effects {
+		if effect.Line == 2 && effect.Via != "helper" {
+			t.Fatalf("inherited effect missing via: %+v", effect)
+		}
+		if effect.Line == 3 && effect.Via != "" {
+			t.Fatalf("direct effect should not name via: %+v", effect)
+		}
+	}
+}
+
+func TestNestedHelperViaNamesImmediateCallee(t *testing.T) {
+	f := fact("caller", 1)
+	f.Calls = []Call{{Callee: "helper", Local: true, Line: 2}}
+	f.Helpers = []Helper{
+		{Name: "helper", Calls: []Call{{Callee: "inner", Local: true, Line: 20}}},
+		{Name: "inner", Calls: []Call{{Callee: "os.Write", Line: 30}}},
+	}
+	result := evaluate(t, f, DefaultConfig()).Functions[0]
+	if len(result.Effects) != 1 {
+		t.Fatalf("effects: %+v", result.Effects)
+	}
+	effect := result.Effects[0]
+	if effect.Via != "helper" {
+		t.Fatalf("via should be the immediate callee: %+v", effect)
+	}
+	if effect.Detail != "helper → inner → os.Write" {
+		t.Fatalf("chain detail lost: %+v", effect)
+	}
+}
+
+func TestViaUsesShortPackageQualifiedName(t *testing.T) {
+	f := fact("caller", 1)
+	f.Calls = []Call{{Callee: "example.com/mod/pkg.helper", Local: true, Line: 2}}
+	f.Helpers = []Helper{{Name: "example.com/mod/pkg.helper", Calls: []Call{{Callee: "os.Write", Line: 20}}}}
+	result := evaluate(t, f, DefaultConfig()).Functions[0]
+	if len(result.Effects) != 1 || result.Effects[0].Via != "pkg.helper" {
+		t.Fatalf("via not shortened: %+v", result.Effects)
+	}
+}

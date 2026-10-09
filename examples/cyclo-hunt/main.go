@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/shanejonas/cyclo/internal/reducer"
+	"github.com/shanejonas/cyclo/adapters/reducer"
 )
 
 func main() {

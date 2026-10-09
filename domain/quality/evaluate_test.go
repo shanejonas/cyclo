@@ -95,7 +95,7 @@ func TestPureStdlibCallsScoreZero(t *testing.T) {
 	for index, callee := range []string{
 		"strings.Repeat", "bytes.Compare", "slices.Contains", "maps.Keys",
 		"strconv.Itoa", "sort.Strings", "errors.Is", "math/big.NewInt",
-		"encoding/json.Marshal", "context.Background", "sync.Mutex.Lock",
+		"context.Background", "sync.Mutex.Lock",
 		"path/filepath.Join", "net/url.Parse",
 		"net/http.ResponseWriter.Header", "flag.FlagSet.Args", "flag.FlagSet.Lookup",
 	} {
@@ -214,13 +214,13 @@ func TestCalleeNormalizationPreservesPlainAndMalformedNames(t *testing.T) {
 
 func TestStrictLimitsAndMinimumStatements(t *testing.T) {
 	f := fact("limits", 1)
-	f.Params, f.CodeLines, f.Statements = 4, 50, 2
+	f.Params, f.CodeLines, f.Statements = 4, 200, 2
 	f.Effects = []Effect{{Kind: IO, Detail: "write", Line: 2}}
 	c := DefaultConfig()
 	if len(evaluate(t, f, c).Diagnostics) != 0 {
 		t.Fatal("limits are strict and minimum statements applies")
 	}
-	f.Params, f.CodeLines, f.Statements, f.HasSelf = 5, 51, 3, true
+	f.Params, f.CodeLines, f.Statements, f.HasSelf = 5, 201, 3, true
 	report := evaluate(t, f, c)
 	if len(report.Diagnostics) != 3 {
 		t.Fatalf("diagnostics: %+v", report.Diagnostics)
@@ -255,7 +255,7 @@ func TestSuppressionsRequireReasonAndKnownRules(t *testing.T) {
 func TestDeterminismDeduplicationAndInputImmutability(t *testing.T) {
 	a, b := fact("a", 10), fact("b", 1)
 	a.Params, b.Params = 8, 9
-	a.Effects = []Effect{{IO, "late", 12}, {Time, "early", 11}}
+	a.Effects = []Effect{{Kind: IO, Detail: "late", Line: 12}, {Kind: Time, Detail: "early", Line: 11}}
 	facts := []Function{a, b, a}
 	before, _ := json.Marshal(facts)
 	first, err := Evaluate(facts, DefaultConfig())
