@@ -121,18 +121,28 @@ func checkNilErrIf(ifStmt *ast.IfStmt, fset *token.FileSet, info *types.Info, er
 	if ret == nil {
 		return nil
 	}
+	ctx := nilRetCtx{ifStmt: ifStmt, fset: fset, ret: ret, info: info, errPos: errPos}
 	if check.isNotNil {
-		return checkNotNilReturn(ifStmt, fset, ret, branch, check, info, errPos)
+		return checkNotNilReturn(ctx, branch, check)
 	}
-	return checkNilReturn(ifStmt, fset, ret, check, info, errPos)
+	return checkNilReturn(ctx, check)
+}
+
+// nilRetCtx bundles the shared context for the nil-return checkers.
+type nilRetCtx struct {
+	ifStmt *ast.IfStmt
+	fset   *token.FileSet
+	ret    *ast.ReturnStmt
+	info   *types.Info
+	errPos int
 }
 
 // checkNotNilReturn checks `if err != nil { return nil }`.
-func checkNotNilReturn(ifStmt *ast.IfStmt, fset *token.FileSet, ret *ast.ReturnStmt, branch ast.Stmt, check *nilErrCheck, info *types.Info, errPos int) *patterns.NilErrHit {
-	if returnsNilError(ret, errPos) && !usesErrorValue(branch, check.errVal, info) {
+func checkNotNilReturn(ctx nilRetCtx, branch ast.Stmt, check *nilErrCheck) *patterns.NilErrHit {
+	if returnsNilError(ctx.ret, ctx.errPos) && !usesErrorValue(branch, check.errVal, ctx.info) {
 		return &patterns.NilErrHit{
-			Line:     fset.Position(ifStmt.Pos()).Line,
-			CondText: condText(fset, ifStmt.Cond),
+			Line:     ctx.fset.Position(ctx.ifStmt.Pos()).Line,
+			CondText: condText(ctx.fset, ctx.ifStmt.Cond),
 			Kind:     "returns nil when err != nil",
 		}
 	}
@@ -140,11 +150,11 @@ func checkNotNilReturn(ifStmt *ast.IfStmt, fset *token.FileSet, ret *ast.ReturnS
 }
 
 // checkNilReturn checks `if err == nil { return err }`.
-func checkNilReturn(ifStmt *ast.IfStmt, fset *token.FileSet, ret *ast.ReturnStmt, check *nilErrCheck, info *types.Info, errPos int) *patterns.NilErrHit {
-	if returnsErrValueAt(ret, check.errVal, errPos, info) {
+func checkNilReturn(ctx nilRetCtx, check *nilErrCheck) *patterns.NilErrHit {
+	if returnsErrValueAt(ctx.ret, check.errVal, ctx.errPos, ctx.info) {
 		return &patterns.NilErrHit{
-			Line:     fset.Position(ifStmt.Pos()).Line,
-			CondText: condText(fset, ifStmt.Cond),
+			Line:     ctx.fset.Position(ctx.ifStmt.Pos()).Line,
+			CondText: condText(ctx.fset, ctx.ifStmt.Cond),
 			Kind:     "returns err when err == nil",
 		}
 	}
@@ -465,7 +475,8 @@ func isTypedNilable(info *types.Info, e ast.Expr) bool {
 }
 
 // findSuppressedKinds extracts suppressed pattern kinds from the function's
-// doc comment. Supports both //lint:ignore and // cyclo-allow syntax.
+// doc comment. Supports both the standard lint-ignore comment form and the
+// legacy allowlist form.
 func findSuppressedKinds(fn *ast.FuncDecl) []string {
 	if fn.Doc == nil {
 		return nil
@@ -502,7 +513,7 @@ func parseLintIgnoreKinds(text string) []string {
 	return kinds
 }
 
-// parseCycloAllowKinds extracts kinds from `// cyclo-allow(k1, k2): reason`.
+// parseCycloAllowKinds extracts kinds from the legacy allowlist comment form.
 func parseCycloAllowKinds(text string) []string {
 	inner := strings.TrimPrefix(text, "// cyclo-allow(")
 	idx := strings.Index(inner, "):")

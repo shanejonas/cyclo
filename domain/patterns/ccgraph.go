@@ -274,8 +274,19 @@ func jaroMatches(r1, r2 []rune) (matches, transpositions int) {
 	window := jaroWindow(l1, l2)
 	seen1 := make([]bool, l1)
 	seen2 := make([]bool, l2)
-	for i := 0; i < l1; i++ {
-		lo, hi := jaroBounds(i, window, l2)
+	matches = jaroFindMatches(r1, r2, window, seen1, seen2)
+	if matches == 0 {
+		return 0, 0
+	}
+	transpositions = jaroTranspositions(r1, r2, seen1, seen2)
+	return matches, transpositions
+}
+
+// jaroFindMatches marks matched runes in seen1/seen2 and returns the count.
+func jaroFindMatches(r1, r2 []rune, window int, seen1, seen2 []bool) int {
+	matches := 0
+	for i := 0; i < len(r1); i++ {
+		lo, hi := jaroBounds(i, window, len(r2))
 		for j := lo; j < hi; j++ {
 			if !seen2[j] && r1[i] == r2[j] {
 				seen1[i] = true
@@ -285,11 +296,7 @@ func jaroMatches(r1, r2 []rune) (matches, transpositions int) {
 			}
 		}
 	}
-	if matches == 0 {
-		return 0, 0
-	}
-	transpositions = jaroTranspositions(r1, r2, seen1, seen2)
-	return matches, transpositions
+	return matches
 }
 
 // jaroTranspositions counts position mismatches among matched runes.

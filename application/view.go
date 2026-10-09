@@ -871,18 +871,23 @@ func joinedRows(panes [][]string, widths []int) []string {
 
 	result := make([]string, 0, rows)
 	for row := 0; row < rows; row++ {
-		cells := make([]string, len(panes))
-		for column, pane := range panes {
-			value := ""
-			if row < len(pane) {
-				value = pane[row]
-			}
-			cells[column] = styledCell(value, widths[column])
-		}
-		result = append(result, strings.Join(cells, " │ "))
+		result = append(result, strings.Join(rowCells(panes, widths, row), " │ "))
 	}
 
 	return result
+}
+
+// rowCells builds one output row from the row-th line of each pane.
+func rowCells(panes [][]string, widths []int, row int) []string {
+	cells := make([]string, len(panes))
+	for column, pane := range panes {
+		value := ""
+		if row < len(pane) {
+			value = pane[row]
+		}
+		cells[column] = styledCell(value, widths[column])
+	}
+	return cells
 }
 
 func fitPaneLines(lines []string, width int, height int) []string {

@@ -186,16 +186,21 @@ func countTriples(sets []CallSet) map[string]int {
 			calls = append(calls, c)
 		}
 		sort.Strings(calls)
-		for i := 0; i < len(calls); i++ {
-			for j := i + 1; j < len(calls); j++ {
-				for k := j + 1; k < len(calls); k++ {
-					key := calls[i] + "\x00" + calls[j] + "\x00" + calls[k]
-					counts[key]++
-				}
+		addTriples(calls, counts)
+	}
+	return counts
+}
+
+// addTriples counts every ordered call triple in the sorted call list.
+func addTriples(calls []string, counts map[string]int) {
+	for i := 0; i < len(calls); i++ {
+		for j := i + 1; j < len(calls); j++ {
+			for k := j + 1; k < len(calls); k++ {
+				key := calls[i] + "\x00" + calls[j] + "\x00" + calls[k]
+				counts[key]++
 			}
 		}
 	}
-	return counts
 }
 
 func parseTripleKey(key string) []string {

@@ -732,11 +732,25 @@ func traitName(traitMethod string) string {
 // traitText renders the inference and the possible refactor for trait-like
 // candidateEvidence. Go adaptation: "trait" becomes "interface" in the prose.
 func traitText(ev *candidateEvidence) (inference, refactor string) {
-	methods := make([]string, len(ev.verdicts))
-	for i, v := range ev.verdicts {
+	methods := methodSketches(ev.verdicts)
+	impls := implList(ev.verdicts)
+	inference = impls + " are used interchangeably through methods of identical signature: an implicit interface."
+	refactor = traitRefactor(ev, methods, impls)
+	return inference, refactor
+}
+
+// methodSketches renders one method sketch per verdict.
+func methodSketches(verdicts []traitVerdict) []string {
+	methods := make([]string, len(verdicts))
+	for i, v := range verdicts {
 		methods[i] = sketch(v.group.Key, sharedName(v.defs))
 	}
-	types := ownerSet(ev.verdicts[0].defs)
+	return methods
+}
+
+// implList renders the comma-joined short owner paths for the verdicts.
+func implList(verdicts []traitVerdict) string {
+	types := ownerSet(verdicts[0].defs)
 	sorted := make([]string, 0, len(types))
 	for t := range types {
 		sorted = append(sorted, t)
@@ -746,16 +760,17 @@ func traitText(ev *candidateEvidence) (inference, refactor string) {
 	for i, t := range sorted {
 		shorted[i] = shortGoPaths(t)
 	}
-	impls := strings.Join(shorted, ", ")
-	inference = impls + " are used interchangeably through methods of identical signature: an implicit interface."
+	return strings.Join(shorted, ", ")
+}
+
+// traitRefactor renders the refactor suggestion for trait-like candidates.
+func traitRefactor(ev *candidateEvidence, methods []string, impls string) string {
 	if ev.existingTrait != "" {
-		refactor = fmt.Sprintf("add %s to existing interface `%s`, already implemented by %s; make the sites generic over it",
+		return fmt.Sprintf("add %s to existing interface `%s`, already implemented by %s; make the sites generic over it",
 			strings.Join(methods, " "), traitName(ev.existingTrait), impls)
-	} else {
-		refactor = fmt.Sprintf("interface Shared { %s } implemented by %s; make the sites generic over it",
-			strings.Join(methods, " "), impls)
 	}
-	return inference, refactor
+	return fmt.Sprintf("interface Shared { %s } implemented by %s; make the sites generic over it",
+		strings.Join(methods, " "), impls)
 }
 
 // traitVerdict pairs a joined signature group with its definitions.

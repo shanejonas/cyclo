@@ -879,7 +879,8 @@ func applySpecificationFix(spec *patterns.FixSpec, src []byte) ([]byte, error) {
 	if !ok {
 		return src, nil
 	}
-	edits := predEdits(fset, f, src, predName, typeName, isLocal, matches)
+	ctx := specEditCtx{fset: fset, f: f, src: src, predName: predName, typeName: typeName, isLocal: isLocal}
+	edits := predEdits(ctx, matches)
 	out := applyEdits(src, edits)
 	formatted, err := format.Source(out)
 	if err != nil {
@@ -1170,25 +1171,35 @@ func specKeysMatch(a, b string) bool {
 	return normalize(aKey) == normalize(bKey)
 }
 
+// specEditCtx bundles the shared context for building specification edits.
+type specEditCtx struct {
+	fset     *token.FileSet
+	f        *ast.File
+	src      []byte
+	predName string
+	typeName string
+	isLocal  bool
+}
+
 // specEdits builds the text edits: insert the Specification type, rewrite
 // matching conditions to IsSatisfiedBy calls.
 // predEdits builds the text edits: rewrite matching conditions to predicate
 // calls and insert the predicate declaration.
-func predEdits(fset *token.FileSet, f *ast.File, src []byte, predName, typeName string, isLocal bool, matches []specMatch) []textEdit {
+func predEdits(ctx specEditCtx, matches []specMatch) []textEdit {
 	var edits []textEdit
 	// Rewrite each matching if condition.
 	for _, m := range matches {
-		condStart := fset.Position(m.stmt.Cond.Pos()).Offset
-		condEnd := fset.Position(m.stmt.Cond.End()).Offset
+		condStart := ctx.fset.Position(m.stmt.Cond.Pos()).Offset
+		condEnd := ctx.fset.Position(m.stmt.Cond.End()).Offset
 		var replacement string
-		if isLocal {
-			replacement = fmt.Sprintf("%s.%s()", m.varName, predName)
+		if ctx.isLocal {
+			replacement = fmt.Sprintf("%s.%s()", m.varName, ctx.predName)
 		} else {
-			replacement = fmt.Sprintf("%s(%s)", unexported(predName), m.varName)
+			replacement = fmt.Sprintf("%s(%s)", unexported(ctx.predName), m.varName)
 		}
 		edits = append(edits, textEdit{start: condStart, end: condEnd, replacement: []byte(replacement)})
 	}
-	edits = append(edits, predDeclEdit(fset, f, src, predName, typeName, isLocal, matches[0]))
+	edits = append(edits, predDeclEdit(ctx, matches[0]))
 	return edits
 }
 
@@ -1202,21 +1213,21 @@ func unexported(name string) string {
 
 // predDeclEdit builds the edit inserting the predicate declaration: a method
 // on the local type, or a plain function for external types.
-func predDeclEdit(fset *token.FileSet, f *ast.File, src []byte, predName, typeName string, isLocal bool, first specMatch) textEdit {
-	insertPos := specInsertPos(fset, f, src)
-	firstCond := src[fset.Position(first.stmt.Cond.Pos()).Offset : fset.Position(first.stmt.Cond.End()).Offset]
+func predDeclEdit(ctx specEditCtx, first specMatch) textEdit {
+	insertPos := specInsertPos(ctx.fset, ctx.f, ctx.src)
+	firstCond := ctx.src[ctx.fset.Position(first.stmt.Cond.Pos()).Offset : ctx.fset.Position(first.stmt.Cond.End()).Offset]
 	paramName := first.varName
 	if paramName == "" {
 		paramName = "v"
 	}
 	body := specRenameVar(string(firstCond), first.varName, paramName)
 	var decl string
-	if isLocal {
-		recvName := baseTypeName(typeName)
-		decl = fmt.Sprintf("\n// %s reports whether the business rule holds.\nfunc (%s %s) %s() bool {\n\treturn %s\n}\n", predName, paramName, recvName, predName, body)
+	if ctx.isLocal {
+		recvName := baseTypeName(ctx.typeName)
+		decl = fmt.Sprintf("\n// %s reports whether the business rule holds.\nfunc (%s %s) %s() bool {\n\treturn %s\n}\n", ctx.predName, paramName, recvName, ctx.predName, body)
 	} else {
-		funcName := unexported(predName)
-		decl = fmt.Sprintf("\n// %s reports whether the business rule holds for %s.\nfunc %s(%s %s) bool {\n\treturn %s\n}\n", funcName, paramName, funcName, paramName, typeName, body)
+		funcName := unexported(ctx.predName)
+		decl = fmt.Sprintf("\n// %s reports whether the business rule holds for %s.\nfunc %s(%s %s) bool {\n\treturn %s\n}\n", funcName, paramName, funcName, paramName, ctx.typeName, body)
 	}
 	return textEdit{start: insertPos, end: insertPos, replacement: []byte(decl)}
 }
