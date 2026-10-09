@@ -24,14 +24,14 @@ const (
 	inconsistentDivergent uint32 = 950
 )
 
-// FindInconsistentClones returns the CCGraph groups that contain at least one
-// suspiciously divergent pair: members similar enough to be clones
+// FindInconsistentClones returns the similarity groups that contain at least
+// one suspiciously divergent pair: members similar enough to be clones
 // (>= inconsistentMinSim) but different enough to suggest inconsistent
 // changes (< inconsistentDivergent).
-func FindInconsistentClones(groups [][]string, pdgs map[string]*Pdg) [][]string {
-	var out [][]string
+func FindInconsistentClones(groups []SimilarityGroup, pdgs map[string]*Pdg) []SimilarityGroup {
+	var out []SimilarityGroup
 	for _, group := range groups {
-		if hasDivergentPair(group, pdgs) {
+		if hasDivergentPair(group.MemberIDs, pdgs) {
 			out = append(out, group)
 		}
 	}
@@ -74,13 +74,13 @@ func buildGroupWls(group []string, pdgs map[string]*Pdg) map[string]*Wl {
 	return out
 }
 
-// InconsistentCloneCandidates converts divergent CCGraph groups into pattern
-// candidates for the report pipeline.
-func InconsistentCloneCandidates(groups [][]string, facts []*FuncFacts) []Candidate {
+// InconsistentCloneCandidates converts divergent similarity groups into
+// pattern candidates for the report pipeline.
+func InconsistentCloneCandidates(groups []SimilarityGroup, facts []*FuncFacts) []Candidate {
 	factByID := buildFactMap(facts)
 	var out []Candidate
 	for _, group := range groups {
-		if c, ok := makeInconsistentCandidate(group, factByID); ok {
+		if c, ok := makeInconsistentCandidate(group.MemberIDs, factByID); ok {
 			out = append(out, c)
 		}
 	}
