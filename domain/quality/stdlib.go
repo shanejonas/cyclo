@@ -69,7 +69,14 @@ var stdlibRules = []stdlibRule{
 	{pkg: "encoding/gob", kind: Global, names: []string{"Register", "RegisterName"}},
 	{pkg: "encoding/json", kind: None},
 	{pkg: "encoding/json", kind: IO, names: []string{
-		"Encoder.Encode", "Decoder.Decode", "Decoder.Token", "Decoder.More",
+		"Decoder.Token", "Decoder.More",
+	}},
+	// json.Unmarshal/Marshal and Decoder.Decode/Encoder.Encode can invoke
+	// user-defined UnmarshalJSON/UnmarshalText/MarshalJSON/MarshalText
+	// methods via interface satisfaction. These are arbitrary callbacks
+	// with unknown side effects, so they are Unknown, not None/IO.
+	{pkg: "encoding/json", kind: UnknownEffect, names: []string{
+		"Unmarshal", "Marshal", "Decoder.Decode", "Encoder.Encode",
 	}},
 	{pkg: "encoding/json/v2", kind: None},
 	{pkg: "encoding/json/jsontext", kind: None},

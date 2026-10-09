@@ -95,7 +95,7 @@ func TestPureStdlibCallsScoreZero(t *testing.T) {
 	for index, callee := range []string{
 		"strings.Repeat", "bytes.Compare", "slices.Contains", "maps.Keys",
 		"strconv.Itoa", "sort.Strings", "errors.Is", "math/big.NewInt",
-		"encoding/json.Marshal", "context.Background", "sync.Mutex.Lock",
+		"context.Background", "sync.Mutex.Lock",
 		"path/filepath.Join", "net/url.Parse",
 		"net/http.ResponseWriter.Header", "flag.FlagSet.Args", "flag.FlagSet.Lookup",
 	} {
