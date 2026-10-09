@@ -1,8 +1,8 @@
 package gopatterns
 
 import (
-	"go/format"
 	"go/ast"
+	"go/format"
 	"go/parser"
 	"strings"
 	"testing"

@@ -16,9 +16,9 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/shanejonas/cyclo/adapters/gitchanged"
 	"github.com/shanejonas/cyclo/adapters/gopatterns"
 	"github.com/shanejonas/cyclo/domain/patterns"
-	"github.com/shanejonas/cyclo/adapters/gitchanged"
 )
 
 const usage = `Usage: cyclo fix [OPTIONS] [DIRECTORIES OR GO FILES...]
@@ -600,28 +600,28 @@ func toFacts(ext *gopatterns.Extraction) ([]*patterns.FuncFacts, []patterns.Anem
 	for _, fp := range ext.Funcs {
 		fp := fp
 		facts = append(facts, &patterns.FuncFacts{
-			ID:               fp.Name,
-			Name:             fp.Name,
-			Path:             fp.Path,
-			Line:             fp.Line,
-			EndLine:          fp.EndLine,
-			Pdg:              &fp.Pdg,
-			SigKey:           gopatterns.SigKeyOf(fp),
-			SelfTy:           fp.SelfTy,
-			GuardClauses:     guardHits(fp.GuardClauses),
-			EnumDispatches:   dispatchHits(fp.EnumDispatches),
-			TypeSwitches:     typeSwitchHits(fp.TypeSwitches),
-			EntityIdentities: fp.EntityIdentities,
-			MutableIdentities: fp.MutableIdentities,
-			AggregateMods:    fp.AggregateMods,
-			DbCalls:          fp.DbCalls,
-			FactoryLits:      fp.FactoryLits,
-			SpecRules:        fp.SpecRules,
-			NilErrHits:       fp.NilErrHits,
+			ID:                  fp.Name,
+			Name:                fp.Name,
+			Path:                fp.Path,
+			Line:                fp.Line,
+			EndLine:             fp.EndLine,
+			Pdg:                 &fp.Pdg,
+			SigKey:              gopatterns.SigKeyOf(fp),
+			SelfTy:              fp.SelfTy,
+			GuardClauses:        guardHits(fp.GuardClauses),
+			EnumDispatches:      dispatchHits(fp.EnumDispatches),
+			TypeSwitches:        typeSwitchHits(fp.TypeSwitches),
+			EntityIdentities:    fp.EntityIdentities,
+			MutableIdentities:   fp.MutableIdentities,
+			AggregateMods:       fp.AggregateMods,
+			DbCalls:             fp.DbCalls,
+			FactoryLits:         fp.FactoryLits,
+			SpecRules:           fp.SpecRules,
+			NilErrHits:          fp.NilErrHits,
 			ForceTypeAssertHits: fp.ForceTypeAssertHits,
-			TypedNilHits:       fp.TypedNilHits,
-			SuppressedKinds:  fp.SuppressedKinds,
-			Params:           paramInfos(fp.Params),
+			TypedNilHits:        fp.TypedNilHits,
+			SuppressedKinds:     fp.SuppressedKinds,
+			Params:              paramInfos(fp.Params),
 		})
 	}
 	return facts, ext.AnemicModels, ext.MissingIdentities, ext.DomainServices

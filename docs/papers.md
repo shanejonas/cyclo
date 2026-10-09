@@ -14,9 +14,9 @@ PDG extractor) unlocks.
 | Li et al. (CP-Miner) | 2004 | OSDI | `inconsistent_clone` | Adapted |
 | Li & Zhou (PR-Miner) | 2005 | FSE | `mined_rule` | Adapted |
 | Engler et al. | 2001 | SOSP | `deviant_behavior` | Inspired by |
-| Thummalapenta & Xie (Alattin) | 2009 | ASE | library only | Adapted |
+| Thummalapenta & Xie (Alattin) | 2009 | ASE | `alattin_rule` | Adapted |
 | Krinke (Barrier slicing) | 2004 | SQJ | library only | Adapted |
-| Weimer & Necula | 2004 | OOPSLA | library only | Adapted |
+| Weimer & Necula | 2004 | OOPSLA | `obligation` | Adapted |
 | Jackson & Rollins (Chopping) | 1994 | CMU | library only | Adapted |
 | Sridharan, Fink & Bodik (Thin slicing) | 2007 | PLDI | library only | Adapted |
 | Binkley & Harman (Dependence clusters) | 2015 | ICSME | `dependence_cluster` | Adapted |
@@ -165,7 +165,7 @@ The OR rule only fires when neither single rule meets the confidence threshold.
 **Fidelity:** Adapted. Core disjunctive mining idea; implemented on cyclo's PDG
 call facts.
 
-**In cyclo:** Library only (`domain/patterns/alattin.go`). Not yet wired as a CLI pattern kind.
+**In cyclo:** `alattin_rule` pattern kind (detection-only). `domain/patterns/alattin.go`.
 
 ---
 
@@ -205,7 +205,7 @@ defer is missing or conditional.
 **Fidelity:** Adapted. Core obligation-tracking idea; adapted for Go's error-handling
 idioms.
 
-**In cyclo:** Library only (`domain/patterns/obligation.go`). Not yet wired as a CLI pattern kind.
+**In cyclo:** `obligation` pattern kind (detection-only). `domain/patterns/obligation.go`.
 
 ---
 

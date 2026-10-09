@@ -1,6 +1,9 @@
 package patterns
 
-import "sort"
+import (
+	"fmt"
+	"sort"
+)
 
 // Alattin (Thummalapenta & Xie, ASE 2009):
 // Classic belief miners (PR-Miner, Engler) find X=>Y and flag ¬Y as bugs.
@@ -163,6 +166,65 @@ func alternativeViolationsFor(sets []CallSet, rule DisjunctiveRule) []Alternativ
 		if hasAntecedent(s, rule.Antecedent) && !hasAnyAlternative(s, rule.Alternatives) {
 			out = append(out, AlternativeViolation{FuncID: s.FuncID, Rule: rule})
 		}
+	}
+	return out
+}
+
+// AlattinRuleCandidates converts disjunctive-rule violations to candidates.
+func AlattinRuleCandidates(violations []AlternativeViolation, facts []*FuncFacts) []Candidate {
+	factByID := map[string]*FuncFacts{}
+	for _, f := range facts {
+		factByID[f.ID] = f
+	}
+	var out []Candidate
+	for _, v := range violations {
+		f := factByID[v.FuncID]
+		if f == nil {
+			continue
+		}
+		out = append(out, Candidate{
+			Kind:        AlattinRule,
+			ScoreMilli:  750, // High: mined rules are repo-specific.
+			Observation: fmt.Sprintf("calls %s but neither %s", joinBackticked(v.Rule.Antecedent), joinBacktickedOr(v.Rule.Alternatives)),
+			Inference: fmt.Sprintf(
+				"%.0f%% of functions that call %s also call %s",
+				v.Rule.Confidence*100, joinBackticked(v.Rule.Antecedent), joinBacktickedOr(v.Rule.Alternatives),
+			),
+			PossibleRefactor: fmt.Sprintf("add one of the missing alternatives: %s", joinBacktickedOr(v.Rule.Alternatives)),
+			Sites: []Site{
+				{Path: f.Path, Line: f.Line, Name: f.Name},
+			},
+		})
+	}
+	return out
+}
+
+// joinBackticked renders items as "`a`, `b`".
+func joinBackticked(items []string) string {
+	quoted := make([]string, len(items))
+	for i, item := range items {
+		quoted[i] = "`" + item + "`"
+	}
+	return joinWith(quoted, ", ")
+}
+
+// joinBacktickedOr renders items as "`a` or `b`".
+func joinBacktickedOr(items []string) string {
+	quoted := make([]string, len(items))
+	for i, item := range items {
+		quoted[i] = "`" + item + "`"
+	}
+	return joinWith(quoted, " or ")
+}
+
+// joinWith joins parts with sep.
+func joinWith(parts []string, sep string) string {
+	out := ""
+	for i, p := range parts {
+		if i > 0 {
+			out += sep
+		}
+		out += p
 	}
 	return out
 }

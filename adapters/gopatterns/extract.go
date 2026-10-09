@@ -262,10 +262,10 @@ func extractFunc(pkg *packages.Package, fn *ast.FuncDecl, path string, ctx extra
 		SuppressedKinds: findSuppressedKinds(fn),
 		Pdg:             patterns.Pdg{Nodes: b.nodes, Edges: b.edges},
 		SelfTy:          selfTy,
-		GuardClauses:   findGuardClauses(fn, pkg.Fset),
-		EnumDispatches: findEnumDispatches(fn, pkg.Fset),
-		TypeSwitches:   findTypeSwitches(fn, pkg.Fset),
-		Params:       primitiveParams(fn, pkg.TypesInfo),
+		GuardClauses:    findGuardClauses(fn, pkg.Fset),
+		EnumDispatches:  findEnumDispatches(fn, pkg.Fset),
+		TypeSwitches:    findTypeSwitches(fn, pkg.Fset),
+		Params:          primitiveParams(fn, pkg.TypesInfo),
 		// EntityIdentities are attribute-based equalities that should use ID.
 		// Includes no-ID cases (paired with missing_identity): the fixer
 		// adds the ID, then a later phase rewrites the comparison.

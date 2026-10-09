@@ -7,12 +7,12 @@ import (
 
 func primitiveFact(name, path string, line int, params []ParamInfo) *FuncFacts {
 	return &FuncFacts{
-		ID:     "pkg." + name,
-		Name:   name,
-		Path:   path,
-		Line:   line,
+		ID:      "pkg." + name,
+		Name:    name,
+		Path:    path,
+		Line:    line,
 		EndLine: line + 10,
-		Params: params,
+		Params:  params,
 	}
 }
 

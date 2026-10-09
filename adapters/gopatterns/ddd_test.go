@@ -95,7 +95,7 @@ func TestIsRepositoryFile(t *testing.T) {
 		{"dao/user.go", true},
 		{"store/session.go", true},
 		{"adapters/sqlite/annotations.go", true}, // adapters/ is the repo layer (Shane's convention)
-		{"adapters/gopatterns/ddd.go", true},  // any adapters/ path is infrastructure
+		{"adapters/gopatterns/ddd.go", true},     // any adapters/ path is infrastructure
 		{"adapters/goquality/analyzer.go", true},
 		{"internal/service/order.go", false},
 		{"pkg/reporter.go", false}, // "reporter" is not "repo"

@@ -274,3 +274,31 @@ func reachableFrom(fwd map[int][]int, start, maxDepth int) map[int]bool {
 	}
 	return seen
 }
+
+// ObligationCandidates converts obligation violations to candidates.
+func ObligationCandidates(violations []ObligationViolation, facts []*FuncFacts) []Candidate {
+	factByID := map[string]*FuncFacts{}
+	for _, f := range facts {
+		factByID[f.ID] = f
+	}
+	var out []Candidate
+	for _, v := range violations {
+		f := factByID[v.FuncID]
+		if f == nil {
+			continue
+		}
+		out = append(out, Candidate{
+			Kind:        Obligation,
+			ScoreMilli:  800, // High: a leaked resource is a bug.
+			Observation: fmt.Sprintf("%s acquired via `%s` has no deferred release", v.Resource, v.AcquireCall),
+			Inference:   v.Reason,
+			PossibleRefactor: fmt.Sprintf(
+				"add `defer` for the release right after acquiring the %s", v.Resource,
+			),
+			Sites: []Site{
+				{Path: f.Path, Line: v.Line, Name: f.Name},
+			},
+		})
+	}
+	return out
+}

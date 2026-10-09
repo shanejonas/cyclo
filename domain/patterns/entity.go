@@ -19,9 +19,9 @@ const mutableIdentityScoreMilli = 350
 
 // entityIdentityCandidates builds candidates from attribute-based equality hits.
 // Two modes:
-// - ID exists: rewrite the comparison to use identity (standard fix).
-// - No ID (paired with missing_identity): add the ID field first. After
-//   re-mining, the standard rewrite fires. The phased fixer handles this.
+//   - ID exists: rewrite the comparison to use identity (standard fix).
+//   - No ID (paired with missing_identity): add the ID field first. After
+//     re-mining, the standard rewrite fires. The phased fixer handles this.
 func entityIdentityCandidates(facts []*FuncFacts) []Candidate {
 	var out []Candidate
 	for _, f := range facts {
@@ -96,11 +96,11 @@ func rewriteCandidate(f *FuncFacts, hit EntityIdentityHit) Candidate {
 			Line:    hit.Line,
 			EndLine: hit.Line,
 			Params: map[string]string{
-				"line":      fmt.Sprintf("%d", hit.Line),
-				"type":      hit.TypeName,
-				"id_field":  hit.IDField,
-				"left":      hit.Left,
-				"right":     hit.Right,
+				"line":     fmt.Sprintf("%d", hit.Line),
+				"type":     hit.TypeName,
+				"id_field": hit.IDField,
+				"left":     hit.Left,
+				"right":    hit.Right,
 			},
 		},
 	}
