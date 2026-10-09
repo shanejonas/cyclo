@@ -119,12 +119,6 @@ const (
 	// an error interface holding (*T)(nil) compared to nil — always false.
 	// Ported from gostaticanalysis/typednil. Detection-only.
 	TypedNil CandidateKind = "typednil"
-	// SemanticClone finds isomorphic PDG subgraphs across functions —
-	// non-contiguous, reordered, or intertwined clones that token-based
-	// detectors miss. Following Komondoor & Horwitz (SAS 2001): the
-	// fragments are meaningful computations, ideal extract-function
-	// candidates. Uses WL-hash bucketing to avoid NP-hard isomorphism.
-	SemanticClone CandidateKind = "semantic_clone"
 	// DependenceCluster flags functions whose PDG contains a large
 	// strongly-connected region — "everything affects everything"
 	// spaghetti that resists testing. Following Binkley & Harman.
@@ -139,16 +133,11 @@ const (
 	// own beliefs about error handling (Engler et al., SOSP 2001). If 95%
 	// of callers check an error, the 5% that don't are bugs. Detection-only.
 	DeviantBehavior CandidateKind = "deviant_behavior"
-	// InconsistentClone flags clones with asymmetric bugs (CP-Miner, Li et
-	// al. OSDI 2004). If one copy has a nilerr bug and its siblings don't,
-	// the edit was inconsistent. Detection-only.
-	InconsistentClone CandidateKind = "inconsistent_clone"
 	// CCGraphClone finds function-level clones via CCGraph (Zou et al.,
 	// ASE 2020): two-stage filtering (characteristic vectors + Jaro-Winkler
 	// name similarity), LSH-clustered WL vectors, and WL kernel similarity.
-	// Unlike semantic_clone (subgraph-level), this finds whole functions
-	// that do the same thing. Detection-only: the LLM judges whether to
-	// merge.
+	// This finds whole functions that do the same thing.
+	// Detection-only: the LLM judges whether to merge.
 	CCGraphClone CandidateKind = "ccgraph_clone"
 	// DomainService identifies a free function operating on two or more
 	// domain types without belonging to any of them. Per Evans, such
@@ -209,11 +198,9 @@ var FixKindOrder = []CandidateKind{
 	NilErr,
 	ForceTypeAssert,
 	TypedNil,
-	SemanticClone,
 	DependenceCluster,
 	MinedRule,
 	DeviantBehavior,
-	InconsistentClone,
 	CCGraphClone,
 }
 

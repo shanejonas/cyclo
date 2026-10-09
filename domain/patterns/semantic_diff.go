@@ -42,7 +42,7 @@ func SemanticDiff(oldPdg, newPdg *Pdg) DiffResult {
 }
 
 // pdgStructureHash computes a canonical hash of the PDG structure,
-// ignoring line numbers and variable names (like semantic_clone).
+// ignoring line numbers and variable names.
 // Two PDGs with the same hash are semantically equivalent.
 func pdgStructureHash(pdg *Pdg) string {
 	// Reuse the subgraph hashing logic for the whole PDG.
