@@ -108,7 +108,7 @@ State includes `detailsView` and `qualityOffset`. `cyclo.revealLines` and
 
 | Rule | Default |
 | --- | --- |
-| `fn_length` | More than 50 code lines, excluding comments and blank lines |
+| `fn_length` | More than 200 code lines, excluding comments and blank lines |
 | `fn_params` | More than 4 parameters, excluding the receiver |
 | `mutation_per_target` | More than 3 writes to a target |
 | `mutated_targets` | More than 3 distinct targets |

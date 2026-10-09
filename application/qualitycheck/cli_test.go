@@ -58,7 +58,7 @@ func TestConfigDefaultsOverridesAndValidation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if config.Granularity != "field" || config.Weights.IO != 0 || config.Weights.Network != 3 || config.FnLength.Max != 50 {
+	if config.Granularity != "field" || config.Weights.IO != 0 || config.Weights.Network != 3 || config.FnLength.Max != 200 {
 		t.Fatalf("config: %+v", config)
 	}
 	for _, source := range []string{"typo = 1", "[fn_params]\nmax = -1", "[[prefixes]]\npath = 'foo'\nkind = 'typo'", "granularity = 'typo'"} {

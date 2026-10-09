@@ -58,7 +58,7 @@ type Grouping struct {
 
 func DefaultConfig() Config {
 	return Config{
-		FnLength: Rule{true, 50}, FnParams: Rule{true, 4},
+		FnLength: Rule{true, 200}, FnParams: Rule{true, 4},
 		MutationPerTarget: Rule{true, 3}, MutatedTargets: Rule{true, 3},
 		SideEffectDensity: Rule{true, 500}, MinStatements: 3, Granularity: "root",
 		Aggregate: Rule{true, 1}, Repository: Rule{true, 0}, MutableIdentity: Rule{true, 0},
