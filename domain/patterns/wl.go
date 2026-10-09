@@ -332,7 +332,7 @@ func charVecSimilar(a, b *Wl) bool {
 	return cosineSimilarity(a.charVec, b.charVec) >= charVecThreshold
 }
 
-const charVecThreshold = 0.3
+const charVecThreshold = 0.9
 
 // NewWl builds the WL refinement of a PDG.
 func NewWl(pdg *Pdg) *Wl {
