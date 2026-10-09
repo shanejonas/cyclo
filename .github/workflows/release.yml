@@ -8,57 +8,28 @@ on:
 permissions:
   contents: write
 
-env:
-  GO_VERSION: "1.24"
-
 jobs:
   release:
-    runs-on: openmuse-linux-checks
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        run: |
-          git init -q .
-          git remote add origin "https://gitea.pizzly-tarpon.ts.net/${GITHUB_REPOSITORY}.git"
-          git -c http.extraHeader="AUTHORIZATION: bearer ${GITHUB_TOKEN}" fetch -q origin "${GITHUB_SHA}"
-          git checkout -q FETCH_HEAD
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Set up Go
-        run: |
-          if ! command -v go >/dev/null 2>&1; then
-            curl -sL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xz -C /tmp
-            echo "/tmp/go/bin" >> "${GITHUB_PATH}"
-          fi
-          go version
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
 
       - name: Test
         run: make check
 
-      - name: Build release binaries
-        run: |
-          mkdir -p dist
-          VERSION="${GITHUB_REF_NAME}"
-          for target in "linux amd64" "linux arm64" "darwin amd64" "darwin arm64" "windows amd64" "windows arm64"; do
-            set -- $target
-            GOOS=$1 GOARCH=$2 go build -buildvcs=false -ldflags "-X main.version=${VERSION}" -o "dist/cyclo-${VERSION}-$1-$2${3:-}" .
-            # windows binary needs .exe
-            if [ "$1" = "windows" ]; then mv "dist/cyclo-${VERSION}-$1-$2" "dist/cyclo-${VERSION}-$1-$2.exe"; fi
-          done
-          ls -la dist/
-
-      - name: Create Gitea release and upload
-        run: |
-          API="https://gitea.pizzly-tarpon.ts.net/api/v1/repos/${GITHUB_REPOSITORY}"
-          AUTH="Authorization: bearer ${GITHUB_TOKEN}"
-          # Create the release (idempotent: reuse if it exists)
-          RELEASE_ID=$(curl -s -H "$AUTH" "${API}/releases/tags/${GITHUB_REF_NAME}" | python3 -c "import json,sys; print(json.load(sys.stdin).get('id') or '')" 2>/dev/null)
-          if [ -z "$RELEASE_ID" ]; then
-            RELEASE_ID=$(curl -s -X POST -H "$AUTH" -H 'Content-Type: application/json' \
-              -d "{\"tag_name\":\"${GITHUB_REF_NAME}\",\"name\":\"${GITHUB_REF_NAME}\"}" \
-              "${API}/releases" | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
-          fi
-          for f in dist/*; do
-            curl -s -X POST -H "$AUTH" -H 'Content-Type: application/octet-stream' \
-              --data-binary "@$f" \
-              "${API}/releases/${RELEASE_ID}/assets?name=$(basename $f)" > /dev/null
-          done
-          echo "uploaded $(ls dist | wc -l) assets to release ${GITHUB_REF_NAME}"
+      - name: Release binaries
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: '~> v2'
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
