@@ -152,12 +152,13 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 		return DeviantBehaviorCandidates(violations, prepared)
 	}},
 	{CCGraphClone, func(prepared []*FuncFacts, options Options) []Candidate {
-		groups := FindSimilarityGroups(prepared, ccMatchThreshold)
+		pdgs, names := ccGraphInputs(prepared)
+		groups := CCGraphClones(pdgs, names)
 		return CCGraphCloneCandidates(groups, prepared)
 	}},
 	{InconsistentClone, func(prepared []*FuncFacts, options Options) []Candidate {
-		pdgs, _ := ccGraphInputs(prepared)
-		groups := FindSimilarityGroups(prepared, ccMatchThreshold)
+		pdgs, names := ccGraphInputs(prepared)
+		groups := CCGraphClones(pdgs, names)
 		divergent := FindInconsistentClones(groups, pdgs)
 		return InconsistentCloneCandidates(divergent, prepared)
 	}},

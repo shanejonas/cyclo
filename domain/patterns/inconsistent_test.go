@@ -9,7 +9,7 @@ func TestFindInconsistentClonesUniform(t *testing.T) {
 		"f2": ccTestPdg(20, 100),
 		"f3": ccTestPdg(20, 200),
 	}
-	groups := makeSimilarityGroups([][]string{{"f1", "f2", "f3"}})
+	groups := [][]string{{"f1", "f2", "f3"}}
 	got := FindInconsistentClones(groups, pdgs)
 	if len(got) != 0 {
 		t.Fatalf("uniform group should not be flagged, got %v", got)
@@ -25,7 +25,7 @@ func TestFindInconsistentClonesDivergent(t *testing.T) {
 		"f2": ccTestPdg(20, 100),
 		"f3": ccTestPdg(22, 200),
 	}
-	groups := makeSimilarityGroups([][]string{{"f1", "f2", "f3"}})
+	groups := [][]string{{"f1", "f2", "f3"}}
 	got := FindInconsistentClones(groups, pdgs)
 	if len(got) != 1 {
 		t.Fatalf("divergent group should be flagged, got %v", got)
@@ -36,8 +36,7 @@ func TestFindInconsistentClonesEmpty(t *testing.T) {
 	if got := FindInconsistentClones(nil, nil); got != nil {
 		t.Fatalf("expected nil for nil input, got %v", got)
 	}
-	single := makeSimilarityGroups([][]string{{"f1"}})
-	if got := FindInconsistentClones(single, map[string]*Pdg{"f1": ccTestPdg(20, 1)}); len(got) != 0 {
+	if got := FindInconsistentClones([][]string{{"f1"}}, map[string]*Pdg{"f1": ccTestPdg(20, 1)}); len(got) != 0 {
 		t.Fatalf("single-member group should not be flagged, got %v", got)
 	}
 }
@@ -48,7 +47,7 @@ func TestInconsistentCloneCandidates(t *testing.T) {
 		{ID: "f2", Name: "processDatum", Path: "b.go", Line: 20},
 		{ID: "f3", Name: "processDatas", Path: "c.go", Line: 30},
 	}
-	groups := makeSimilarityGroups([][]string{{"f1", "f2", "f3"}})
+	groups := [][]string{{"f1", "f2", "f3"}}
 	cands := InconsistentCloneCandidates(groups, facts)
 	if len(cands) != 1 {
 		t.Fatalf("expected 1 candidate, got %d", len(cands))
