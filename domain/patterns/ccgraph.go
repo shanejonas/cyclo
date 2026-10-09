@@ -2,8 +2,10 @@ package patterns
 
 import (
 	"fmt"
+	"runtime"
 	"sort"
 	"strings"
+	"sync"
 )
 
 // CCGraph-style clone detection (Zou et al., ASE 2020) with LSH scaling.
@@ -46,8 +48,15 @@ func CCGraphClones(pdgs map[string]*Pdg, names map[string]string) [][]string {
 		return nil
 	}
 	// Stages 1+2: cheap filters produce the candidate pair set.
-	charVecs := ccCharVecs(ids, pdgs)
-	candidates := ccCandidatePairs(ids, charVecs, names)
+	// vecs and alignedNames are indexed by position in ids, so the
+	// O(n^2) pair loop uses slice indexing instead of map lookups.
+	vecs := make([][]float64, len(ids))
+	alignedNames := make([]string, len(ids))
+	for i, id := range ids {
+		vecs[i] = characteristicVector(pdgs[id])
+		alignedNames[i] = names[id]
+	}
+	candidates := ccCandidatePairs(ids, vecs, alignedNames)
 	if len(candidates) == 0 {
 		return nil
 	}
@@ -74,15 +83,6 @@ func ccSortableIDs(pdgs map[string]*Pdg) []string {
 	return ids
 }
 
-// ccCharVecs computes the 7-dim characteristic vector per function.
-func ccCharVecs(ids []string, pdgs map[string]*Pdg) map[string][]float64 {
-	out := make(map[string][]float64, len(ids))
-	for _, id := range ids {
-		out[id] = characteristicVector(pdgs[id])
-	}
-	return out
-}
-
 // ccPairKey builds a canonical key for an unordered function pair.
 func ccPairKey(a, b string) string {
 	if a > b {
@@ -91,22 +91,54 @@ func ccPairKey(a, b string) string {
 	return a + "\x00" + b
 }
 
+// ccPairJob is one unordered function pair to check.
+type ccPairJob struct{ a, b string }
+
 // ccCandidatePairs returns the set of pairs passing Stages 1+2,
-// keyed by ccPairKey.
-func ccCandidatePairs(ids []string, charVecs map[string][]float64, names map[string]string) map[string]bool {
+// keyed by ccPairKey. vecs and names are aligned with ids by position.
+// Pair checks are striped across a worker pool; the output is a set,
+// so worker assignment cannot affect the result.
+func ccCandidatePairs(ids []string, vecs [][]float64, names []string) map[string]bool {
+	workers := runtime.NumCPU()
+	found := make(chan map[string]bool, workers)
+	var wg sync.WaitGroup
+	for w := 0; w < workers; w++ {
+		wg.Add(1)
+		go func(w int) {
+			defer wg.Done()
+			found <- ccFilterStripes(ids, vecs, names, w, workers)
+		}(w)
+	}
+	go func() {
+		wg.Wait()
+		close(found)
+	}()
 	out := map[string]bool{}
-	for i := 0; i < len(ids); i++ {
+	for m := range found {
+		for k := range m {
+			out[k] = true
+		}
+	}
+	return out
+}
+
+// ccFilterStripes applies Stages 1+2 to the pairs whose outer index i
+// satisfies i%workers == worker, returning the surviving pair keys.
+// Slice indexing (no map lookups) keeps the inner loop tight.
+func ccFilterStripes(ids []string, vecs [][]float64, names []string, worker, workers int) map[string]bool {
+	out := map[string]bool{}
+	for i := worker; i < len(ids); i += workers {
+		vi, ni := vecs[i], names[i]
 		for j := i + 1; j < len(ids); j++ {
-			a, b := ids[i], ids[j]
 			// Stage 1: characteristic-vector cosine pre-filter.
-			if cosineSimilarity(charVecs[a], charVecs[b]) < charVecThreshold {
+			if cosineSimilarity(vi, vecs[j]) < charVecThreshold {
 				continue
 			}
 			// Stage 2: Jaro-Winkler name filter.
-			if !ccNamesSimilar(names[a], names[b]) {
+			if !ccNamesSimilar(ni, names[j]) {
 				continue
 			}
-			out[ccPairKey(a, b)] = true
+			out[ccPairKey(ids[i], ids[j])] = true
 		}
 	}
 	return out
@@ -154,19 +186,49 @@ func ccLSHClusters(candidates map[string]bool, wls map[string]*Wl) [][]string {
 }
 
 // ccUnionSimilar unions pairs within each LSH cluster that pass all
-// filters including WL similarity.
+// filters including WL similarity. The WL kernel checks are striped
+// across a worker pool; unions are applied sequentially afterwards.
+// Union order cannot affect the final groups (groupsOfTwoOrMore
+// normalizes via find), so the output matches the sequential version.
 func ccUnionSimilar(cluster []string, candidates map[string]bool, wls map[string]*Wl, parent map[string]string) {
-	for i := 0; i < len(cluster); i++ {
+	workers := runtime.NumCPU()
+	found := make(chan []ccPairJob, workers)
+	var wg sync.WaitGroup
+	for w := 0; w < workers; w++ {
+		wg.Add(1)
+		go func(w int) {
+			defer wg.Done()
+			found <- ccSimilarStripes(cluster, candidates, wls, w, workers)
+		}(w)
+	}
+	go func() {
+		wg.Wait()
+		close(found)
+	}()
+	for pairs := range found {
+		for _, p := range pairs {
+			union(parent, p.a, p.b)
+		}
+	}
+}
+
+// ccSimilarStripes returns the cluster pairs (outer index striped by
+// worker) passing the candidate-set and WL-similarity filters.
+func ccSimilarStripes(cluster []string, candidates map[string]bool, wls map[string]*Wl, worker, workers int) []ccPairJob {
+	var out []ccPairJob
+	for i := worker; i < len(cluster); i += workers {
 		for j := i + 1; j < len(cluster); j++ {
 			a, b := cluster[i], cluster[j]
 			if !candidates[ccPairKey(a, b)] {
 				continue
 			}
-			if SimilarityMilli(wls[a], wls[b]) >= ccMatchThreshold {
-				union(parent, a, b)
+			if SimilarityMilli(wls[a], wls[b]) < ccMatchThreshold {
+				continue
 			}
+			out = append(out, ccPairJob{a: a, b: b})
 		}
 	}
+	return out
 }
 
 // ccMakeParent initializes union-find parent pointers.
