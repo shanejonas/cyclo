@@ -139,6 +139,12 @@ const (
 	// This finds whole functions that do the same thing.
 	// Detection-only: the LLM judges whether to merge.
 	CCGraphClone CandidateKind = "ccgraph_clone"
+	// InconsistentClone finds CCGraph clone groups with suspiciously divergent
+	// members (CP-Miner style): clones similar enough to be the same logic
+	// but different enough that one instance may have a bug fix or change the
+	// others missed. Detection-only: deciding which version is correct needs
+	// human judgment.
+	InconsistentClone CandidateKind = "inconsistent_clone"
 	// DomainService identifies a free function operating on two or more
 	// domain types without belonging to any of them. Per Evans, such
 	// stateless coordination is a Domain Service, not misplaced behavior:
@@ -202,6 +208,7 @@ var FixKindOrder = []CandidateKind{
 	MinedRule,
 	DeviantBehavior,
 	CCGraphClone,
+	InconsistentClone,
 }
 
 // FixKindRank returns the application-order rank for a pattern kind.
