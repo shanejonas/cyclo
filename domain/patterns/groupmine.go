@@ -19,6 +19,17 @@ import (
 // meaningful.
 const minGroupMineSize = 10
 
+// minCohortCallDensity is the minimum average calls per function for a
+// cohort to be mined. Groups below this are boilerplate (getters,
+// setters) with no call variance worth mining.
+const minCohortCallDensity = 5
+
+// defaultCohortThresholdMilli is the default WL similarity threshold for
+// cohort detection, in thousandths. Lower than the paper's 900 clone
+// threshold: cohorts are functions solving similar problems, not
+// near-duplicate clones.
+const defaultCohortThresholdMilli = 650
+
 // SimilarityGroupResult holds the PR-Miner results for one CCGraph similarity
 // group.
 type SimilarityGroupResult struct {
@@ -32,11 +43,13 @@ type SimilarityGroupResult struct {
 	Violations []RuleViolation
 }
 
-// MineGroups runs CCGraph to find similarity groups, then mines PR-Miner
-// rules within each group of 10+ functions.
-func MineSimilarityGroups(facts []*FuncFacts) []SimilarityGroupResult {
+// MineSimilarityGroups runs CCGraph to find similarity cohorts at the
+// given WL match threshold (in thousandths; 900 is the paper's clone
+// threshold, 650 finds looser cohorts), then mines PR-Miner rules within
+// each cohort of 10+ functions with sufficient call density.
+func MineSimilarityGroups(facts []*FuncFacts, thresholdMilli uint32) []SimilarityGroupResult {
 	pdgs, names := ccGraphInputs(facts)
-	groups := CCGraphClones(pdgs, names)
+	groups := CCGraphCohorts(pdgs, names, thresholdMilli)
 	byID := factsByID(facts)
 
 	var out []SimilarityGroupResult
@@ -44,7 +57,7 @@ func MineSimilarityGroups(facts []*FuncFacts) []SimilarityGroupResult {
 		if len(group) < minGroupMineSize {
 			continue
 		}
-		if result := mineOneGroup(group, names, byID); result != nil {
+		if result := mineOneGroup(group, names, byID, thresholdMilli); result != nil {
 			out = append(out, *result)
 		}
 	}
@@ -62,9 +75,10 @@ func factsByID(facts []*FuncFacts) map[string]*FuncFacts {
 	return byID
 }
 
-// mineOneGroup extracts call sets for a similarity group, mines rules,
-// and finds violations. Returns nil if no rules were found.
-func mineOneGroup(group []string, names map[string]string, byID map[string]*FuncFacts) *SimilarityGroupResult {
+// mineOneGroup extracts call sets for a similarity cohort, skips it when
+// call density is too low (boilerplate), mines rules, and finds
+// violations. Returns nil if no rules were found.
+func mineOneGroup(group []string, names map[string]string, byID map[string]*FuncFacts, thresholdMilli uint32) *SimilarityGroupResult {
 	facts := make([]*FuncFacts, 0, len(group))
 	for _, id := range group {
 		if f := byID[id]; f != nil {
@@ -75,6 +89,9 @@ func mineOneGroup(group []string, names map[string]string, byID map[string]*Func
 		return nil
 	}
 	sets := BuildCallSets(facts)
+	if !meetsCallDensity(sets) {
+		return nil
+	}
 	rules := MineRules(sets)
 	if len(rules) == 0 {
 		return nil
@@ -86,6 +103,20 @@ func mineOneGroup(group []string, names map[string]string, byID map[string]*Func
 		Rules:          rules,
 		Violations:     violations,
 	}
+}
+
+// meetsCallDensity reports whether a cohort's call sets average at least
+// minCohortCallDensity calls per function. Trivial getters and setters
+// fall below this and carry no minable variance.
+func meetsCallDensity(sets []CallSet) bool {
+	if len(sets) == 0 {
+		return false
+	}
+	total := 0
+	for _, s := range sets {
+		total += len(s.Calls)
+	}
+	return total/len(sets) >= minCohortCallDensity
 }
 
 // groupRepresentative picks a display name for the group: the most common
@@ -102,19 +133,29 @@ func groupRepresentative(group []string, names map[string]string) string {
 }
 
 // minedRuleGroupCandidates converts group mining results to candidates.
-// Each violation becomes a candidate with group context.
-func minedRuleGroupCandidates(prepared []*FuncFacts) []Candidate {
+// Each violation becomes a candidate with cohort context. thresholdMilli
+// is the WL match threshold used for cohort detection.
+func minedRuleGroupCandidates(prepared []*FuncFacts, thresholdMilli uint32) []Candidate {
 	byID := factsByID(prepared)
 	var out []Candidate
-	for _, result := range MineSimilarityGroups(prepared) {
-		out = append(out, groupCandidates(result, byID)...)
+	for _, result := range MineSimilarityGroups(prepared, thresholdMilli) {
+		out = append(out, groupCandidates(result, byID, thresholdMilli)...)
 	}
 	return out
 }
 
-// groupCandidates converts one group's violations to candidates with
-// group context in the inference text.
-func groupCandidates(result SimilarityGroupResult, byID map[string]*FuncFacts) []Candidate {
+// groupNoun returns "cohort" for looser-than-clone thresholds and
+// "similarity group" for the paper's clone threshold.
+func groupNoun(thresholdMilli uint32) string {
+	if thresholdMilli < ccMatchThreshold {
+		return "cohort"
+	}
+	return "similarity group"
+}
+
+// groupCandidates converts one cohort's violations to candidates with
+// cohort context in the inference text.
+func groupCandidates(result SimilarityGroupResult, byID map[string]*FuncFacts, thresholdMilli uint32) []Candidate {
 	var out []Candidate
 	for _, v := range result.Violations {
 		f := byID[v.FuncID]
@@ -127,7 +168,8 @@ func groupCandidates(result SimilarityGroupResult, byID map[string]*FuncFacts) [
 			ScoreMilli:  750,
 			Observation: fmt.Sprintf("calls %s but not `%s`", ant, v.Rule.Consequent),
 			Inference: fmt.Sprintf(
-				"in similarity group of %d functions (e.g., %s): %.0f%% of functions that call %s also call `%s`",
+				"in %s of %d functions (e.g., %s): %.0f%% of functions that call %s also call `%s`",
+				groupNoun(thresholdMilli),
 				len(result.GroupIDs),
 				result.Representative,
 				v.Rule.Confidence*100,

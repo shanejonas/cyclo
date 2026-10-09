@@ -32,6 +32,9 @@ Informational only: always exits 0, never a quality gate.
   --group-mining
                     mine PR-Miner rules within CCGraph similarity groups;
                     differences between similar functions reveal patterns
+  --cohort-threshold F
+                    WL similarity threshold (0-1) for group-mining cohort
+                    detection [default 0.65]; lower finds looser cohorts
 
 Exit 0: always, on success (even with no candidates). Exit 2: extraction or
 analysis failure.
@@ -45,6 +48,7 @@ type options struct {
 	useCache        bool
 	subsystemMining bool
 	groupMining     bool
+	cohortThreshold float64
 	paths           []string
 }
 
@@ -99,6 +103,7 @@ func GetReport(ctx context.Context, args []string) (*patterns.PatternsReport, er
 		WlCache:           cache,
 		SubsystemMining:   opts.subsystemMining,
 		GroupMining:       opts.groupMining,
+		CohortThreshold:   opts.cohortThreshold,
 	})
 	return &report, nil
 }
@@ -214,10 +219,11 @@ func parseOptions(args []string) (options, error) {
 	useCache := flags.Bool("cache", false, "reuse WL refinements from .cyclo/patterns-cache.json")
 	subsystemMining := flags.Bool("subsystem-mining", false, "mine PR-Miner rules per call-graph subsystem")
 	groupMining := flags.Bool("group-mining", false, "mine PR-Miner rules within CCGraph similarity groups")
+	cohortThreshold := flags.Float64("cohort-threshold", 0.65, "WL similarity threshold for group-mining cohorts (0-1; lower finds looser cohorts)")
 	if err := flags.Parse(args); err != nil {
 		return options{}, err
 	}
-	result := options{format: *format, threshold: *threshold, useCache: *useCache, subsystemMining: *subsystemMining, groupMining: *groupMining, paths: flags.Args()}
+	result := options{format: *format, threshold: *threshold, useCache: *useCache, subsystemMining: *subsystemMining, groupMining: *groupMining, cohortThreshold: *cohortThreshold, paths: flags.Args()}
 	return result, result.validate()
 }
 
@@ -227,6 +233,9 @@ func (opts options) validate() error {
 	}
 	if opts.threshold > 1000 {
 		return fmt.Errorf("threshold must be between 0 and 1000")
+	}
+	if opts.cohortThreshold < 0 || opts.cohortThreshold > 1 {
+		return fmt.Errorf("cohort-threshold must be between 0 and 1")
 	}
 	return nil
 }

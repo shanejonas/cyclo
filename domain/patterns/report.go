@@ -61,6 +61,20 @@ type Options struct {
 	// differences reveal the interesting patterns: 19 handlers that all
 	// send a response and 1 that forgot to.
 	GroupMining bool
+	// CohortThreshold is the WL kernel similarity threshold for group
+	// mining cohort detection, in [0, 1]. Lower than the paper's 0.9 clone
+	// threshold: cohorts are functions solving similar problems, not
+	// near-duplicate clones. Zero means the default (0.65).
+	CohortThreshold float64
+}
+
+// cohortThresholdMilli converts Options.CohortThreshold to thousandths
+// for CCGraphCohorts. Zero means the default cohort threshold.
+func cohortThresholdMilli(options Options) uint32 {
+	if options.CohortThreshold <= 0 {
+		return defaultCohortThresholdMilli
+	}
+	return uint32(options.CohortThreshold * 1000)
 }
 
 // Build keeps groups at or above minScoreMilli, then the first top (all when
@@ -142,7 +156,7 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 	}},
 	{MinedRule, func(prepared []*FuncFacts, options Options) []Candidate {
 		if options.GroupMining {
-			return minedRuleGroupCandidates(prepared)
+			return minedRuleGroupCandidates(prepared, cohortThresholdMilli(options))
 		}
 		if options.SubsystemMining {
 			return minedRuleSubsystemCandidates(prepared)
