@@ -10,8 +10,8 @@ import (
 //
 // The pipeline:
 //  1. Characteristic vectors (cheap 7-dim) → candidate pairs.
-//     CCGraph Stage 1: numerical PDG characteristics, cosine >= 0.3.
-//  2. Jaro-Winkler function-name similarity >= 0.7 → still candidate.
+//     CCGraph Stage 1: numerical PDG characteristics, cosine >= 0.9.
+//  2. Jaro-Winkler function-name similarity >= 0.5 → still candidate.
 //     CCGraph Stage 2: string similarity filter.
 //  3. LSH on 512-dim WL vectors → candidate clusters.
 //     Scaling layer (Gabel et al.): avoids O(n^2) pairwise WL checks.
@@ -20,11 +20,11 @@ import (
 //
 // LSH is the optimization, CCGraph is the algorithm. Both are kept.
 
-// Thresholds from the paper's design (tuned for our WL kernel).
+// Thresholds from the paper (Zou et al., ASE 2020).
 const (
 	// ccStage2NameThreshold is the minimum Jaro-Winkler similarity for
 	// two function names to survive Stage 2 filtering.
-	ccStage2NameThreshold = 0.7
+	ccStage2NameThreshold = 0.5
 	// ccMatchThreshold is the minimum WL kernel similarity (in
 	// thousandths, matching SimilarityMilli) for a clone pair.
 	ccMatchThreshold = 900

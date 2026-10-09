@@ -33,7 +33,7 @@ func TestJaroWinklerDifferent(t *testing.T) {
 }
 
 func TestJaroWinklerThreshold(t *testing.T) {
-	// Sanity: names that differ by a suffix pass the 0.7 Stage 2 bar,
+	// Sanity: names that differ by a suffix pass the 0.5 Stage 2 bar,
 	// unrelated names don't.
 	if jaroWinkler("fetchData", "fetchDatum") < ccStage2NameThreshold {
 		t.Fatal("fetchData/fetchDatum should pass Stage 2")
