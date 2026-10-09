@@ -97,19 +97,24 @@ func blockKeys(pdgs []*Pdg) [][]string {
 	}
 	keys := make([][]string, len(pdgs))
 	for i, set := range sets {
-		ranked := append([]string{}, set...)
-		sort.Slice(ranked, func(a, b int) bool {
-			if freq[ranked[a]] != freq[ranked[b]] {
-				return freq[ranked[a]] < freq[ranked[b]]
-			}
-			return ranked[a] < ranked[b]
-		})
-		if len(ranked) > blockKeysCount {
-			ranked = ranked[:blockKeysCount]
-		}
-		keys[i] = ranked
+		keys[i] = rankKeys(set, freq)
 	}
 	return keys
+}
+
+// rankKeys orders call classes rarest-first (ties by name) and truncates.
+func rankKeys(set []string, freq map[string]int) []string {
+	ranked := append([]string{}, set...)
+	sort.Slice(ranked, func(a, b int) bool {
+		if freq[ranked[a]] != freq[ranked[b]] {
+			return freq[ranked[a]] < freq[ranked[b]]
+		}
+		return ranked[a] < ranked[b]
+	})
+	if len(ranked) > blockKeysCount {
+		ranked = ranked[:blockKeysCount]
+	}
+	return ranked
 }
 
 // indexBlocks maps each blocking key to the functions carrying it.

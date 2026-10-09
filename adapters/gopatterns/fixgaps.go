@@ -53,7 +53,7 @@ func applyEnumDispatchFix(spec *patterns.FixSpec, src []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return buildDispatchFix(fset, f, sw, cases, keyType, src)
+	return buildDispatchFix(fset, f, src, dispatchPlan{sw: sw, cases: cases, keyType: keyType})
 }
 
 // validatedSwitch finds and validates the switch statement.
@@ -144,19 +144,26 @@ func inferKeyType(val ast.Expr, keyType string) string {
 	return xIdent.Name
 }
 
+// dispatchPlan bundles a validated switch with its derived cases.
+type dispatchPlan struct {
+	sw      *ast.SwitchStmt
+	cases   []caseEntry
+	keyType string
+}
+
 // buildDispatchFix creates the text edits for the dispatch table.
-func buildDispatchFix(fset *token.FileSet, f *ast.File, sw *ast.SwitchStmt, cases []caseEntry, keyType string, src []byte) ([]byte, error) {
-	tagText := srcText(fset, sw.Tag, src)
-	tableName := strings.ToLower(keyType) + "Dispatch"
-	table := buildTable(tableName, keyType, cases)
+func buildDispatchFix(fset *token.FileSet, f *ast.File, src []byte, plan dispatchPlan) ([]byte, error) {
+	tagText := srcText(fset, plan.sw.Tag, src)
+	tableName := strings.ToLower(plan.keyType) + "Dispatch"
+	table := buildTable(tableName, plan.keyType, plan.cases)
 	repl := buildLookup(tableName, tagText)
-	fnDecl := findEnclosingFunc(f, sw)
+	fnDecl := findEnclosingFunc(f, plan.sw)
 	if fnDecl == nil {
 		return nil, fmt.Errorf("enum_dispatch: switch not in function")
 	}
 	fnStart := fset.Position(fnDecl.Pos()).Offset
-	swStart := fset.Position(sw.Pos()).Offset
-	swEnd := fset.Position(sw.End()).Offset
+	swStart := fset.Position(plan.sw.Pos()).Offset
+	swEnd := fset.Position(plan.sw.End()).Offset
 	edits := []textEdit{
 		{start: fnStart, end: fnStart, replacement: []byte(table + "\n")},
 		{start: swStart, end: swEnd, replacement: []byte(repl)},
@@ -330,8 +337,9 @@ func extractGeneralizeParams(fset *token.FileSet, group []*ast.FuncDecl, src []b
 		return nil, fmt.Errorf("no type variation found")
 	}
 	constraint := inferConstraint(fset, group[0], src)
-	genericFn := buildGenericFunc(fset, group[0], baseName, typeVars, constraint, src)
-	return &generalizeParams{baseName: baseName, typeVars: typeVars, constraint: constraint, genericFn: genericFn}, nil
+	params := &generalizeParams{baseName: baseName, typeVars: typeVars, constraint: constraint}
+	params.genericFn = buildGenericFunc(fset, group[0], src, params)
+	return params, nil
 }
 
 // buildGeneralizeEdits creates the text edits for generalization.
@@ -451,17 +459,17 @@ func usesComparison(bodyText string) bool {
 }
 
 // buildGenericFunc constructs the generic function source.
-func buildGenericFunc(fset *token.FileSet, template *ast.FuncDecl, baseName string, typeVars map[string]string, constraint string, src []byte) string {
+func buildGenericFunc(fset *token.FileSet, template *ast.FuncDecl, src []byte, params *generalizeParams) string {
 	// Get the template source.
 	fnText := srcText(fset, template, src)
 	// Replace type names with T.
-	for concrete, placeholder := range typeVars {
+	for concrete, placeholder := range params.typeVars {
 		fnText = strings.ReplaceAll(fnText, concrete, placeholder)
 	}
 	// Replace function name with base name and add type params.
 	// Find "func Name(" and replace with "func baseName[T constraint](".
 	oldDecl := "func " + template.Name.Name + "("
-	newDecl := fmt.Sprintf("func %s[T %s](", baseName, constraint)
+	newDecl := fmt.Sprintf("func %s[T %s](", params.baseName, params.constraint)
 	fnText = strings.Replace(fnText, oldDecl, newDecl, 1)
 	return fnText
 }
