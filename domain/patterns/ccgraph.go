@@ -382,11 +382,11 @@ func buildFactMap(facts []*FuncFacts) map[string]*FuncFacts {
 
 // CCGraphCloneCandidates converts CCGraph clone groups (function ID lists)
 // into pattern candidates for the report pipeline.
-func CCGraphCloneCandidates(groups [][]string, facts []*FuncFacts) []Candidate {
+func CCGraphCloneCandidates(groups []SimilarityGroup, facts []*FuncFacts) []Candidate {
 	factByID := buildFactMap(facts)
 	var out []Candidate
 	for _, group := range groups {
-		if c, ok := makeCCGraphCandidate(group, factByID); ok {
+		if c, ok := makeCCGraphCandidate(group.MemberIDs, factByID); ok {
 			out = append(out, c)
 		}
 	}
