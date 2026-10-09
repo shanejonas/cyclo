@@ -52,6 +52,10 @@ type Options struct {
 	// WlCache memoizes WL refinements across runs for incremental mining.
 	// Nil computes every refinement fresh.
 	WlCache *WlCache
+	// SubsystemMining scopes PR-Miner rule mining to call-graph subsystems
+	// (connected components) instead of the whole repo. Idioms live at the
+	// subsystem level; whole-repo mining dilutes them to nothing.
+	SubsystemMining bool
 }
 
 // Build keeps groups at or above minScoreMilli, then the first top (all when
@@ -132,6 +136,9 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 		return DepClusterCandidates(clusters, prepared)
 	}},
 	{MinedRule, func(prepared []*FuncFacts, options Options) []Candidate {
+		if options.SubsystemMining {
+			return minedRuleSubsystemCandidates(prepared)
+		}
 		sets := BuildCallSets(prepared)
 		rules := MineRules(sets)
 		violations := FindViolations(sets, rules)
