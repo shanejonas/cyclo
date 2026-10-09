@@ -43,8 +43,8 @@ func Transfer(fromID string, toID string, amount int, currency string) {}
 `)
 	got := primitiveParams(fn, info)
 	want := []patterns.ParamInfo{
-		{"fromID", "string"}, {"toID", "string"},
-		{"amount", "int"}, {"currency", "string"},
+		{Name: "fromID", Type: "string"}, {Name: "toID", Type: "string"},
+		{Name: "amount", Type: "int"}, {Name: "currency", Type: "string"},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("got %v, want %v", got, want)

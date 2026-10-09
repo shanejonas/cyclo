@@ -2,6 +2,7 @@ package patterns
 
 import (
 	"fmt"
+	"math"
 	"sort"
 )
 
@@ -55,52 +56,144 @@ func MineRules(sets []CallSet) []MinedRuleDef {
 	if len(sets) == 0 {
 		return nil
 	}
+	p := buildPostings(sets)
 	var rules []MinedRuleDef
-	rules = append(rules, mineSingleAntecedent(sets)...)
-	rules = append(rules, mineDoubleAntecedent(sets)...)
+	rules = append(rules, mineSingleAntecedent(p)...)
+	rules = append(rules, mineDoubleAntecedent(p, sets)...)
 	return rules
 }
 
-// mineSingleAntecedent mines rules of form {A} -> B.
-func mineSingleAntecedent(sets []CallSet) []MinedRuleDef {
-	single := countSingles(sets)
-	var rules []MinedRuleDef
-	for a, cntA := range single {
-		for b := range single {
-			if a == b {
-				continue
-			}
-			if r, ok := makeRule(sets, []string{a}, b, cntA); ok {
-				rules = append(rules, r)
-			}
+// callPostings is an inverted index from call name to the sorted list of
+// function indices containing that call. Built once per MineRules call so
+// co-occurrence counts become postings-list intersections instead of
+// full scans over all functions.
+type callPostings struct {
+	lists map[string][]int
+	total int
+}
+
+// buildPostings indexes which functions contain each call.
+// Indices are appended in increasing order, so every list stays sorted.
+func buildPostings(sets []CallSet) *callPostings {
+	p := &callPostings{lists: make(map[string][]int), total: len(sets)}
+	for i, s := range sets {
+		for c := range s.Calls {
+			p.lists[c] = append(p.lists[c], i)
 		}
+	}
+	return p
+}
+
+// minCountForSupport returns the smallest integer count meeting minSupport.
+// Pairs below this count can never produce a rule, so they are pruned
+// before the (more expensive) intersection.
+func minCountForSupport(total int) int {
+	return int(math.Ceil(minSupport * float64(total)))
+}
+
+// intersectSize returns |a ∩ b| for sorted index lists via two-pointer merge.
+func intersectSize(a, b []int) int {
+	i, j, n := 0, 0, 0
+	for i < len(a) && j < len(b) {
+		switch {
+		case a[i] == b[j]:
+			n++
+			i++
+			j++
+		case a[i] < b[j]:
+			i++
+		default:
+			j++
+		}
+	}
+	return n
+}
+
+// intersectLists returns a ∩ b for sorted index lists, preserving order.
+func intersectLists(a, b []int) []int {
+	var out []int
+	i, j := 0, 0
+	for i < len(a) && j < len(b) {
+		switch {
+		case a[i] == b[j]:
+			out = append(out, a[i])
+			i++
+			j++
+		case a[i] < b[j]:
+			i++
+		default:
+			j++
+		}
+	}
+	return out
+}
+
+// sortedContains reports whether sorted list contains x via binary search.
+func sortedContains(list []int, x int) bool {
+	lo, hi := 0, len(list)
+	for lo < hi {
+		mid := (lo + hi) / 2
+		if list[mid] < x {
+			lo = mid + 1
+		} else {
+			hi = mid
+		}
+	}
+	return lo < len(list) && list[lo] == x
+}
+
+// mineSingleAntecedent mines rules of form {A} -> B using the postings index.
+// A pair is skipped without intersecting when either side alone is too rare
+// to meet minSupport, since co-occurrence cannot exceed either side's count.
+func mineSingleAntecedent(p *callPostings) []MinedRuleDef {
+	minCnt := minCountForSupport(p.total)
+	var rules []MinedRuleDef
+	for a, listA := range p.lists {
+		if len(listA) < minCnt {
+			continue
+		}
+		rules = append(rules, singleConsequents(p, a, listA, minCnt)...)
 	}
 	return rules
 }
 
-// mineDoubleAntecedent mines rules of form {A,B} -> C.
-func mineDoubleAntecedent(sets []CallSet) []MinedRuleDef {
-	triples := countTriples(sets)
+// singleConsequents mines {a} -> b rules for one fixed antecedent a.
+func singleConsequents(p *callPostings, a string, listA []int, minCnt int) []MinedRuleDef {
 	var rules []MinedRuleDef
-	for key, cntABC := range triples {
-		parts := parseTripleKey(key)
-		if len(parts) != 3 {
+	for b, listB := range p.lists {
+		if a == b || len(listB) < minCnt {
 			continue
 		}
-		a, b, c := parts[0], parts[1], parts[2]
-		cntAB := countCoOccur(sets, []string{a, b})
-		if r, ok := makeRuleFromCounts(len(sets), cntAB, cntABC, []string{a, b}, c); ok {
+		cntAB := intersectSize(listA, listB)
+		if r, ok := makeRuleFromCounts(p.total, len(listA), cntAB, []string{a}, b); ok {
 			rules = append(rules, r)
 		}
 	}
 	return rules
 }
 
-// makeRule creates a rule if support and confidence thresholds are met.
-// cntA is the count of the antecedent, cntAB is the count of antecedent+consequent.
-func makeRule(sets []CallSet, antecedent []string, consequent string, cntA int) (MinedRuleDef, bool) {
-	cntAB := countCoOccur(sets, append(antecedent, consequent))
-	return makeRuleFromCounts(len(sets), cntA, cntAB, antecedent, consequent)
+// mineDoubleAntecedent mines rules of form {A,B} -> C.
+// cntABC comes from the triple enumeration; cntAB is a postings intersection
+// instead of a full scan. Triples below minSupport skip the intersection.
+func mineDoubleAntecedent(p *callPostings, sets []CallSet) []MinedRuleDef {
+	minCnt := minCountForSupport(p.total)
+	triples := countTriples(sets)
+	var rules []MinedRuleDef
+	for key, cntABC := range triples {
+		if cntABC < minCnt {
+			continue
+		}
+		parts := parseTripleKey(key)
+		if len(parts) != 3 {
+			continue
+		}
+		a, b, c := parts[0], parts[1], parts[2]
+		cntAB := intersectSize(p.lists[a], p.lists[b])
+		if r, ok := makeRuleFromCounts(len(sets), cntAB, cntABC, []string{a, b}, c); ok {
+			rules = append(rules, r)
+		}
+	}
+	return rules
 }
 
 // makeRuleFromCounts creates a rule from precomputed counts.
@@ -123,19 +216,47 @@ func makeRuleFromCounts(total, cntA, cntAB int, antecedent []string, consequent 
 
 // FindViolations finds functions that have the antecedent but not the consequent.
 func FindViolations(sets []CallSet, rules []MinedRuleDef) []RuleViolation {
+	p := buildPostings(sets)
 	var out []RuleViolation
 	for _, rule := range rules {
-		out = append(out, violationsForRule(sets, rule)...)
+		out = append(out, violationsForRule(p, sets, rule)...)
 	}
 	return out
 }
 
-// violationsForRule finds functions violating one rule.
-func violationsForRule(sets []CallSet, rule MinedRuleDef) []RuleViolation {
+// violationsForRule finds functions violating one rule via the index.
+// The antecedent intersection is walked in function order, so output order
+// matches the original full-scan implementation.
+func violationsForRule(p *callPostings, sets []CallSet, rule MinedRuleDef) []RuleViolation {
+	ant := antecedentPostings(p, rule.Antecedent)
+	if len(ant) == 0 {
+		return nil
+	}
+	cons := p.lists[rule.Consequent]
 	var out []RuleViolation
-	for _, s := range sets {
-		if hasAntecedent(s, rule.Antecedent) && !s.Calls[rule.Consequent] {
-			out = append(out, RuleViolation{FuncID: s.FuncID, Rule: rule})
+	for _, idx := range ant {
+		if !sortedContains(cons, idx) {
+			out = append(out, RuleViolation{FuncID: sets[idx].FuncID, Rule: rule})
+		}
+	}
+	return out
+}
+
+// antecedentPostings returns the sorted function indices containing every
+// antecedent call. An empty antecedent matches all functions.
+func antecedentPostings(p *callPostings, antecedent []string) []int {
+	if len(antecedent) == 0 {
+		all := make([]int, p.total)
+		for i := range all {
+			all[i] = i
+		}
+		return all
+	}
+	out := p.lists[antecedent[0]]
+	for _, a := range antecedent[1:] {
+		out = intersectLists(out, p.lists[a])
+		if len(out) == 0 {
+			break
 		}
 	}
 	return out

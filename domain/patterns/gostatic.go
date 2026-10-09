@@ -28,9 +28,9 @@ type TypedNilHit struct {
 }
 
 const (
-	nilErrScoreMilli         = 800
+	nilErrScoreMilli          = 800
 	forceTypeAssertScoreMilli = 700
-	typedNilScoreMilli       = 750
+	typedNilScoreMilli        = 750
 )
 
 // nilErrCandidates builds candidates from NilErrHit findings.

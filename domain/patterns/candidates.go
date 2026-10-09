@@ -158,6 +158,30 @@ const (
 	// Detection-only: the fix depends on context (parameterize? escape?
 	// validate?), so the LLM judges.
 	TaintFlowKind CandidateKind = "taint_flow"
+	// BarrierSlice flags functions whose return-value dependence cone
+	// (excluding error handling via Try-node barriers) is large. Following
+	// Krinke (SQJ 2004): mark code off-limits and the slice can't pass
+	// through. Detection-only: the slice is an attention guide.
+	BarrierSliceKind CandidateKind = "barrier_slice"
+	// ThinSlice flags functions with a long producer-only data chain feeding
+	// a return value. Following Sridharan et al. (PLDI 2007): only producer
+	// statements, skipping control dependences. Detection-only.
+	ThinSliceKind CandidateKind = "thin_slice"
+	// Chop flags functions where many statements lie on the input-to-output
+	// dependence path. Following Jackson & Rollins (CMU-CS-94-169, 1994):
+	// the chop is the intersection of the forward slice from parameters
+	// with the backward slice to returns. Detection-only.
+	ChopKind CandidateKind = "chop"
+	// AlattinRule flags violations of disjunctive rules mined from the
+	// codebase itself (Thummalapenta & Xie, ASE 2009): "if you call A,
+	// you call B OR C". A function calling A with neither alternative
+	// is a bug. Detection-only.
+	AlattinRule CandidateKind = "alattin_rule"
+	// Obligation flags resources acquired without a deferred release
+	// (Weimer & Necula, OOPSLA 2004): an opened file, lock, or connection
+	// with no `defer Close/Unlock` is a candidate leak. Detection-only:
+	// ownership transfer (factories) needs judgment.
+	Obligation CandidateKind = "obligation"
 )
 
 // FixKindOrder defines the order in which pattern fixes are applied when
@@ -210,6 +234,11 @@ var FixKindOrder = []CandidateKind{
 	CCGraphClone,
 	InconsistentClone,
 	TaintFlowKind,
+	BarrierSliceKind,
+	ThinSliceKind,
+	ChopKind,
+	AlattinRule,
+	Obligation,
 }
 
 // FixKindRank returns the application-order rank for a pattern kind.

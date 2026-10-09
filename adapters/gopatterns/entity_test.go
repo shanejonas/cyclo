@@ -33,8 +33,8 @@ func parseTestFunc(t *testing.T, src string) (*ast.FuncDecl, *token.FileSet) {
 
 func TestIsIDField(t *testing.T) {
 	cases := []struct {
-		name  string
-		want  bool
+		name string
+		want bool
 	}{
 		{"ID", true},
 		{"Id", true},

@@ -331,12 +331,12 @@ func hasNamedResults(fn *ast.FuncDecl) bool {
 
 // paramCtx carries the shared context for parameterizing a function pair.
 type paramCtx struct {
-	fset         *token.FileSet
-	a, b         *ast.FuncDecl
-	src          []byte
-	r            *renames
-	holes        []hole
-	params       []holeParam
+	fset          *token.FileSet
+	a, b          *ast.FuncDecl
+	src           []byte
+	r             *renames
+	holes         []hole
+	params        []holeParam
 	extractedName string
 }
 
@@ -1126,7 +1126,6 @@ func resultParts(fset *token.FileSet, fn *ast.FuncDecl) []string {
 	}
 	return parts
 }
-
 
 // inferHoleFuncType infers the function type for a hole identifier by
 // finding its call site in both functions.

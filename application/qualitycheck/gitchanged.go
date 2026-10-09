@@ -3,8 +3,8 @@ package qualitycheck
 import (
 	"strings"
 
-	"github.com/shanejonas/cyclo/domain/quality"
 	"github.com/shanejonas/cyclo/adapters/gitchanged"
+	"github.com/shanejonas/cyclo/domain/quality"
 )
 
 // touchedFunctions returns the set of fact keys (path + name) for functions

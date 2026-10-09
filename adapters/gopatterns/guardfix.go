@@ -90,6 +90,7 @@ func applyEdits(src []byte, edits []textEdit) []byte {
 	out.Write(src[pos:])
 	return out.Bytes()
 }
+
 // guardEdit computes the text edit that turns ifStmt into a guard clause.
 // It returns false when the transform cannot be proven safe.
 func guardEdit(fset *token.FileSet, ifStmt *ast.IfStmt, src []byte) (textEdit, GuardFix, bool) {

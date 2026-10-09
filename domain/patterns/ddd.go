@@ -327,7 +327,8 @@ func shortTypeName(typeName string) string {
 }
 
 // specificationCandidate builds the fixable candidate for a business rule.
-func specificationCandidate(k specRuleKey, facts []*FuncFacts, funcs map[string]bool, hit SpecificationHit, file string) Candidate {	names := make([]string, 0, len(funcs))
+func specificationCandidate(k specRuleKey, facts []*FuncFacts, funcs map[string]bool, hit SpecificationHit, file string) Candidate {
+	names := make([]string, 0, len(funcs))
 	for id := range funcs {
 		names = append(names, id)
 	}
@@ -349,10 +350,10 @@ func specificationCandidate(k specRuleKey, facts []*FuncFacts, funcs map[string]
 			Line:    hit.Line,
 			EndLine: hit.Line,
 			Params: map[string]string{
-				"type":     k.typeName,
-				"varname":  hit.VarName,
-				"cond":     hit.CondText,
-				"rulekey":  k.key,
+				"type":    k.typeName,
+				"varname": hit.VarName,
+				"cond":    hit.CondText,
+				"rulekey": k.key,
 			},
 		},
 	}

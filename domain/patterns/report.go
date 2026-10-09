@@ -105,14 +105,22 @@ type singleFunctionBuilder struct {
 // type-creating passes. Detection-only kinds sort last.
 var singleFunctionBuilders = []singleFunctionBuilder{
 	{GuardClause, func(prepared []*FuncFacts, options Options) []Candidate { return guardCandidates(prepared) }},
-	{PrimitiveObsession, func(prepared []*FuncFacts, options Options) []Candidate { return primitiveObsessionCandidates(prepared) }},
+	{PrimitiveObsession, func(prepared []*FuncFacts, options Options) []Candidate {
+		return primitiveObsessionCandidates(prepared)
+	}},
 	{ValueObject, func(prepared []*FuncFacts, options Options) []Candidate { return valueObjectCandidates(prepared) }},
 	{Factory, func(prepared []*FuncFacts, options Options) []Candidate { return factoryCandidates(prepared) }},
 	{Specification, func(prepared []*FuncFacts, options Options) []Candidate { return specificationCandidates(prepared) }},
-	{MissingIdentity, func(prepared []*FuncFacts, options Options) []Candidate { return missingIdentityCandidates(options.MissingIdentities) }},
+	{MissingIdentity, func(prepared []*FuncFacts, options Options) []Candidate {
+		return missingIdentityCandidates(options.MissingIdentities)
+	}},
 	{EntityIdentity, func(prepared []*FuncFacts, options Options) []Candidate { return entityIdentityCandidates(prepared) }},
-	{DomainService, func(prepared []*FuncFacts, options Options) []Candidate { return domainServiceCandidates(options.DomainServices) }},
-	{AnemicModel, func(prepared []*FuncFacts, options Options) []Candidate { return anemicModelCandidates(options.AnemicModels, options.DomainServices) }},
+	{DomainService, func(prepared []*FuncFacts, options Options) []Candidate {
+		return domainServiceCandidates(options.DomainServices)
+	}},
+	{AnemicModel, func(prepared []*FuncFacts, options Options) []Candidate {
+		return anemicModelCandidates(options.AnemicModels, options.DomainServices)
+	}},
 	{MutableIdentity, func(prepared []*FuncFacts, options Options) []Candidate { return mutableIdentityCandidates(prepared) }},
 	{Aggregate, func(prepared []*FuncFacts, options Options) []Candidate { return aggregateCandidates(prepared) }},
 	{Repository, func(prepared []*FuncFacts, options Options) []Candidate { return repositoryCandidates(prepared) }},
@@ -157,6 +165,28 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 	{TaintFlowKind, func(prepared []*FuncFacts, options Options) []Candidate {
 		flows := FindTaintFlows(prepared)
 		return TaintFlowCandidates(flows, prepared)
+	}},
+	{BarrierSliceKind, func(prepared []*FuncFacts, options Options) []Candidate {
+		findings := FindBarrierSlices(prepared)
+		return BarrierSliceCandidates(findings, prepared)
+	}},
+	{ThinSliceKind, func(prepared []*FuncFacts, options Options) []Candidate {
+		findings := FindThinSlices(prepared)
+		return ThinSliceCandidates(findings, prepared)
+	}},
+	{ChopKind, func(prepared []*FuncFacts, options Options) []Candidate {
+		findings := FindChops(prepared)
+		return ChopCandidates(findings, prepared)
+	}},
+	{AlattinRule, func(prepared []*FuncFacts, options Options) []Candidate {
+		sets := BuildCallSets(prepared)
+		rules := MineDisjunctiveRules(sets)
+		violations := FindAlternativeViolations(sets, rules)
+		return AlattinRuleCandidates(violations, prepared)
+	}},
+	{Obligation, func(prepared []*FuncFacts, options Options) []Candidate {
+		violations := FindObligationViolations(prepared)
+		return ObligationCandidates(violations, prepared)
 	}},
 }
 

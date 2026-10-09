@@ -194,10 +194,10 @@ func DepClusterCandidates(clusters []DepCluster, facts []*FuncFacts) []Candidate
 			continue
 		}
 		out = append(out, Candidate{
-			Kind:        DependenceCluster,
-			ScoreMilli:  650, // High: tangles resist testing.
-			Observation: fmt.Sprintf("%d mutually-dependent statements (%.0f%% of function)", len(c.Nodes), c.Fraction*100),
-			Inference:   "everything affects everything here; the code resists testing and comprehension",
+			Kind:             DependenceCluster,
+			ScoreMilli:       650, // High: tangles resist testing.
+			Observation:      fmt.Sprintf("%d mutually-dependent statements (%.0f%% of function)", len(c.Nodes), c.Fraction*100),
+			Inference:        "everything affects everything here; the code resists testing and comprehension",
 			PossibleRefactor: "break the cycle: extract the cluster into smaller functions with clear inputs/outputs",
 			Sites: []Site{
 				{Path: f.Path, Line: c.Lines[0], Name: f.Name},

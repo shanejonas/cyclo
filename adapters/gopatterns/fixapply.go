@@ -354,8 +354,6 @@ func packageEndOffset(fset *token.FileSet, f *ast.File, src []byte) int {
 	return offset + 1
 }
 
-
-
 // applyAnemicModelFix applies an anemic_model FixSpec.
 func applyAnemicModelFix(spec *patterns.FixSpec, src []byte) ([]byte, error) {
 	fset, f, err := parseSpec(spec, src)
@@ -384,11 +382,11 @@ func applyPrimitiveObsessionFix(spec *patterns.FixSpec, src []byte) ([]byte, err
 
 // applyEntityIdentityFix applies an entity_identity FixSpec.
 // Two modes:
-// - Standard: replaces attribute-based equality (a.Name == b.Name &&
-//   a.Email == b.Email) with identity comparison (a.ID == b.ID).
-// - Add-ID (paired with missing_identity): adds an ID field to a struct
-//   that is compared by attributes but has no identity. After re-mining,
-//   the standard rewrite fires.
+//   - Standard: replaces attribute-based equality (a.Name == b.Name &&
+//     a.Email == b.Email) with identity comparison (a.ID == b.ID).
+//   - Add-ID (paired with missing_identity): adds an ID field to a struct
+//     that is compared by attributes but has no identity. After re-mining,
+//     the standard rewrite fires.
 func applyEntityIdentityFix(spec *patterns.FixSpec, src []byte) ([]byte, error) {
 	if spec.Params["add_id"] == "true" {
 		return applyEntityAddIDFix(spec, src)
@@ -492,7 +490,6 @@ func findComparisonAtLine(fset *token.FileSet, f *ast.File, line int) ast.Expr {
 	})
 	return target
 }
-
 
 // structInsertPos finds the byte offset after the last field of a struct.
 func structInsertPos(fset *token.FileSet, f *ast.File, typeName string) (int, error) {
@@ -1215,7 +1212,7 @@ func unexported(name string) string {
 // on the local type, or a plain function for external types.
 func predDeclEdit(ctx specEditCtx, first specMatch) textEdit {
 	insertPos := specInsertPos(ctx.fset, ctx.f, ctx.src)
-	firstCond := ctx.src[ctx.fset.Position(first.stmt.Cond.Pos()).Offset : ctx.fset.Position(first.stmt.Cond.End()).Offset]
+	firstCond := ctx.src[ctx.fset.Position(first.stmt.Cond.Pos()).Offset:ctx.fset.Position(first.stmt.Cond.End()).Offset]
 	paramName := first.varName
 	if paramName == "" {
 		paramName = "v"
