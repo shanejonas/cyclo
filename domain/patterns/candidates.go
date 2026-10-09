@@ -209,6 +209,7 @@ var FixKindOrder = []CandidateKind{
 	DeviantBehavior,
 	CCGraphClone,
 	InconsistentClone,
+	TaintFlowKind,
 }
 
 // FixKindRank returns the application-order rank for a pattern kind.
