@@ -43,6 +43,13 @@ const (
 // function ID to function name; when a name is missing, Stage 2 is
 // skipped for that pair.
 func CCGraphClones(pdgs map[string]*Pdg, names map[string]string) [][]string {
+	return ccGraphGroups(pdgs, names, ccMatchThreshold)
+}
+
+// ccGraphGroups runs the shared CCGraph pipeline with a parameterized
+// Stage-4 WL similarity threshold. The paper-exact path passes
+// ccMatchThreshold.
+func ccGraphGroups(pdgs map[string]*Pdg, names map[string]string, matchMilli uint32) [][]string {
 	ids := ccSortableIDs(pdgs)
 	if len(ids) < 2 {
 		return nil
@@ -66,7 +73,7 @@ func CCGraphClones(pdgs map[string]*Pdg, names map[string]string) [][]string {
 	// Stage 4: WL similarity within LSH clusters.
 	parent := ccMakeParent(ids)
 	for _, cluster := range clusters {
-		ccUnionSimilar(cluster, candidates, wls, parent)
+		ccUnionSimilar(cluster, candidates, wls, parent, matchMilli)
 	}
 	return groupsOfTwoOrMore(parent)
 }
@@ -190,7 +197,7 @@ func ccLSHClusters(candidates map[string]bool, wls map[string]*Wl) [][]string {
 // across a worker pool; unions are applied sequentially afterwards.
 // Union order cannot affect the final groups (groupsOfTwoOrMore
 // normalizes via find), so the output matches the sequential version.
-func ccUnionSimilar(cluster []string, candidates map[string]bool, wls map[string]*Wl, parent map[string]string) {
+func ccUnionSimilar(cluster []string, candidates map[string]bool, wls map[string]*Wl, parent map[string]string, matchMilli uint32) {
 	workers := runtime.NumCPU()
 	found := make(chan []ccPairJob, workers)
 	var wg sync.WaitGroup
@@ -198,7 +205,7 @@ func ccUnionSimilar(cluster []string, candidates map[string]bool, wls map[string
 		wg.Add(1)
 		go func(w int) {
 			defer wg.Done()
-			found <- ccSimilarStripes(cluster, candidates, wls, w, workers)
+			found <- ccSimilarStripes(cluster, candidates, wls, w, workers, matchMilli)
 		}(w)
 	}
 	go func() {
@@ -214,7 +221,7 @@ func ccUnionSimilar(cluster []string, candidates map[string]bool, wls map[string
 
 // ccSimilarStripes returns the cluster pairs (outer index striped by
 // worker) passing the candidate-set and WL-similarity filters.
-func ccSimilarStripes(cluster []string, candidates map[string]bool, wls map[string]*Wl, worker, workers int) []ccPairJob {
+func ccSimilarStripes(cluster []string, candidates map[string]bool, wls map[string]*Wl, worker, workers int, matchMilli uint32) []ccPairJob {
 	var out []ccPairJob
 	for i := worker; i < len(cluster); i += workers {
 		for j := i + 1; j < len(cluster); j++ {
@@ -222,7 +229,7 @@ func ccSimilarStripes(cluster []string, candidates map[string]bool, wls map[stri
 			if !candidates[ccPairKey(a, b)] {
 				continue
 			}
-			if SimilarityMilli(wls[a], wls[b]) < ccMatchThreshold {
+			if SimilarityMilli(wls[a], wls[b]) < matchMilli {
 				continue
 			}
 			out = append(out, ccPairJob{a: a, b: b})
