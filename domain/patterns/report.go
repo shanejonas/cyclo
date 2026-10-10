@@ -152,13 +152,20 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 		return DeviantBehaviorCandidates(violations, prepared)
 	}},
 	{CCGraphClone, func(prepared []*FuncFacts, options Options) []Candidate {
-		pdgs, names := ccGraphInputs(prepared)
-		groups := CCGraphClones(pdgs, names)
-		return CCGraphCloneCandidates(groups, prepared)
+		pdgs, names, astTypes := ccGraphInputs(prepared)
+		groups := CCGraphClonesWithAST(pdgs, names, astTypes)
+		out := CCGraphCloneCandidates(groups, prepared)
+		// Bridge clone detection to abstraction proposing: run the
+		// parameterize proposer (Bulychev & Minea anti-unification via PDG
+		// alignment) on each clone group. Groups that do not yield an
+		// abstraction are skipped.
+		params := defaultParams(options.Params)
+		out = append(out, CloneGroupParameterizeCandidates(prepared, groups, params)...)
+		return out
 	}},
 	{InconsistentClone, func(prepared []*FuncFacts, options Options) []Candidate {
-		pdgs, names := ccGraphInputs(prepared)
-		groups := CCGraphClones(pdgs, names)
+		pdgs, names, astTypes := ccGraphInputs(prepared)
+		groups := CCGraphClonesWithAST(pdgs, names, astTypes)
 		divergent := FindInconsistentClones(groups, pdgs)
 		return InconsistentCloneCandidates(divergent, prepared)
 	}},

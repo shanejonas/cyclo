@@ -82,7 +82,7 @@ func branchBase(root string) (string, bool) {
 func ChangedRanges(root, base string, paths []string) (map[string][]LineRange, error) {
 	result := map[string][]LineRange{}
 	if base != "" {
-		args := append([]string{"diff", "--no-color", "--no-ext-diff", "--no-textconv", "--unified=0", base, "--"}, paths...)
+		args := append([]string{"diff", "--no-color", "--no-ext-diff", "--no-textconv", "--src-prefix=a/", "--dst-prefix=b/", "--unified=0", base, "--"}, paths...)
 		output, err := gitOutput(root, args...)
 		if err != nil {
 			return nil, fmt.Errorf("git diff: %w", err)

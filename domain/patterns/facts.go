@@ -28,6 +28,10 @@ type FuncFacts struct {
 	// Pdg is the function's program dependence graph. Nil means the body
 	// was not extracted (filtered out of mining, like rstyle's pdg: None).
 	Pdg *Pdg
+	// AstTypes is the multiset of AST node type names for the function
+	// body (see AstNodeMultiset). Used by the CCGraph Stage 0 AST
+	// pre-filter. Nil means the AST was not fingerprinted.
+	AstTypes map[string]int
 	// Mutates is true when the function has any escaping mutation
 	// (rstyle: mutations.iter().any(|m| m.escapes)).
 	Mutates bool

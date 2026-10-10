@@ -41,19 +41,45 @@ const (
 // scaling: characteristic-vector pre-filter, Jaro-Winkler name filter,
 // LSH candidate clustering, then WL kernel similarity. names maps
 // function ID to function name; when a name is missing, Stage 2 is
-// skipped for that pair.
+// skipped for that pair. No AST data: the Stage 0 AST pre-filter is
+// skipped.
 func CCGraphClones(pdgs map[string]*Pdg, names map[string]string) [][]string {
-	return ccGraphGroups(pdgs, names, ccMatchThreshold)
+	return ccGraphGroups(pdgs, names, nil, false)
 }
 
-// ccGraphGroups runs the shared CCGraph pipeline with a parameterized
-// Stage-4 WL similarity threshold. The paper-exact path passes
-// ccMatchThreshold.
-func ccGraphGroups(pdgs map[string]*Pdg, names map[string]string, matchMilli uint32) [][]string {
+// CCGraphClonesWithAST is CCGraphClones with the Stage 0 AST pre-filter
+// enabled. astTypes maps function ID to its AST node-type multiset (see
+// AstNodeMultiset); nil or empty disables the pre-filter, matching
+// CCGraphClones exactly.
+func CCGraphClonesWithAST(pdgs map[string]*Pdg, names map[string]string, astTypes map[string]map[string]int) [][]string {
+	return ccGraphGroups(pdgs, names, astTypes, false)
+}
+
+// CCGraphClonesWithNeighborhoodWL is CCGraphClones with the neighborhood-augmented
+// WL kernel replacing the standard WL kernel in Stage 4. All paper-exact
+// thresholds are unchanged; only the similarity kernel differs.
+func CCGraphClonesWithNeighborhoodWL(pdgs map[string]*Pdg, names map[string]string) [][]string {
+	return ccGraphGroups(pdgs, names, nil, true)
+}
+
+// ccGraphGroups runs the shared CCGraph pipeline. The Stage 4 WL
+// similarity threshold is the paper-exact ccMatchThreshold.
+//
+// Stage 0 (AST pre-filter) runs before the paper stages when astTypes
+// is non-empty. It only ADDS candidate pairs with high AST similarity;
+// the paper stages (1, 2, 4) keep their exact thresholds and order.
+//
+// When useNeighborhoodWL is true, Stage 4 uses the neighborhood WL kernel (SimilarityNeighborhoodWLMilli)
+// instead of the standard WL kernel (SimilarityMilli).
+func ccGraphGroups(pdgs map[string]*Pdg, names map[string]string, astTypes map[string]map[string]int, useNeighborhoodWL bool) [][]string {
 	ids := ccSortableIDs(pdgs)
 	if len(ids) < 2 {
 		return nil
 	}
+	// Stage 0: AST pre-filter. High-similarity pairs bypass the
+	// characteristic-vector filter; nothing is removed that the paper
+	// stages would have kept.
+	astBypass := ccASTBypass(ids, astTypes)
 	// Stages 1+2: cheap filters produce the candidate pair set.
 	// vecs and alignedNames are indexed by position in ids, so the
 	// O(n^2) pair loop uses slice indexing instead of map lookups.
@@ -64,16 +90,27 @@ func ccGraphGroups(pdgs map[string]*Pdg, names map[string]string, matchMilli uin
 		alignedNames[i] = names[id]
 	}
 	candidates := ccCandidatePairs(ids, vecs, alignedNames)
+	// Merge Stage 0 bypass pairs into the candidate set.
+	ccMergeBypass(candidates, astBypass)
 	if len(candidates) == 0 {
 		return nil
 	}
 	// Stage 3: LSH-cluster the survivors' WL vectors.
+	// Stage 4: WL similarity within LSH clusters. The kernel is selected
+	// once here: standard WL or neighborhood-augmented WL, wrapped in a
+	// closure so the worker functions stay kernel-agnostic.
 	wls := ccBuildWls(candidates, pdgs)
 	clusters := ccLSHClusters(candidates, wls)
-	// Stage 4: WL similarity within LSH clusters.
+	sim := func(a, b string) uint32 { return SimilarityMilli(wls[a], wls[b]) }
+	if useNeighborhoodWL {
+		neighborhoodWLs := ccBuildNeighborhoodWLs(candidates, pdgs)
+		sim = func(a, b string) uint32 {
+			return SimilarityNeighborhoodWLMilli(neighborhoodWLs[a], neighborhoodWLs[b])
+		}
+	}
 	parent := ccMakeParent(ids)
 	for _, cluster := range clusters {
-		ccUnionSimilar(cluster, candidates, wls, parent, matchMilli)
+		ccUnionSimilar(cluster, candidates, sim, parent)
 	}
 	return groupsOfTwoOrMore(parent)
 }
@@ -181,6 +218,27 @@ func ccBuildWls(candidates map[string]bool, pdgs map[string]*Pdg) map[string]*Wl
 	return out
 }
 
+// ccBuildNeighborhoodWLs builds NeighborhoodWL instances for every function appearing in any
+// candidate pair. Only called when the neighborhood WL kernel is selected.
+func ccBuildNeighborhoodWLs(candidates map[string]bool, pdgs map[string]*Pdg) map[string]*NeighborhoodWL {
+	ids := map[string]bool{}
+	for key := range candidates {
+		// Keys are "a\x00b"; split them back out.
+		for i := 0; i < len(key); i++ {
+			if key[i] == 0 {
+				ids[key[:i]] = true
+				ids[key[i+1:]] = true
+				break
+			}
+		}
+	}
+	out := make(map[string]*NeighborhoodWL, len(ids))
+	for id := range ids {
+		out[id] = NewNeighborhoodWL(pdgs[id])
+	}
+	return out
+}
+
 // ccLSHClusters vectorizes the survivors' WL instances and LSH-clusters
 // them into candidate groups.
 func ccLSHClusters(candidates map[string]bool, wls map[string]*Wl) [][]string {
@@ -197,7 +255,7 @@ func ccLSHClusters(candidates map[string]bool, wls map[string]*Wl) [][]string {
 // across a worker pool; unions are applied sequentially afterwards.
 // Union order cannot affect the final groups (groupsOfTwoOrMore
 // normalizes via find), so the output matches the sequential version.
-func ccUnionSimilar(cluster []string, candidates map[string]bool, wls map[string]*Wl, parent map[string]string, matchMilli uint32) {
+func ccUnionSimilar(cluster []string, candidates map[string]bool, sim func(a, b string) uint32, parent map[string]string) {
 	workers := runtime.NumCPU()
 	found := make(chan []ccPairJob, workers)
 	var wg sync.WaitGroup
@@ -205,7 +263,7 @@ func ccUnionSimilar(cluster []string, candidates map[string]bool, wls map[string
 		wg.Add(1)
 		go func(w int) {
 			defer wg.Done()
-			found <- ccSimilarStripes(cluster, candidates, wls, w, workers, matchMilli)
+			found <- ccSimilarStripes(cluster, candidates, sim, w, workers)
 		}(w)
 	}
 	go func() {
@@ -220,8 +278,10 @@ func ccUnionSimilar(cluster []string, candidates map[string]bool, wls map[string
 }
 
 // ccSimilarStripes returns the cluster pairs (outer index striped by
-// worker) passing the candidate-set and WL-similarity filters.
-func ccSimilarStripes(cluster []string, candidates map[string]bool, wls map[string]*Wl, worker, workers int, matchMilli uint32) []ccPairJob {
+// worker) passing the candidate-set and WL-similarity filters. The sim
+// closure is the Stage 4 kernel: standard WL or neighborhood-augmented WL,
+// selected by the caller.
+func ccSimilarStripes(cluster []string, candidates map[string]bool, sim func(a, b string) uint32, worker, workers int) []ccPairJob {
 	var out []ccPairJob
 	for i := worker; i < len(cluster); i += workers {
 		for j := i + 1; j < len(cluster); j++ {
@@ -229,7 +289,7 @@ func ccSimilarStripes(cluster []string, candidates map[string]bool, wls map[stri
 			if !candidates[ccPairKey(a, b)] {
 				continue
 			}
-			if SimilarityMilli(wls[a], wls[b]) < matchMilli {
+			if sim(a, b) < ccMatchThreshold {
 				continue
 			}
 			out = append(out, ccPairJob{a: a, b: b})
@@ -431,17 +491,21 @@ func ccObservation(sites []Site) string {
 	return fmt.Sprintf("CCGraph found %d similar functions: %s", len(sites), strings.Join(names, ", "))
 }
 
-// ccGraphInputs builds the PDG and name maps CCGraphClones needs from facts.
-// Functions without a PDG are skipped.
-func ccGraphInputs(facts []*FuncFacts) (map[string]*Pdg, map[string]string) {
+// ccGraphInputs builds the PDG, name, and AST-type maps CCGraphClones
+// needs from facts. Functions without a PDG are skipped.
+func ccGraphInputs(facts []*FuncFacts) (map[string]*Pdg, map[string]string, map[string]map[string]int) {
 	pdgs := make(map[string]*Pdg, len(facts))
 	names := make(map[string]string, len(facts))
+	astTypes := make(map[string]map[string]int, len(facts))
 	for _, f := range facts {
 		if f == nil || f.Pdg == nil {
 			continue
 		}
 		pdgs[f.ID] = f.Pdg
 		names[f.ID] = f.Name
+		if len(f.AstTypes) > 0 {
+			astTypes[f.ID] = f.AstTypes
+		}
 	}
-	return pdgs, names
+	return pdgs, names, astTypes
 }
