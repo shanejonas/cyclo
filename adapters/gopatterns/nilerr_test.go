@@ -35,19 +35,21 @@ func parseNilErrFunc(t *testing.T, src string) (*ast.FuncDecl, *token.FileSet, *
 		Selections: make(map[*ast.SelectorExpr]*types.Selection),
 	}
 	// Type-check just this file for signature resolution.
-	_, _ = conf.Check("test", fset, []*ast.File{f}, info)
+	if _, err := conf.Check("test", fset, []*ast.File{f}, info); err != nil {
+		t.Fatalf("type-check: %v", err)
+	}
 	return fn, fset, info
 }
 
 func TestNilErrReturnNilErr_NoFinding(t *testing.T) {
 	// (T, error) with `return nil, err`: the error is propagated, not swallowed.
 	src := `package p
-func f() (int, error) {
+func f() (*int, error) {
 	err := foo()
 	if err != nil {
 		return nil, err
 	}
-	return 0, nil
+	return nil, nil
 }
 func foo() error { return nil }
 `
@@ -61,12 +63,12 @@ func foo() error { return nil }
 func TestNilErrReturnNilNil_Finding(t *testing.T) {
 	// (T, error) with `return nil, nil` inside error guard: error is swallowed.
 	src := `package p
-func f() (int, error) {
+func f() (*int, error) {
 	err := foo()
 	if err != nil {
 		return nil, nil
 	}
-	return 0, nil
+	return nil, nil
 }
 func foo() error { return nil }
 `
@@ -151,5 +153,44 @@ func foo() error { return nil }
 	hits := findNilErrHits(fn, fset, info)
 	if len(hits) != 1 {
 		t.Errorf("expected 1 finding for error in middle position with `nil`, got %d", len(hits))
+	}
+}
+
+func TestNilErrMultipleErrorResults(t *testing.T) {
+	cases := []struct {
+		name, body string
+		want       int
+	}{
+		{"last error propagated", "if err != nil { return nil, 0, nil, err }; return nil, 0, nil, nil", 0},
+		{"first error propagated", "if err != nil { return nil, 0, err, nil }; return nil, 0, nil, nil", 0},
+		{"all errors swallowed", "if err != nil { return nil, 0, nil, nil }; return nil, 0, nil, nil", 1},
+		{"inverse guard propagates", "if err == nil { return nil, 0, nil, nil } else { return nil, 0, nil, err }", 0},
+		{"inverse guard swallows", "if err == nil { return nil, 0, nil, nil } else { return nil, 0, nil, nil }", 1},
+		{"named return propagates", "if err != nil { return }; return", 0},
+		{"success returns nil error", "if err == nil { return nil, 0, nil, err }; return nil, 0, nil, err", 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fn, fset, info := parseNilErrFunc(t, "package p\nfunc f(err error) (value *int, gas uint64, vmErr error, resultErr error) { resultErr = err; "+tc.body+" }")
+			hits := findNilErrHits(fn, fset, info)
+			if len(hits) != tc.want {
+				t.Fatalf("got %+v, want %d hits", hits, tc.want)
+			}
+		})
+	}
+}
+
+func TestNilErrIgnoresClosureResults(t *testing.T) {
+	fn, fset, info := parseNilErrFunc(t, `package p
+func f(err error) error {
+ if err != nil {
+  callback := func() *int { return nil }
+  _ = callback
+  return err
+ }
+ return nil
+}`)
+	if hits := findNilErrHits(fn, fset, info); len(hits) != 0 {
+		t.Fatalf("unexpected hits: %+v", hits)
 	}
 }

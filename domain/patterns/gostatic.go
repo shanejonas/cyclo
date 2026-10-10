@@ -12,7 +12,7 @@ import (
 type NilErrHit struct {
 	Line     int
 	CondText string
-	Kind     string // "returns nil when err != nil" or "returns err when err == nil"
+	Kind     string // "returns nil when err != nil"
 }
 
 // ForceTypeAssertHit is one unchecked `x.(T)` assertion.

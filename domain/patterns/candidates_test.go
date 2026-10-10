@@ -111,8 +111,8 @@ func TestTraitMethodFromParallelMethods(t *testing.T) {
 	if !strings.Contains(c.Observation, "M0 = Dog.bark | Cat.meow") {
 		t.Errorf("observation = %q, want M0 = Dog.bark | Cat.meow", c.Observation)
 	}
-	if !strings.Contains(c.PossibleRefactor, "func method() string") {
-		t.Errorf("possible_refactor = %q, want func method() string", c.PossibleRefactor)
+	if !strings.Contains(c.PossibleRefactor, "`method` (signature shape `fn(_) -> string`)") {
+		t.Errorf("possible_refactor = %q, want `method` (signature shape `fn(_) -> string`)", c.PossibleRefactor)
 	}
 	if c.Breakdown.Support != 2 {
 		t.Errorf("support = %d, want 2", c.Breakdown.Support)
@@ -244,7 +244,7 @@ func TestTraitTextProposesNewInterface(t *testing.T) {
 	facts := []*FuncFacts{candGetter("Dog", "bark"), candGetter("Cat", "meow")}
 	groups := MineGroups(facts)
 	_, refactor := traitText(testEvidence(&groups[0], facts, ""))
-	if !strings.HasPrefix(refactor, "interface Shared {") {
+	if !strings.HasPrefix(refactor, "consider a shared interface with") {
 		t.Errorf("refactor = %q", refactor)
 	}
 }
@@ -253,7 +253,7 @@ func TestTraitTextExtendsExistingInterface(t *testing.T) {
 	facts := []*FuncFacts{candGetter("Dog", "bark"), candGetter("Cat", "meow")}
 	groups := MineGroups(facts)
 	_, refactor := traitText(testEvidence(&groups[0], facts, "k.public.Signature.is_valid"))
-	if !strings.HasPrefix(refactor, "add func method() string to existing interface `Signature`") {
+	if !strings.HasPrefix(refactor, "add `method` (signature shape `fn(_) -> string`) to existing interface `Signature`") {
 		t.Errorf("refactor = %q", refactor)
 	}
 	if strings.Contains(refactor, "interface Shared") {
@@ -657,5 +657,29 @@ func TestFixKindOrder(t *testing.T) {
 		if FixKindRank(k) >= len(FixKindOrder) {
 			t.Errorf("fixable kind %q not in FixKindOrder", k)
 		}
+	}
+}
+
+func TestTraitSuggestionDescribesErasedShapes(t *testing.T) {
+	cases := []string{
+		"fn(*_,[byte],error,bool)",
+		"fn(*_) -> ()",
+		"fn(*_, map[string][byte]) -> (int, error)",
+		"fn(_, ...[byte]) -> error",
+	}
+	for _, key := range cases {
+		t.Run(key, func(t *testing.T) {
+			facts := []*FuncFacts{candGetter("Dog", "processOutput"), candGetter("Cat", "processOutput")}
+			_, suggestion := traitText(testEvidence(&SigGroup{Key: key}, facts, ""))
+			if !strings.Contains(suggestion, "`processOutput` (signature shape `"+key+"`)") {
+				t.Fatalf("missing shape: %s", suggestion)
+			}
+			if strings.Contains(suggestion, "interface Shared {") || strings.Contains(suggestion, "func processOutput(") {
+				t.Fatalf("shape rendered as Go code: %s", suggestion)
+			}
+			if !strings.Contains(suggestion, "preserve the concrete parameter and result types") {
+				t.Fatalf("missing preservation guidance: %s", suggestion)
+			}
+		})
 	}
 }
