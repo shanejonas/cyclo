@@ -86,14 +86,16 @@ func (c *WlCache) Get(pdg *Pdg) (*Wl, bool) {
 		return nil, false
 	}
 	c.hits++
+	g := buildGraph(pdg)
 	return &Wl{
-		graph:    buildGraph(pdg),
-		rounds:   e.Rounds,
-		hists:    histograms(e.Rounds),
-		calls:    e.Calls,
-		diameter: e.Diameter,
-		charVec:  e.CharVec,
-		pdg:      pdg,
+		graph:     g,
+		rounds:    e.Rounds,
+		hists:     histograms(e.Rounds),
+		calls:     e.Calls,
+		diameter:  e.Diameter,
+		charVec:   e.CharVec,
+		pdg:       pdg,
+		nodeCount: len(g.labels),
 	}, true
 }
 

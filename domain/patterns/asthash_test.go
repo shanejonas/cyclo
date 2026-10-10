@@ -87,10 +87,10 @@ func TestCCASTBypassHighSimilarity(t *testing.T) {
 		"f3": AstNodeMultiset(c),
 	}
 	got := ccASTBypass([]string{"f1", "f2", "f3"}, types)
-	if !got[ccPairKey("f1", "f2")] {
+	if !got[ccPairKey(0, 1)] {
 		t.Fatal("structurally identical pair should be bypassed")
 	}
-	if got[ccPairKey("f1", "f3")] || got[ccPairKey("f2", "f3")] {
+	if got[ccPairKey(0, 2)] || got[ccPairKey(1, 2)] {
 		t.Fatal("structurally different pairs should not be bypassed")
 	}
 }

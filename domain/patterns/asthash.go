@@ -102,13 +102,13 @@ func astMultisetOverlap(a, b map[string]int) (inter, union int) {
 	return inter, union
 }
 
-// ccASTBypass returns the set of pair keys (ccPairKey) whose AST
-// Jaccard similarity meets the bypass threshold. ids is the sorted
-// function ID list; types maps ID to its AST node multiset. Functions
-// without a multiset are skipped (conservative: no bypass). The output
-// is a set, so iteration order cannot affect the result.
-func ccASTBypass(ids []string, types map[string]map[string]int) map[string]bool {
-	out := map[string]bool{}
+// ccASTBypass returns the set of pair keys (ccPairKey over positions in
+// ids) whose AST Jaccard similarity meets the bypass threshold. ids is
+// the sorted function ID list; types maps ID to its AST node multiset.
+// Functions without a multiset are skipped (conservative: no bypass).
+// The output is a set, so iteration order cannot affect the result.
+func ccASTBypass(ids []string, types map[string]map[string]int) map[int64]bool {
+	out := map[int64]bool{}
 	if len(types) == 0 {
 		return out
 	}
@@ -119,7 +119,7 @@ func ccASTBypass(ids []string, types map[string]map[string]int) map[string]bool 
 }
 
 // ccMergeBypass merges Stage 0 bypass pair keys into the candidate set.
-func ccMergeBypass(candidates, bypass map[string]bool) {
+func ccMergeBypass(candidates, bypass map[int64]bool) {
 	for k := range bypass {
 		candidates[k] = true
 	}
@@ -127,7 +127,7 @@ func ccMergeBypass(candidates, bypass map[string]bool) {
 
 // ccASTBypassRow checks pairs (ids[i], ids[j]) for j > i, adding those
 // that clear the bypass threshold to out.
-func ccASTBypassRow(ids []string, i int, types map[string]map[string]int, out map[string]bool) {
+func ccASTBypassRow(ids []string, i int, types map[string]map[string]int, out map[int64]bool) {
 	ti := types[ids[i]]
 	if len(ti) == 0 {
 		return
@@ -138,7 +138,7 @@ func ccASTBypassRow(ids []string, i int, types map[string]map[string]int, out ma
 			continue
 		}
 		if AstJaccard(ti, tj) >= astBypassThreshold {
-			out[ccPairKey(ids[i], ids[j])] = true
+			out[ccPairKey(i, j)] = true
 		}
 	}
 }

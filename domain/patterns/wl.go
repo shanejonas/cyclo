@@ -255,6 +255,11 @@ type Wl struct {
 	diameter int
 	charVec  []float64
 	pdg      *Pdg
+	// nodeCount caches len(graph.labels). The CCGraph pipeline
+	// (SimilarityMilli, Vectorize) only needs hists and the node
+	// count, so NewWlLight omits graph/rounds/pdg and relies on
+	// this field. Populated by every constructor.
+	nodeCount int
 	// projCache lazily holds WL histograms for single-edge-kind projections,
 	// keyed by edge kind. Used by SimilarityWeighted; computed on demand so
 	// functions that never reach pair comparison pay nothing.
@@ -334,13 +339,39 @@ func NewWl(pdg *Pdg) *Wl {
 	// not the full maxLevels. Small-diameter graphs save refinement work.
 	rounds := (&g).refineRoundsDiameter(d)
 	return &Wl{
-		graph:    g,
-		rounds:   rounds,
-		hists:    histograms(rounds),
-		calls:    countCalls(pdg),
-		diameter: d,
-		charVec:  characteristicVector(pdg),
-		pdg:      pdg,
+		graph:     g,
+		rounds:    rounds,
+		hists:     histograms(rounds),
+		calls:     countCalls(pdg),
+		diameter:  d,
+		charVec:   characteristicVector(pdg),
+		pdg:       pdg,
+		nodeCount: len(g.labels),
+	}
+}
+
+// NewWlLight builds a Wl with only the fields needed for CCGraph
+// similarity (SimilarityMilli) and LSH vectorization (Vectorize):
+// hists, diameter, nodeCount, charVec, and calls. It omits graph,
+// rounds, and pdg, which are only needed by PDG alignment (align.go),
+// the WL disk cache (wlcache.go), and weighted similarity
+// (SimilarityWeighted). The caller supplies the characteristic vector
+// (already computed for Stage 1) instead of recomputing it.
+//
+// Significantly reduces retained memory when building WL instances for
+// thousands of candidate functions: the refinement history (rounds)
+// and adjacency (graph) dominate per-instance memory, and neither is
+// read by the CCGraph pipeline.
+func NewWlLight(pdg *Pdg, charVec []float64) *Wl {
+	g := buildGraph(pdg)
+	d := diameter(&g)
+	rounds := (&g).refineRoundsDiameter(d)
+	return &Wl{
+		hists:     histograms(rounds),
+		calls:     countCalls(pdg),
+		diameter:  d,
+		charVec:   charVec,
+		nodeCount: len(g.labels),
 	}
 }
 
@@ -381,7 +412,7 @@ func countCalls(pdg *Pdg) int {
 	return calls
 }
 
-func (w *Wl) nodes() int { return len(w.graph.labels) }
+func (w *Wl) nodes() int { return w.nodeCount }
 
 // levels caps refinement depth by the smaller graph's diameter.
 func levels(a, b *Wl) int {
