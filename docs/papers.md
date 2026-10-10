@@ -45,7 +45,7 @@ expensive kernel computation.
 
 **The pipeline (from the paper):**
 1. **Characteristic vectors** (7-dimensional PDG numerical features) → cosine similarity ≥ **0.9**
-2. **Jaro-Winkler** string similarity on function names → ratio ≥ **0.5**
+2. **Jaro-Winkler** string similarity on function or method names, excluding import paths and receiver names → ratio ≥ **0.5**
 3. **WL vectors** (512-dim) → locality-sensitive hashing for candidate clustering
 4. **WL graph kernel** similarity → threshold **0.9** for final clone verdict
 

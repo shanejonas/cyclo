@@ -187,11 +187,11 @@ func (f ccPairFilters) accepts(i, j int, matcher nameMatcher) bool {
 	return matcher.similar(f.names[i], f.names[j])
 }
 
-// ccNameRunes converts each name once, outside the candidate-pair loop.
+// ccNameRunes extracts each function or method name outside the candidate-pair loop.
 func ccNameRunes(names []string) [][]rune {
 	out := make([][]rune, len(names))
 	for i, name := range names {
-		out[i] = []rune(name)
+		out[i] = []rune(shortName(name))
 	}
 	return out
 }
@@ -240,7 +240,7 @@ func ccNamesSimilar(a, b string) bool {
 	if a == "" || b == "" {
 		return true
 	}
-	return jaroWinkler(a, b) >= ccStage2NameThreshold
+	return jaroWinkler(shortName(a), shortName(b)) >= ccStage2NameThreshold
 }
 
 // ccBuildWls builds WL instances for every function appearing in any
