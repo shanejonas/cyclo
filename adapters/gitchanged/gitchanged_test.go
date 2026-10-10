@@ -1,8 +1,48 @@
 package gitchanged
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
 	"testing"
 )
+
+func TestChangedRangesWithCustomPrefixes(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	for _, setting := range []string{"diff.mnemonicPrefix", "diff.noPrefix"} {
+		t.Run(setting, func(t *testing.T) {
+			root := t.TempDir()
+			run := func(args ...string) {
+				t.Helper()
+				if output, err := gitOutput(root, args...); err != nil {
+					t.Fatalf("git %v: %v\n%s", args, err, output)
+				}
+			}
+			write := func(content string) {
+				t.Helper()
+				if err := os.WriteFile(filepath.Join(root, "main.go"), []byte(content), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			run("init")
+			run("config", setting, "true")
+			write("package main\n")
+			run("add", "main.go")
+			run("-c", "user.name=test", "-c", "user.email=test@example.com", "commit", "-m", "initial")
+			write("package main\nfunc touched() {}\n")
+			ranges, err := ChangedRanges(root, "HEAD", []string{"."})
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := ranges["main.go"]
+			if len(got) != 1 || got[0] != (LineRange{Start: 2, End: 2}) {
+				t.Fatalf("changed ranges = %v", ranges)
+			}
+		})
+	}
+}
 
 func TestParseFileRanges(t *testing.T) {
 	output := `diff --git a/foo.go b/foo.go
