@@ -777,7 +777,7 @@ func steps(c *ctx, levelCtxs []*ctx, v Variant) []step {
 }
 
 // alignVariant runs the pipeline and scores the final matching.
-func alignVariant(c *ctx, v Variant) (Alignment, []Stage) {
+func alignVariant(c *ctx, v Variant, record bool) (Alignment, []Stage) {
 	depth := len(c.wa.rounds)
 	if l := c.levelsUsed(); l < depth {
 		depth = l
@@ -793,9 +793,11 @@ func alignVariant(c *ctx, v Variant) (Alignment, []Stage) {
 	var stages []Stage
 	for _, s := range steps(c, levelCtxs, v) {
 		m = s.run(m)
-		stages = append(stages, Stage{Name: s.name, Pairs: m.pairs()})
+		if record {
+			stages = append(stages, Stage{Name: s.name, Pairs: m.pairs()})
+		}
 	}
-	pairs := stages[len(stages)-1].Pairs
+	pairs := m.pairs()
 	larger := max(len(c.ca), len(c.cb), 1)
 	return Alignment{
 		Pairs:         pairs,
@@ -806,16 +808,16 @@ func alignVariant(c *ctx, v Variant) (Alignment, []Stage) {
 
 // Align aligns two PDGs: the default (Baseline) pipeline variant.
 func Align(pa *Pdg, wa *Wl, pb *Pdg, wb *Wl) Alignment {
-	al, _ := AlignStaged(pa, wa, pb, wb)
+	al, _ := alignVariant(newCtx(pa, wa, pb, wb), Baseline, false)
 	return al
 }
 
 // AlignStaged is Align, also reporting the matching after every step.
 func AlignStaged(pa *Pdg, wa *Wl, pb *Pdg, wb *Wl) (Alignment, []Stage) {
-	return alignVariant(newCtx(pa, wa, pb, wb), Baseline)
+	return alignVariant(newCtx(pa, wa, pb, wb), Baseline, true)
 }
 
 // AlignVariant runs one pipeline variant, for the ablation.
 func AlignVariant(pa *Pdg, wa *Wl, pb *Pdg, wb *Wl, v Variant) (Alignment, []Stage) {
-	return alignVariant(newCtx(pa, wa, pb, wb), v)
+	return alignVariant(newCtx(pa, wa, pb, wb), v, true)
 }

@@ -234,14 +234,18 @@ func TestWLBoundMatchesExactScore(t *testing.T) {
 
 func randomDependenceGraph(rng *rand.Rand) *Pdg {
 	pdg := &Pdg{Nodes: make([]PdgNode, rng.Intn(30)+1)}
-	kinds := []NodeKind{Param, Return, Call, Lit}
+	kinds := []NodeKind{Param, Return, Call, Lit, "Ctrl", "Branch", "Loop", Try}
 	for i := range pdg.Nodes {
 		pdg.Nodes[i].Kind = kinds[rng.Intn(len(kinds))]
 	}
 	for i := range pdg.Nodes {
 		for j := range pdg.Nodes {
 			if rng.Intn(20) == 0 {
-				pdg.Edges = append(pdg.Edges, PdgEdge{From: i, To: j, Kind: Data})
+				kind := Data
+				if rng.Intn(4) == 0 {
+					kind = Ctrl
+				}
+				pdg.Edges = append(pdg.Edges, PdgEdge{From: i, To: j, Kind: kind})
 			}
 		}
 	}
@@ -263,6 +267,77 @@ func TestMultiSourceChopMatchesPairUnion(t *testing.T) {
 		}
 		if got := paramToReturnChop(pdg); !reflect.DeepEqual(got, want) {
 			t.Fatalf("trial %d: multi-source=%v pair union=%v", trial, got, want)
+		}
+	}
+}
+
+func TestReusableReturnSlicesMatchOriginal(t *testing.T) {
+	rng := rand.New(rand.NewSource(83))
+	for trial := 0; trial < 100; trial++ {
+		pdg := randomDependenceGraph(rng)
+		barriers := map[int]bool{}
+		blocked := make([]bool, len(pdg.Nodes))
+		for i := range pdg.Nodes {
+			if rng.Intn(5) == 0 {
+				barriers[i], blocked[i] = true, true
+			}
+		}
+		full, thin := newReturnTraversal(pdg, false), newReturnTraversal(pdg, true)
+		unblocked := make([]bool, len(pdg.Nodes))
+		for seed := range pdg.Nodes {
+			if got, want := full.size(seed, blocked), len(BarrierSlice(pdg, seed, barriers)); got != want {
+				t.Fatalf("trial %d barrier seed %d: %d != %d", trial, seed, got, want)
+			}
+			if got, want := thin.size(seed, unblocked), len(ThinSlice(pdg, seed)); got != want {
+				t.Fatalf("trial %d thin seed %d: %d != %d", trial, seed, got, want)
+			}
+		}
+	}
+}
+
+func TestIntegerTriplesMatchStringCounts(t *testing.T) {
+	rng := rand.New(rand.NewSource(89))
+	for trial := 0; trial < 50; trial++ {
+		sets := make([]CallSet, 80)
+		for i := range sets {
+			sets[i].Calls = map[string]bool{}
+			for _, name := range []string{"a", "b", "c", "d", "e"} {
+				if rng.Intn(5) == 0 {
+					sets[i].Calls[name] = true
+				}
+			}
+		}
+		sets[0].Calls["rare"] = true
+		p := buildPostings(sets)
+		names, indices := frequentCallIndices(p)
+		got := countTriples(sets, indices)
+		want := map[[3]int]int{}
+		for a := 0; a < len(names); a++ {
+			for b := a + 1; b < len(names); b++ {
+				for c := b + 1; c < len(names); c++ {
+					if count := countCoOccur(sets, []string{names[a], names[b], names[c]}); count > 0 {
+						want[[3]int{a, b, c}] = count
+					}
+				}
+			}
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("trial %d: indexed triples differ", trial)
+		}
+	}
+}
+
+func TestAlignmentWithoutTraceMatchesStaged(t *testing.T) {
+	rng := rand.New(rand.NewSource(97))
+	for trial := 0; trial < 40; trial++ {
+		a, b := randomDependenceGraph(rng), randomDependenceGraph(rng)
+		wa, wb := NewWl(a), NewWl(b)
+		want, stages := AlignStaged(a, wa, b, wb)
+		if got := Align(a, wa, b, wb); !reflect.DeepEqual(got, want) {
+			t.Fatalf("trial %d: untraced alignment differs", trial)
+		}
+		if len(stages) == 0 {
+			t.Fatal("staged alignment loses trace")
 		}
 	}
 }

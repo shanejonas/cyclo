@@ -99,11 +99,13 @@ func ccGraphGroups(pdgs map[string]*Pdg, names map[string]string, astTypes map[s
 	// closure so the worker functions stay kernel-agnostic.
 	wls := ccBuildWls(ids, candidates, pdgs, vecs)
 	clusters := ccLSHClusters(wls)
-	sim := func(a, b string) bool { return similarityAtLeast(wls[a], wls[b], ccMatchThreshold) }
+	aligned := ccAlignedWLs(ids, wls)
+	sim := func(a, b int) bool { return similarityAtLeast(aligned[a], aligned[b], ccMatchThreshold) }
 	if useNeighborhoodWL {
 		neighborhoodWLs := ccBuildNeighborhoodWLs(ids, candidates, pdgs)
-		sim = func(a, b string) bool {
-			return SimilarityNeighborhoodWLMilli(neighborhoodWLs[a], neighborhoodWLs[b]) >= ccMatchThreshold
+		neighborhood := ccAlignedNeighborhoodWLs(ids, neighborhoodWLs)
+		sim = func(a, b int) bool {
+			return SimilarityNeighborhoodWLMilli(neighborhood[a], neighborhood[b]) >= ccMatchThreshold
 		}
 	}
 	// idToIndex maps function IDs back to ids-slice positions for
@@ -288,15 +290,19 @@ func ccLSHClusters(wls map[string]*Wl) [][]string {
 // normalizes via find), so the output matches the sequential version.
 // idToIndex maps function IDs to positions in the sorted ids slice,
 // for candidate-set lookups.
-func ccUnionSimilar(cluster []string, candidates *ccPairs, idToIndex map[string]int, sim func(a, b string) bool, parent map[string]string) {
-	workers := runtime.NumCPU()
+func ccUnionSimilar(cluster []string, candidates *ccPairs, idToIndex map[string]int, sim func(a, b int) bool, parent map[string]string) {
+	indices := make([]int, len(cluster))
+	for i, id := range cluster {
+		indices[i] = idToIndex[id]
+	}
+	workers := min(runtime.NumCPU(), len(cluster))
 	found := make(chan []ccPairJob, workers)
 	var wg sync.WaitGroup
 	for w := 0; w < workers; w++ {
 		wg.Add(1)
 		go func(w int) {
 			defer wg.Done()
-			found <- ccSimilarStripes(cluster, candidates, idToIndex, sim, w, workers)
+			found <- ccSimilarStripes(cluster, candidates, indices, sim, w, workers)
 		}(w)
 	}
 	go func() {
@@ -315,18 +321,18 @@ func ccUnionSimilar(cluster []string, candidates *ccPairs, idToIndex map[string]
 // closure is the Stage 4 kernel: standard WL or neighborhood-augmented WL,
 // selected by the caller. idToIndex maps function IDs to positions in the
 // sorted ids slice, for candidate-set lookups.
-func ccSimilarStripes(cluster []string, candidates *ccPairs, idToIndex map[string]int, sim func(a, b string) bool, worker, workers int) []ccPairJob {
+func ccSimilarStripes(cluster []string, candidates *ccPairs, indices []int, sim func(a, b int) bool, worker, workers int) []ccPairJob {
 	var out []ccPairJob
 	for i := worker; i < len(cluster); i += workers {
 		for j := i + 1; j < len(cluster); j++ {
-			a, b := cluster[i], cluster[j]
-			if !candidates.has(idToIndex[a], idToIndex[b]) {
+			a, b := indices[i], indices[j]
+			if !candidates.has(a, b) {
 				continue
 			}
 			if !sim(a, b) {
 				continue
 			}
-			out = append(out, ccPairJob{a: a, b: b})
+			out = append(out, ccPairJob{a: cluster[i], b: cluster[j]})
 		}
 	}
 	return out
@@ -534,4 +540,20 @@ func ccGraphInputs(facts []*FuncFacts) (map[string]*Pdg, map[string]string, map[
 		}
 	}
 	return pdgs, names, astTypes
+}
+
+func ccAlignedWLs(ids []string, wls map[string]*Wl) []*Wl {
+	out := make([]*Wl, len(ids))
+	for i, id := range ids {
+		out[i] = wls[id]
+	}
+	return out
+}
+
+func ccAlignedNeighborhoodWLs(ids []string, wls map[string]*NeighborhoodWL) []*NeighborhoodWL {
+	out := make([]*NeighborhoodWL, len(ids))
+	for i, id := range ids {
+		out[i] = wls[id]
+	}
+	return out
 }

@@ -62,33 +62,25 @@ func FindBarrierSlices(facts []*FuncFacts) []BarrierSliceFinding {
 // is large.
 func barrierSlicesForFunc(f *FuncFacts) []BarrierSliceFinding {
 	var out []BarrierSliceFinding
-	barriers := tryBarriers(f.Pdg)
+	barriers := make([]bool, len(f.Pdg.Nodes))
+	for i, n := range f.Pdg.Nodes {
+		barriers[i] = n.Kind == Try
+	}
+	traversal := newReturnTraversal(f.Pdg, false)
 	for i, n := range f.Pdg.Nodes {
 		if n.Kind != Return {
 			continue
 		}
-		slice := BarrierSlice(f.Pdg, i, barriers)
-		if len(slice) >= minBarrierSliceNodes {
+		size := traversal.size(i, barriers)
+		if size >= minBarrierSliceNodes {
 			out = append(out, BarrierSliceFinding{
 				FuncID:    f.ID,
-				SliceSize: len(slice),
+				SliceSize: size,
 				SeedLine:  n.Line,
 			})
 		}
 	}
 	return out
-}
-
-// tryBarriers returns the set of Try node indices (error-handling idiom
-// nodes) to use as barriers.
-func tryBarriers(pdg *Pdg) map[int]bool {
-	barriers := map[int]bool{}
-	for i, n := range pdg.Nodes {
-		if n.Kind == Try {
-			barriers[i] = true
-		}
-	}
-	return barriers
 }
 
 // FindThinSlices computes the thin (producer-only) slice from each return
@@ -108,15 +100,17 @@ func FindThinSlices(facts []*FuncFacts) []ThinSliceFinding {
 // statement in one function, flagging returns with a long producer chain.
 func thinSlicesForFunc(f *FuncFacts) []ThinSliceFinding {
 	var out []ThinSliceFinding
+	traversal := newReturnTraversal(f.Pdg, true)
+	blocked := make([]bool, len(f.Pdg.Nodes))
 	for i, n := range f.Pdg.Nodes {
 		if n.Kind != Return {
 			continue
 		}
-		slice := ThinSlice(f.Pdg, i)
-		if len(slice) >= minThinSliceNodes {
+		size := traversal.size(i, blocked)
+		if size >= minThinSliceNodes {
 			out = append(out, ThinSliceFinding{
 				FuncID:    f.ID,
-				SliceSize: len(slice),
+				SliceSize: size,
 				SeedLine:  n.Line,
 			})
 		}

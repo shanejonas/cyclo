@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"runtime"
 	"slices"
 
 	"github.com/shanejonas/cyclo/adapters/gopatterns"
@@ -83,6 +84,9 @@ func GetReport(ctx context.Context, args []string) (*patterns.PatternsReport, er
 		return nil, err
 	}
 	defer saveCache()
+	// Extraction's AST and type-checking data are no longer needed. Reclaim
+	// that large temporary phase before allocating the mining graphs.
+	runtime.GC()
 	report := patterns.Run(toFacts(pdgs.Funcs), patterns.Options{
 		Params:            params,
 		AnemicModels:      pdgs.AnemicModels,
