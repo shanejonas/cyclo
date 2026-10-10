@@ -179,10 +179,18 @@ func ClusterClones(vectors map[string][]float64, lsh *LSH) [][]string {
 	for id := range vectors {
 		parent[id] = id
 	}
-	for id, vec := range vectors {
-		for _, cand := range lsh.Query(vec) {
-			union(parent, id, cand)
-		}
+	// A bucket is a connected component. Joining each member to its first
+	// member preserves connectivity without querying every vector again.
+	for _, table := range lsh.tables {
+		unionBuckets(parent, table.buckets)
 	}
 	return groupsOfTwoOrMore(parent)
+}
+
+func unionBuckets(parent map[string]string, buckets map[uint64][]string) {
+	for _, members := range buckets {
+		for _, id := range members[1:] {
+			union(parent, members[0], id)
+		}
+	}
 }

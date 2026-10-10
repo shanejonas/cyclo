@@ -51,7 +51,8 @@ type Options struct {
 	DomainServices []DomainServiceHit
 	// WlCache memoizes WL refinements across runs for incremental mining.
 	// Nil computes every refinement fresh.
-	WlCache *WlCache
+	WlCache     *WlCache
+	cloneGroups [][]string
 }
 
 // Build keeps groups at or above minScoreMilli, then the first top (all when
@@ -152,8 +153,7 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 		return DeviantBehaviorCandidates(violations, prepared)
 	}},
 	{CCGraphClone, func(prepared []*FuncFacts, options Options) []Candidate {
-		pdgs, names, astTypes := ccGraphInputs(prepared)
-		groups := CCGraphClonesWithAST(pdgs, names, astTypes)
+		groups := options.cloneGroups
 		out := CCGraphCloneCandidates(groups, prepared)
 		// Bridge clone detection to abstraction proposing: run the
 		// parameterize proposer (Bulychev & Minea anti-unification via PDG
@@ -164,9 +164,8 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 		return out
 	}},
 	{InconsistentClone, func(prepared []*FuncFacts, options Options) []Candidate {
-		pdgs, names, astTypes := ccGraphInputs(prepared)
-		groups := CCGraphClonesWithAST(pdgs, names, astTypes)
-		divergent := FindInconsistentClones(groups, pdgs)
+		pdgs, _, _ := ccGraphInputs(prepared)
+		divergent := FindInconsistentClones(options.cloneGroups, pdgs)
 		return InconsistentCloneCandidates(divergent, prepared)
 	}},
 	{TaintFlowKind, func(prepared []*FuncFacts, options Options) []Candidate {
@@ -201,6 +200,8 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 // clustering. Builders run in FixKindOrder (see singleFunctionBuilders)
 // so detection respects pattern dependencies.
 func addSingleFunctionCandidates(mined *Mined, prepared []*FuncFacts, options Options) {
+	pdgs, names, astTypes := ccGraphInputs(prepared)
+	options.cloneGroups = CCGraphClonesWithAST(pdgs, names, astTypes)
 	for _, b := range singleFunctionBuilders {
 		if cands := b.build(prepared, options); len(cands) > 0 {
 			mined.Candidates = append(mined.Candidates, cands...)

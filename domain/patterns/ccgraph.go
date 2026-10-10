@@ -166,13 +166,14 @@ type ccPairJob struct{ a, b string }
 // the output is a set, so worker assignment cannot affect the result.
 func ccCandidatePairs(ids []string, vecs [][]float64, names []string) map[int64]bool {
 	workers := runtime.NumCPU()
+	runes := ccNameRunes(names)
 	found := make(chan map[int64]bool, workers)
 	var wg sync.WaitGroup
 	for w := 0; w < workers; w++ {
 		wg.Add(1)
 		go func(w int) {
 			defer wg.Done()
-			found <- ccFilterStripes(ids, vecs, names, w, workers)
+			found <- ccFilterStripes(ids, vecs, runes, w, workers)
 		}(w)
 	}
 	go func() {
@@ -191,8 +192,9 @@ func ccCandidatePairs(ids []string, vecs [][]float64, names []string) map[int64]
 // ccFilterStripes applies Stages 1+2 to the pairs whose outer index i
 // satisfies i%workers == worker, returning the surviving pair keys.
 // Slice indexing (no map lookups) keeps the inner loop tight.
-func ccFilterStripes(ids []string, vecs [][]float64, names []string, worker, workers int) map[int64]bool {
+func ccFilterStripes(ids []string, vecs [][]float64, names [][]rune, worker, workers int) map[int64]bool {
 	out := map[int64]bool{}
+	matcher := newNameMatcher(names)
 	for i := worker; i < len(ids); i += workers {
 		vi, ni := vecs[i], names[i]
 		for j := i + 1; j < len(ids); j++ {
@@ -201,13 +203,45 @@ func ccFilterStripes(ids []string, vecs [][]float64, names []string, worker, wor
 				continue
 			}
 			// Stage 2: Jaro-Winkler name filter.
-			if !ccNamesSimilar(ni, names[j]) {
+			if !matcher.similar(ni, names[j]) {
 				continue
 			}
 			out[ccPairKey(i, j)] = true
 		}
 	}
 	return out
+}
+
+// ccNameRunes converts each name once, outside the candidate-pair loop.
+func ccNameRunes(names []string) [][]rune {
+	out := make([][]rune, len(names))
+	for i, name := range names {
+		out[i] = []rune(name)
+	}
+	return out
+}
+
+// nameMatcher owns scratch buffers for one worker; workers never share them.
+type nameMatcher struct{ seen1, seen2 []bool }
+
+func newNameMatcher(names [][]rune) nameMatcher {
+	size := 0
+	for _, name := range names {
+		size = max(size, len(name))
+	}
+	return nameMatcher{make([]bool, size), make([]bool, size)}
+}
+
+func (m nameMatcher) similar(a, b []rune) bool {
+	if len(a) == 0 || len(b) == 0 {
+		return true
+	}
+	seen1, seen2 := m.seen1[:len(a)], m.seen2[:len(b)]
+	clear(seen1)
+	clear(seen2)
+	j := jaroRunes(a, b, seen1, seen2)
+	prefix := commonRunePrefix(a, b, 4)
+	return j+float64(prefix)*0.1*(1-j) >= ccStage2NameThreshold
 }
 
 // ccNamesSimilar reports whether two function names are similar enough.
@@ -340,35 +374,24 @@ func jaroWinkler(s1, s2 string) float64 {
 // jaro returns the Jaro similarity in [0, 1].
 func jaro(s1, s2 string) float64 {
 	r1, r2 := []rune(s1), []rune(s2)
-	l1, l2 := len(r1), len(r2)
-	if l1 == 0 && l2 == 0 {
-		return 1.0
-	}
-	if l1 == 0 || l2 == 0 {
-		return 0.0
-	}
-	matches, transpositions := jaroMatches(r1, r2)
-	if matches == 0 {
-		return 0.0
-	}
-	m := float64(matches)
-	t := float64(transpositions) / 2.0
-	return (m/float64(l1) + m/float64(l2) + (m-t)/m) / 3.0
+	return jaroRunes(r1, r2, make([]bool, len(r1)), make([]bool, len(r2)))
 }
 
-// jaroMatches counts matching runes and transpositions within the
-// Jaro match window.
-func jaroMatches(r1, r2 []rune) (matches, transpositions int) {
+func jaroRunes(r1, r2 []rune, seen1, seen2 []bool) float64 {
 	l1, l2 := len(r1), len(r2)
-	window := jaroWindow(l1, l2)
-	seen1 := make([]bool, l1)
-	seen2 := make([]bool, l2)
-	matches = jaroFindMatches(r1, r2, window, seen1, seen2)
-	if matches == 0 {
-		return 0, 0
+	if l1 == 0 && l2 == 0 {
+		return 1
 	}
-	transpositions = jaroTranspositions(r1, r2, seen1, seen2)
-	return matches, transpositions
+	if l1 == 0 || l2 == 0 {
+		return 0
+	}
+	matches := jaroFindMatches(r1, r2, jaroWindow(l1, l2), seen1, seen2)
+	if matches == 0 {
+		return 0
+	}
+	t := float64(jaroTranspositions(r1, r2, seen1, seen2)) / 2
+	m := float64(matches)
+	return (m/float64(l1) + m/float64(l2) + (m-t)/m) / 3
 }
 
 // jaroFindMatches marks matched runes in seen1/seen2 and returns the count.
@@ -435,7 +458,10 @@ func jaroBounds(i, window, l2 int) (int, int) {
 
 // commonPrefixLen returns the length of the common prefix, capped at max.
 func commonPrefixLen(s1, s2 string, max int) int {
-	r1, r2 := []rune(s1), []rune(s2)
+	return commonRunePrefix([]rune(s1), []rune(s2), max)
+}
+
+func commonRunePrefix(r1, r2 []rune, max int) int {
 	n := len(r1)
 	if len(r2) < n {
 		n = len(r2)

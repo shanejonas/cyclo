@@ -46,60 +46,54 @@ func MineDisjunctiveRules(sets []CallSet) []DisjunctiveRule {
 	if len(sets) == 0 {
 		return nil
 	}
+	p := buildPostings(sets)
 	var rules []DisjunctiveRule
-	for a := range countSingles(sets) {
-		rules = append(rules, disjunctiveRulesFor(sets, a)...)
+	for a, list := range p.lists {
+		if len(list) < minCountForSupport(p.total) {
+			continue
+		}
+		rules = append(rules, disjunctiveRulesFor(p, sets, a)...)
 	}
 	return rules
 }
 
-// disjunctiveRulesFor mines {A} -> (B or C) rules for one antecedent.
-func disjunctiveRulesFor(sets []CallSet, a string) []DisjunctiveRule {
-	co := coOccurring(sets, a)
-	cntA := countCoOccur(sets, []string{a})
+// alternativePostings indexes only functions containing the antecedent.
+// Alternatives that already imply a single-consequent rule are redundant.
+func alternativePostings(p *callPostings, sets []CallSet, a string) map[string][]int {
+	co := map[string][]int{}
+	for _, i := range p.lists[a] {
+		for b := range sets[i].Calls {
+			if b != a {
+				co[b] = append(co[b], i)
+			}
+		}
+	}
+	for b, list := range co {
+		if _, ok := makeRuleFromCounts(p.total, len(p.lists[a]), len(list), []string{a}, b); ok {
+			delete(co, b)
+		}
+	}
+	return co
+}
+
+// disjunctiveRulesFor counts unions of antecedent-restricted postings.
+func disjunctiveRulesFor(p *callPostings, sets []CallSet, a string) []DisjunctiveRule {
+	co := alternativePostings(p, sets, a)
+	names := make([]string, 0, len(co))
+	for b := range co {
+		names = append(names, b)
+	}
+	sort.Strings(names)
 	var rules []DisjunctiveRule
-	for i := 0; i < len(co); i++ {
-		for j := i + 1; j < len(co); j++ {
-			if r, ok := makeDisjunctiveRule(sets, a, co[i], co[j], cntA); ok {
+	for i, b := range names {
+		for _, c := range names[i+1:] {
+			count := len(co[b]) + len(co[c]) - intersectSize(co[b], co[c])
+			if r, ok := disjunctiveRuleFromCounts(p.total, len(p.lists[a]), count, a, b, c); ok {
 				rules = append(rules, r)
 			}
 		}
 	}
 	return rules
-}
-
-// coOccurring returns sorted callees (other than a) that co-occur with a
-// at least once. Only these can form alternatives worth checking.
-func coOccurring(sets []CallSet, a string) []string {
-	var co []string
-	for b := range countSingles(sets) {
-		if b != a && countCoOccur(sets, []string{a, b}) > 0 {
-			co = append(co, b)
-		}
-	}
-	sort.Strings(co)
-	return co
-}
-
-// makeDisjunctiveRule builds the {A} -> (B or C) rule if it meets the
-// thresholds and isn't redundant with the single-consequent rules.
-func makeDisjunctiveRule(sets []CallSet, a, b, c string, cntA int) (DisjunctiveRule, bool) {
-	if disjunctRedundant(sets, a, b, c, cntA) {
-		return DisjunctiveRule{}, false
-	}
-	cntOr := countDisjunct(sets, a, []string{b, c})
-	return disjunctiveRuleFromCounts(len(sets), cntA, cntOr, a, b, c)
-}
-
-// disjunctRedundant reports whether {A}->B or {A}->C already meets the
-// rule thresholds on its own, making the OR rule redundant.
-func disjunctRedundant(sets []CallSet, a, b, c string, cntA int) bool {
-	total := len(sets)
-	if _, ok := makeRuleFromCounts(total, cntA, countCoOccur(sets, []string{a, b}), []string{a}, b); ok {
-		return true
-	}
-	_, ok := makeRuleFromCounts(total, cntA, countCoOccur(sets, []string{a, c}), []string{a}, c)
-	return ok
 }
 
 // disjunctiveRuleFromCounts builds the rule from precomputed counts.

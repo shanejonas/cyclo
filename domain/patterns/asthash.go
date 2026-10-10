@@ -88,14 +88,12 @@ func AstJaccard(a, b map[string]int) float64 {
 // astMultisetOverlap returns the intersection and union sizes of two
 // multisets, using min counts for intersection and max for union.
 func astMultisetOverlap(a, b map[string]int) (inter, union int) {
-	seen := map[string]bool{}
 	for k, ca := range a {
-		seen[k] = true
 		inter += min(ca, b[k])
 		union += max(ca, b[k])
 	}
 	for k, cb := range b {
-		if !seen[k] {
+		if _, ok := a[k]; !ok {
 			union += cb
 		}
 	}
