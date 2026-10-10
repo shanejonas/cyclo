@@ -39,6 +39,20 @@ func TestTypedNilInterfaceBoundary(t *testing.T) {
 		{"named function", "var f Callback; var x any = f; _ = x == nil", 1},
 		{"named pointer", "var p Pointer; var x any = p; _ = x == nil", 1},
 		{"alias interface", "var p *Target; var x Alias = p; _ = x == nil", 1},
+		{"non-nil literal", "var x any = &Target{}; _ = x == nil", 0},
+		{"non-nil new", "var x any = new(Target); _ = x == nil", 0},
+		{"non-nil map", "var x any = make(map[string]int); _ = x == nil", 0},
+		{"constructor result", "p := build(); var x any = p; _ = x == nil", 0},
+		{"checked constructor", "p, err := construct(); if err != nil { return }; var x any = p; _ = x == nil", 0},
+		{"explicit nil pointer", "var x any = (*Target)(nil); _ = x == nil", 1},
+		{"initialized nil pointer", "var p *Target = nil; var x any = p; _ = x == nil", 1},
+		{"initialized nil slice", "var p []int = []int(nil); var x any = p; _ = x == nil", 1},
+		{"alias of reassigned source", "var p *Target; p = &Target{}; var q = p; var x any = q; _ = x == nil", 0},
+		{"source reassigned", "var p *Target; p = &Target{}; var x any = p; _ = x == nil", 0},
+		{"source address escapes", "var p *Target; replace(&p); var x any = p; _ = x == nil", 0},
+		{"interface overwritten", "var p *Target; var x any = p; x = &Target{}; _ = x == nil", 0},
+		{"check before boxing", "var p *Target; var x any; _ = x == nil; x = p; _ = x", 0},
+
 		{"shadowed name", "var p *Target; var x any = p; _ = x; { x := resolve(); _ = x == nil }", 0},
 		{"outer checked after shadow", "var p *Target; var x any = p; { x := resolve(); _ = x == nil }; _ = x == nil", 1},
 	}
@@ -60,6 +74,9 @@ func check() {` + body + `}
 type Target struct{}
 func (*Target) Error() string { return "failed" }
 func resolve() any { return nil }
+func build() *Target { return &Target{} }
+func construct() (*Target, error) { return &Target{}, nil }
+func replace(p **Target) { *p = &Target{} }
 type Box interface{}
 type Alias = any
 type Values []int

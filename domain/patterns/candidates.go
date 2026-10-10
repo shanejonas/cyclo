@@ -106,8 +106,7 @@ const (
 	// the Evans struct is not used. DDD-inspired; the transform is mechanical.
 	Specification CandidateKind = "specification"
 	// NilErr flags `if err != nil { return nil }`: the error was checked
-	// but swallowed by returning nil. Also the inverse: `if err == nil`
-	// returning err. Ported from gostaticanalysis/nilerr. Detection-only:
+	// but swallowed by returning nil in every error result. Detection-only:
 	// the fix depends on intent (return err? wrap it?).
 	NilErr CandidateKind = "nilerr"
 	// ForceTypeAssert flags unchecked `x.(T)` type assertions that panic
@@ -712,24 +711,10 @@ func ScoreMilli(b Breakdown, mismatch bool) uint32 {
 	return uint32(math.Round(damped))
 }
 
-// sketch renders a method sketch from a signature key and name.
-// Go adaptation: rstyle strips "&mut Self"/"&Self"/"Self" receiver prefixes
-// and renders "fn name(&self) -> T;". The Go SigClass carries the receiver
-// as the erased "_" first parameter, which an interface method sketch drops
-// as implicit; the result is a Go method sketch ("func method() string").
+// sketch describes a normalized shape. Erased types and omitted results are
+// mining keys, not Go declarations; do not present them as interface code.
 func sketch(key, name string) string {
-	body := strings.TrimPrefix(key, "fn(")
-	if rest, ok := strings.CutPrefix(body, "_, "); ok {
-		body = rest
-	} else if rest, ok := strings.CutPrefix(body, "_)"); ok {
-		body = ")" + rest
-	}
-	params, ret, _ := strings.Cut(body, ") -> ")
-	out := "func " + name + "(" + params + ")"
-	if ret != "" && ret != "()" {
-		out += " " + ret
-	}
-	return out
+	return fmt.Sprintf("`%s` (signature shape `%s`)", name, key)
 }
 
 // sharedName is the common short method name, or "method".
@@ -763,7 +748,7 @@ func traitName(traitMethod string) string {
 func traitText(ev *candidateEvidence) (inference, refactor string) {
 	methods := methodSketches(ev.verdicts)
 	impls := implList(ev.verdicts)
-	inference = impls + " are used interchangeably through methods of identical signature: an implicit interface."
+	inference = impls + " have methods with matching signature shapes; review concrete types before defining a shared interface."
 	refactor = traitRefactor(ev, methods, impls)
 	return inference, refactor
 }
@@ -798,7 +783,7 @@ func traitRefactor(ev *candidateEvidence, methods []string, impls string) string
 		return fmt.Sprintf("add %s to existing interface `%s`, already implemented by %s; make the sites generic over it",
 			strings.Join(methods, " "), traitName(ev.existingTrait), impls)
 	}
-	return fmt.Sprintf("interface Shared { %s } implemented by %s; make the sites generic over it",
+	return fmt.Sprintf("consider a shared interface with %s for %s; preserve the concrete parameter and result types",
 		strings.Join(methods, " "), impls)
 }
 

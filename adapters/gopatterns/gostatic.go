@@ -14,19 +14,22 @@ import (
 var errorType = types.Universe.Lookup("error").Type().Underlying().(*types.Interface)
 
 // findNilErrHits finds `if err != nil { return nil }` and
-// `if err == nil { return err }` patterns.
+// the equivalent `if err == nil { ... } else { return nil }` pattern.
 func findNilErrHits(fn *ast.FuncDecl, fset *token.FileSet, info *types.Info) []patterns.NilErrHit {
 	var out []patterns.NilErrHit
 	if fn.Body == nil {
 		return out
 	}
-	errPos := errorResultPosition(fn, info)
+	errPositions := errorResultPositions(fn, info)
 	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		if _, ok := n.(*ast.FuncLit); ok {
+			return false
+		}
 		ifStmt, ok := n.(*ast.IfStmt)
 		if !ok {
 			return true
 		}
-		if hit := checkNilErrIf(ifStmt, fset, info, errPos); hit != nil {
+		if hit := checkNilErrIf(ifStmt, fset, info, errPositions); hit != nil {
 			out = append(out, *hit)
 		}
 		return true
@@ -34,52 +37,42 @@ func findNilErrHits(fn *ast.FuncDecl, fset *token.FileSet, info *types.Info) []p
 	return out
 }
 
-// errorResultPosition returns the index of the error-typed result in the
-// function's signature, or -1 if there is none. For `return nil, err` in a
-// `(T, error)` function, position 1 is the error — the nil at position 0
-// is the value, not a swallowed error.
-func errorResultPosition(fn *ast.FuncDecl, info *types.Info) int {
+// errorResultPositions returns every error result, including named results.
+func errorResultPositions(fn *ast.FuncDecl, info *types.Info) []int {
 	if fn.Type == nil || fn.Type.Results == nil {
-		return -1
+		return nil
 	}
-	if pos := errorPosFromTypes(fn, info); pos >= 0 {
-		return pos
-	}
-	return errorPosFromAST(fn)
-}
-
-// errorPosFromTypes resolves the error position via types.Info.
-func errorPosFromTypes(fn *ast.FuncDecl, info *types.Info) int {
-	if info == nil {
-		return -1
-	}
-	sig, ok := info.TypeOf(fn.Name).(*types.Signature)
-	if !ok {
-		return -1
-	}
-	results := sig.Results()
-	for i := 0; i < results.Len(); i++ {
-		if isNilErrErrorType(results.At(i).Type()) {
-			return i
+	if info != nil {
+		if object, ok := info.Defs[fn.Name].(*types.Func); ok {
+			return signatureErrorPositions(object.Type().(*types.Signature))
 		}
 	}
-	return -1
+	return astErrorPositions(fn.Type.Results)
 }
 
-// errorPosFromAST falls back to inspecting AST result types for `error`.
-func errorPosFromAST(fn *ast.FuncDecl) int {
+func signatureErrorPositions(sig *types.Signature) []int {
+	var positions []int
+	for i := 0; i < sig.Results().Len(); i++ {
+		if isNilErrErrorType(sig.Results().At(i).Type()) {
+			positions = append(positions, i)
+		}
+	}
+	return positions
+}
+
+func astErrorPositions(results *ast.FieldList) []int {
+	var positions []int
 	pos := 0
-	for _, field := range fn.Type.Results.List {
-		count := len(field.Names)
-		if count == 0 {
-			count = 1
-		}
+	for _, field := range results.List {
+		count := max(len(field.Names), 1)
 		if isErrorASTType(field.Type) {
-			return pos
+			for i := 0; i < count; i++ {
+				positions = append(positions, pos+i)
+			}
 		}
 		pos += count
 	}
-	return -1
+	return positions
 }
 
 // isNilErrErrorType reports whether t is the error interface type.
@@ -92,7 +85,7 @@ func isNilErrErrorType(t types.Type) bool {
 		return false
 	}
 	// error is the interface with exactly the Error() string method.
-	return iface.NumMethods() == 1 && iface.Method(0).Name() == "Error"
+	return types.Identical(iface, errorType)
 }
 
 // isErrorASTType reports whether the AST type expression is `error`.
@@ -108,7 +101,7 @@ type nilErrCheck struct {
 }
 
 // checkNilErrIf checks one if statement for the nilerr pattern.
-func checkNilErrIf(ifStmt *ast.IfStmt, fset *token.FileSet, info *types.Info, errPos int) *patterns.NilErrHit {
+func checkNilErrIf(ifStmt *ast.IfStmt, fset *token.FileSet, info *types.Info, errPositions []int) *patterns.NilErrHit {
 	check := parseNilErrCond(ifStmt.Cond, info)
 	if check == nil {
 		return nil
@@ -121,44 +114,14 @@ func checkNilErrIf(ifStmt *ast.IfStmt, fset *token.FileSet, info *types.Info, er
 	if ret == nil {
 		return nil
 	}
-	ctx := nilRetCtx{ifStmt: ifStmt, fset: fset, ret: ret, info: info, errPos: errPos}
-	if check.isNotNil {
-		return checkNotNilReturn(ctx, branch, check)
+	if !returnsNilErrors(ret, errPositions) || usesErrorValue(branch, check.errVal, info) {
+		return nil
 	}
-	return checkNilReturn(ctx, check)
-}
-
-// nilRetCtx bundles the shared context for the nil-return checkers.
-type nilRetCtx struct {
-	ifStmt *ast.IfStmt
-	fset   *token.FileSet
-	ret    *ast.ReturnStmt
-	info   *types.Info
-	errPos int
-}
-
-// checkNotNilReturn checks `if err != nil { return nil }`.
-func checkNotNilReturn(ctx nilRetCtx, branch ast.Stmt, check *nilErrCheck) *patterns.NilErrHit {
-	if returnsNilError(ctx.ret, ctx.errPos) && !usesErrorValue(branch, check.errVal, ctx.info) {
-		return &patterns.NilErrHit{
-			Line:     ctx.fset.Position(ctx.ifStmt.Pos()).Line,
-			CondText: condText(ctx.fset, ctx.ifStmt.Cond),
-			Kind:     "returns nil when err != nil",
-		}
+	return &patterns.NilErrHit{
+		Line:     fset.Position(ifStmt.Pos()).Line,
+		CondText: condText(fset, ifStmt.Cond),
+		Kind:     "returns nil when err != nil",
 	}
-	return nil
-}
-
-// checkNilReturn checks `if err == nil { return err }`.
-func checkNilReturn(ctx nilRetCtx, check *nilErrCheck) *patterns.NilErrHit {
-	if returnsErrValueAt(ctx.ret, check.errVal, ctx.errPos, ctx.info) {
-		return &patterns.NilErrHit{
-			Line:     ctx.fset.Position(ctx.ifStmt.Pos()).Line,
-			CondText: condText(ctx.fset, ctx.ifStmt.Cond),
-			Kind:     "returns err when err == nil",
-		}
-	}
-	return nil
 }
 
 // parseNilErrCond parses `err != nil` or `err == nil`, returning the error
@@ -221,6 +184,9 @@ func isErrorExpr(info *types.Info, e ast.Expr) bool {
 func findReturnInBranch(branch ast.Stmt) *ast.ReturnStmt {
 	var ret *ast.ReturnStmt
 	ast.Inspect(branch, func(n ast.Node) bool {
+		if _, ok := n.(*ast.FuncLit); ok {
+			return false
+		}
 		if r, ok := n.(*ast.ReturnStmt); ok {
 			ret = r
 			return false
@@ -230,24 +196,18 @@ func findReturnInBranch(branch ast.Stmt) *ast.ReturnStmt {
 	return ret
 }
 
-// returnsNilError reports whether ret returns nil at the error result
-// position. errPos is the index of the error-typed result (-1 if none).
-// For `return nil, err` in a `(T, error)` function, the nil is at position 0
-// (the value), not the error — so this returns false.
-func returnsNilError(ret *ast.ReturnStmt, errPos int) bool {
-	if errPos < 0 || errPos >= len(ret.Results) {
+// returnsNilErrors requires nil in every error result. A second error result
+// may propagate the checked error even when an earlier error result is nil.
+func returnsNilErrors(ret *ast.ReturnStmt, positions []int) bool {
+	if len(positions) == 0 {
 		return false
 	}
-	return isNilIdent(ret.Results[errPos])
-}
-
-// returnsErrValueAt reports whether ret returns the errVal at the error
-// result position.
-func returnsErrValueAt(ret *ast.ReturnStmt, errVal ast.Expr, errPos int, info *types.Info) bool {
-	if errPos < 0 || errPos >= len(ret.Results) {
-		return false
+	for _, pos := range positions {
+		if pos >= len(ret.Results) || !isNilIdent(ret.Results[pos]) {
+			return false
+		}
 	}
-	return exprName(ret.Results[errPos]) == exprName(errVal)
+	return true
 }
 
 // usesErrorValue reports whether the error value is used in the branch
@@ -374,7 +334,7 @@ func isEmptyInterface(info *types.Info, e ast.Expr) bool {
 }
 
 // findTypedNilHits finds interface nil checks after a concrete nil-able
-// value is boxed. It records possible typed nils, not control-flow proofs.
+// value with nil evidence is boxed. Unknown constructor results are omitted.
 func findTypedNilHits(fn *ast.FuncDecl, fset *token.FileSet, info *types.Info) []patterns.TypedNilHit {
 	var out []patterns.TypedNilHit
 	if fn.Body == nil || info == nil {
@@ -390,42 +350,55 @@ func findTypedNilHits(fn *ast.FuncDecl, fset *token.FileSet, info *types.Info) [
 	return out
 }
 
-// collectTypedVars tracks interface objects, so shadowed names stay separate.
-func collectTypedVars(body ast.Node, info *types.Info) map[types.Object]bool {
-	typedVars := map[types.Object]bool{}
-	ast.Inspect(body, func(n ast.Node) bool {
-		collectValueSpecVars(n, info, typedVars)
-		collectAssignVars(n, info, typedVars)
-		return true
-	})
-	return typedVars
+type typedNilEvidence struct {
+	boxed   map[types.Object]token.Pos
+	nilVars map[types.Object]bool
 }
 
-func collectValueSpecVars(n ast.Node, info *types.Info, typedVars map[types.Object]bool) {
+// collectTypedVars tracks interface objects, so shadowed names stay separate.
+func collectTypedVars(body ast.Node, info *types.Info) map[types.Object]token.Pos {
+	evidence := &typedNilEvidence{
+		boxed:   map[types.Object]token.Pos{},
+		nilVars: stableNilVars(body, info),
+	}
+	ast.Inspect(body, func(n ast.Node) bool {
+		collectValueSpecVars(n, info, evidence)
+		collectAssignVars(n, info, evidence)
+		return true
+	})
+	for object, count := range interfaceWrites(body, info) {
+		if count > 1 {
+			delete(evidence.boxed, object)
+		}
+	}
+	return evidence.boxed
+}
+
+func collectValueSpecVars(n ast.Node, info *types.Info, evidence *typedNilEvidence) {
 	vs, ok := n.(*ast.ValueSpec)
 	if !ok {
 		return
 	}
 	for i, name := range vs.Names {
 		if i < len(vs.Values) {
-			trackTypedNilAssignment(name, vs.Values[i], info, typedVars)
+			trackTypedNilAssignment(name, vs.Values[i], info, evidence)
 		}
 	}
 }
 
-func collectAssignVars(n ast.Node, info *types.Info, typedVars map[types.Object]bool) {
+func collectAssignVars(n ast.Node, info *types.Info, evidence *typedNilEvidence) {
 	assign, ok := n.(*ast.AssignStmt)
 	if !ok {
 		return
 	}
 	for i, lhs := range assign.Lhs {
 		if i < len(assign.Rhs) {
-			trackTypedNilAssignment(lhs, assign.Rhs[i], info, typedVars)
+			trackTypedNilAssignment(lhs, assign.Rhs[i], info, evidence)
 		}
 	}
 }
 
-func trackTypedNilAssignment(lhs, rhs ast.Expr, info *types.Info, typedVars map[types.Object]bool) {
+func trackTypedNilAssignment(lhs, rhs ast.Expr, info *types.Info, evidence *typedNilEvidence) {
 	id, ok := lhs.(*ast.Ident)
 	if !ok {
 		return
@@ -437,12 +410,12 @@ func trackTypedNilAssignment(lhs, rhs ast.Expr, info *types.Info, typedVars map[
 	if _, ok := object.Type().Underlying().(*types.Interface); !ok {
 		return
 	}
-	if isTypedNilable(info, rhs) {
-		typedVars[object] = true
+	if isTypedNilable(info, rhs) && hasNilEvidence(rhs, info, evidence.nilVars) {
+		evidence.boxed[object] = rhs.Pos()
 	}
 }
 
-func checkTypedNilCompare(n ast.Node, fset *token.FileSet, info *types.Info, typedVars map[types.Object]bool) *patterns.TypedNilHit {
+func checkTypedNilCompare(n ast.Node, fset *token.FileSet, info *types.Info, typedVars map[types.Object]token.Pos) *patterns.TypedNilHit {
 	bin, ok := n.(*ast.BinaryExpr)
 	if !ok || (bin.Op != token.EQL && bin.Op != token.NEQ) {
 		return nil
@@ -460,9 +433,9 @@ func checkTypedNilCompare(n ast.Node, fset *token.FileSet, info *types.Info, typ
 	}
 }
 
-func typedNilVar(v, other ast.Expr, info *types.Info, typedVars map[types.Object]bool) string {
+func typedNilVar(v, other ast.Expr, info *types.Info, typedVars map[types.Object]token.Pos) string {
 	id, ok := v.(*ast.Ident)
-	if ok && typedVars[info.ObjectOf(id)] && isNilIdent(other) {
+	if ok && typedVars[info.ObjectOf(id)] > 0 && typedVars[info.ObjectOf(id)] < id.Pos() && isNilIdent(other) {
 		return id.Name
 	}
 	return ""

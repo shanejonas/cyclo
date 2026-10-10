@@ -128,6 +128,8 @@ Facts export uses schema_version 2 with helper summaries; version 1 remains read
 
 Suppressions use ` + "`// cyclo-allow(rule_a, rule_b): reason`" + ` above a function, with intervening doc comments allowed. Reasons are required; unknown rules fail validation. Prefer documenting a deliberate exception over hiding evidence.
 
+Bug-pattern warnings are advisory. ` + "`nilerr`" + ` requires explicit nil in every error result of the error branch; propagating an error in another result is valid. ` + "`typednil`" + ` requires a concrete nil value or a stable zero-valued local boxed into an interface. Unknown constructor results, parameters, and mutable bindings are omitted; absence of a warning does not prove nil safety. Interface suggestions describe normalized signature shapes, not Go declarations; preserve the concrete parameter and result types.
+
 **Patterns vs quality:** ` + "`cyclo fix`" + ` handles mechanical patterns automatically. ` + "`cyclo check`" + ` findings (side_effect_density, mutated_targets, etc.) are design smells — they need your judgment to refactor. The check tells you *where* to look; you decide *how* to restructure. Don't try to auto-fix quality findings.
 
 ## Reduce a bug reproducer
