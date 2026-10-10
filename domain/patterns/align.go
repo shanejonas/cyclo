@@ -23,24 +23,24 @@ const (
 	HoleLiteral HoleKind = "literal"
 	HoleField   HoleKind = "field"
 	HoleOp      HoleKind = "op"
+	HoleEffect  HoleKind = "effect"
 )
 
-// Prefix is the hole variable prefix of the kind: T, M, F, L, D, O.
+// Prefix is the hole variable prefix of the kind: T, M, F, L, D, O, E.
 func (k HoleKind) Prefix() byte {
-	switch k {
-	case HoleType:
-		return 'T'
-	case HoleMethod:
-		return 'M'
-	case HoleFreeFn:
-		return 'F'
-	case HoleLiteral:
-		return 'L'
-	case HoleField:
-		return 'D'
-	default:
-		return 'O'
+	if p, ok := holeKindPrefixes[k]; ok {
+		return p
 	}
+	return 'O'
+}
+
+var holeKindPrefixes = map[HoleKind]byte{
+	HoleType:    'T',
+	HoleMethod:  'M',
+	HoleFreeFn:  'F',
+	HoleLiteral: 'L',
+	HoleField:   'D',
+	HoleEffect:  'E',
 }
 
 // HoleVar is the variable name of the index-th hole of a kind: T0, M1, ...
@@ -588,6 +588,50 @@ func typeDiffs(a, b *PdgNode) []holeDiff {
 	return []holeDiff{{HoleType, a.TyClass, b.TyClass}}
 }
 
+// effectDiff reports when two aligned Call nodes have different side-effect
+// profiles. Effect differences are holes: the abstraction must account for
+// what each side does, not just what it calls.
+func effectDiff(a, b *PdgNode) (holeDiff, bool) {
+	if a.Kind != Call || b.Kind != Call {
+		return holeDiff{}, false
+	}
+	if a.Effects == b.Effects {
+		return holeDiff{}, false
+	}
+	return holeDiff{HoleEffect, effectName(a.Effects), effectName(b.Effects)}, true
+}
+
+// effectName renders effect bitflags for hole display.
+func effectName(e uint16) string {
+	if e == EffectNone {
+		return "pure"
+	}
+	var parts []string
+	for _, ef := range effectFlagNames {
+		if e&ef.bit != 0 {
+			parts = append(parts, ef.name)
+		}
+	}
+	return strings.Join(parts, "|")
+}
+
+type effectFlagName struct {
+	bit  uint16
+	name string
+}
+
+var effectFlagNames = []effectFlagName{
+	{EffectMutates, "mutates"},
+	{EffectIO, "io"},
+	{EffectNetwork, "network"},
+	{EffectGlobal, "global"},
+	{EffectUnsafe, "unsafe"},
+	{EffectTime, "time"},
+	{EffectRandom, "random"},
+	{EffectPanic, "panic"},
+	{EffectUnknown, "unknown"},
+}
+
 // nodeDiffs collects every hole between two aligned nodes.
 func nodeDiffs(a, b *PdgNode) []holeDiff {
 	var out []holeDiff
@@ -595,6 +639,9 @@ func nodeDiffs(a, b *PdgNode) []holeDiff {
 		out = append(out, d)
 	}
 	if d, ok := textDiff(a, b); ok {
+		out = append(out, d)
+	}
+	if d, ok := effectDiff(a, b); ok {
 		out = append(out, d)
 	}
 	return append(out, typeDiffs(a, b)...)

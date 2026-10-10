@@ -6,7 +6,29 @@ import (
 	"go/types"
 
 	"github.com/shanejonas/cyclo/domain/patterns"
+	"github.com/shanejonas/cyclo/domain/quality"
 )
+
+// effectBits maps a quality.Kind to PdgNode effect bitflags. Pure (None)
+// maps to EffectNone; unknown callees map to EffectUnknown.
+func effectBits(kind quality.Kind) uint16 {
+	if bit, ok := kindToEffectBit[kind]; ok {
+		return bit
+	}
+	return patterns.EffectNone // quality.None and anything else
+}
+
+var kindToEffectBit = map[quality.Kind]uint16{
+	quality.MutationEffect: patterns.EffectMutates,
+	quality.IO:             patterns.EffectIO,
+	quality.Network:        patterns.EffectNetwork,
+	quality.Global:         patterns.EffectGlobal,
+	quality.Unsafe:         patterns.EffectUnsafe,
+	quality.Time:           patterns.EffectTime,
+	quality.Random:         patterns.EffectRandom,
+	quality.Panic:          patterns.EffectPanic,
+	quality.UnknownEffect:  patterns.EffectUnknown,
+}
 
 // expr lowers an expression to the node producing its value, or none when the
 // expression is a bare variable use (resolved through binds), blank, or has
@@ -243,7 +265,7 @@ func (b *builder) callExpr(e *ast.CallExpr) int {
 		return n
 	}
 	calleeID, sigClass, receiver := b.resolveCallee(fun)
-	n := b.node(patterns.PdgNode{Kind: patterns.Call, CalleeID: calleeID, SigClass: sigClass, Line: b.line(e.Pos())})
+	n := b.node(patterns.PdgNode{Kind: patterns.Call, CalleeID: calleeID, SigClass: sigClass, Effects: effectBits(quality.ClassifyCallee(calleeID)), Line: b.line(e.Pos())})
 	argPos := 0
 	switch {
 	case receiver != nil:

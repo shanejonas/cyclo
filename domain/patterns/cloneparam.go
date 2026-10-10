@@ -61,6 +61,12 @@ func ParameterizeFromCloneGroup(facts []*FuncFacts, group []string, params Param
 	if len(fns) < 2 {
 		return nil
 	}
+	// Safety: don't propose extracting helpers from functions with
+	// incompatible side-effect profiles. If one member does IO and another
+	// is pure, a shared helper would be wrong.
+	if !compatibleEffects(fns) {
+		return nil
+	}
 	cluster := alignCloneGroup(fns, params)
 	if cluster == nil {
 		return nil
@@ -69,6 +75,28 @@ func ParameterizeFromCloneGroup(facts []*FuncFacts, group []string, params Param
 	sites := sitesOf(fns, cluster)
 	ix := newCandidateIndex(facts, nil, params)
 	return parameterize(ix, sites, cluster)
+}
+
+// compatibleEffects reports whether all functions in the group have the same
+// side-effect profile (union of Call node Effects). Functions with wildly
+// different effects (e.g., one does IO, another is pure) should not share
+// an extracted helper.
+func compatibleEffects(fns []*FuncFacts) bool {
+	var first uint16
+	for i, f := range fns {
+		var union uint16
+		if f.Pdg != nil {
+			for _, n := range f.Pdg.Nodes {
+				union |= n.Effects
+			}
+		}
+		if i == 0 {
+			first = union
+		} else if union != first {
+			return false
+		}
+	}
+	return true
 }
 
 // CloneGroupParameterizeCandidates runs ParameterizeFromCloneGroup on every
