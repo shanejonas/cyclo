@@ -467,6 +467,29 @@ func SimilarityMilli(a, b *Wl) uint32 {
 	return uint32(num * 1000 / den)
 }
 
+// similarityAtLeast answers only the threshold question. Each unvisited
+// level contributes at most the smaller graph's node count, so an upper
+// bound below the threshold safely stops the remaining intersections.
+func similarityAtLeast(a, b *Wl, limit uint32) bool {
+	h := levels(a, b)
+	remaining := uint64(h * (h + 1) / 2)
+	den := remaining * maxNodes(a, b)
+	if den == 0 {
+		return limit == 0
+	}
+	bound := uint64(min(a.nodes(), b.nodes()))
+	var num uint64
+	for i := 0; i < h; i++ {
+		if (num+remaining*bound)*1000/den < uint64(limit) {
+			return false
+		}
+		weight := uint64(h - i)
+		num += weight * uint64(intersection(a.hists[i], b.hists[i]))
+		remaining -= weight
+	}
+	return num*1000/den >= uint64(limit)
+}
+
 func maxNodes(a, b *Wl) uint64 {
 	denom := uint64(a.nodes())
 	if uint64(b.nodes()) > denom {

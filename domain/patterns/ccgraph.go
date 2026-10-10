@@ -99,11 +99,11 @@ func ccGraphGroups(pdgs map[string]*Pdg, names map[string]string, astTypes map[s
 	// closure so the worker functions stay kernel-agnostic.
 	wls := ccBuildWls(ids, candidates, pdgs, vecs)
 	clusters := ccLSHClusters(wls)
-	sim := func(a, b string) uint32 { return SimilarityMilli(wls[a], wls[b]) }
+	sim := func(a, b string) bool { return similarityAtLeast(wls[a], wls[b], ccMatchThreshold) }
 	if useNeighborhoodWL {
 		neighborhoodWLs := ccBuildNeighborhoodWLs(ids, candidates, pdgs)
-		sim = func(a, b string) uint32 {
-			return SimilarityNeighborhoodWLMilli(neighborhoodWLs[a], neighborhoodWLs[b])
+		sim = func(a, b string) bool {
+			return SimilarityNeighborhoodWLMilli(neighborhoodWLs[a], neighborhoodWLs[b]) >= ccMatchThreshold
 		}
 	}
 	// idToIndex maps function IDs back to ids-slice positions for
@@ -209,12 +209,27 @@ func (m nameMatcher) similar(a, b []rune) bool {
 	if len(a) == 0 || len(b) == 0 {
 		return true
 	}
+	prefix := commonRunePrefix(a, b, 4)
+	if nameScoreLowerBound(len(a), len(b), prefix) >= ccStage2NameThreshold {
+		return true
+	}
 	seen1, seen2 := m.seen1[:len(a)], m.seen2[:len(b)]
 	clear(seen1)
 	clear(seen2)
 	j := jaroRunes(a, b, seen1, seen2)
-	prefix := commonRunePrefix(a, b, 4)
 	return j+float64(prefix)*0.1*(1-j) >= ccStage2NameThreshold
+}
+
+// Equal leading runes always match under Jaro's greedy search. With at
+// least prefix matches and at most matches/2 transpositions, this bounds
+// the score from below. It only skips work for pairs already above the
+// unchanged name threshold; other pairs still use the exact algorithm.
+func nameScoreLowerBound(a, b, prefix int) float64 {
+	if prefix == 0 {
+		return 0
+	}
+	j := (float64(prefix)/float64(a) + float64(prefix)/float64(b) + 0.5) / 3
+	return j + float64(prefix)*0.1*(1-j)
 }
 
 // ccNamesSimilar reports whether two function names are similar enough.
@@ -273,7 +288,7 @@ func ccLSHClusters(wls map[string]*Wl) [][]string {
 // normalizes via find), so the output matches the sequential version.
 // idToIndex maps function IDs to positions in the sorted ids slice,
 // for candidate-set lookups.
-func ccUnionSimilar(cluster []string, candidates *ccPairs, idToIndex map[string]int, sim func(a, b string) uint32, parent map[string]string) {
+func ccUnionSimilar(cluster []string, candidates *ccPairs, idToIndex map[string]int, sim func(a, b string) bool, parent map[string]string) {
 	workers := runtime.NumCPU()
 	found := make(chan []ccPairJob, workers)
 	var wg sync.WaitGroup
@@ -300,7 +315,7 @@ func ccUnionSimilar(cluster []string, candidates *ccPairs, idToIndex map[string]
 // closure is the Stage 4 kernel: standard WL or neighborhood-augmented WL,
 // selected by the caller. idToIndex maps function IDs to positions in the
 // sorted ids slice, for candidate-set lookups.
-func ccSimilarStripes(cluster []string, candidates *ccPairs, idToIndex map[string]int, sim func(a, b string) uint32, worker, workers int) []ccPairJob {
+func ccSimilarStripes(cluster []string, candidates *ccPairs, idToIndex map[string]int, sim func(a, b string) bool, worker, workers int) []ccPairJob {
 	var out []ccPairJob
 	for i := worker; i < len(cluster); i += workers {
 		for j := i + 1; j < len(cluster); j++ {
@@ -308,7 +323,7 @@ func ccSimilarStripes(cluster []string, candidates *ccPairs, idToIndex map[strin
 			if !candidates.has(idToIndex[a], idToIndex[b]) {
 				continue
 			}
-			if sim(a, b) < ccMatchThreshold {
+			if !sim(a, b) {
 				continue
 			}
 			out = append(out, ccPairJob{a: a, b: b})

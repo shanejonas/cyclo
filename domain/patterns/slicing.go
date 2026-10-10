@@ -144,18 +144,54 @@ func FindChops(facts []*FuncFacts) []ChopFinding {
 	return out
 }
 
-// paramToReturnChop unions the chop from every param to every return.
+// paramToReturnChop unions all param-to-return chops. Distributing the
+// union over intersection gives reachability from any parameter intersected
+// with reachability to any return, so two traversals replace all pair scans.
 func paramToReturnChop(pdg *Pdg) map[int]bool {
 	params, returns := paramReturnIndices(pdg)
 	union := map[int]bool{}
-	for _, src := range params {
-		for _, sink := range returns {
-			for _, n := range Chop(pdg, src, sink) {
-				union[n] = true
-			}
+	if len(params) == 0 || len(returns) == 0 {
+		return union
+	}
+	forward, backward := dependenceAdjacency(pdg)
+	fwd := reachFrom(forward, params)
+	bwd := reachFrom(backward, returns)
+	for n, reached := range fwd {
+		if reached && bwd[n] {
+			union[n] = true
 		}
 	}
 	return union
+}
+
+func dependenceAdjacency(pdg *Pdg) ([][]int, [][]int) {
+	forward := make([][]int, len(pdg.Nodes))
+	backward := make([][]int, len(pdg.Nodes))
+	for _, e := range pdg.Edges {
+		forward[e.From] = append(forward[e.From], e.To)
+		backward[e.To] = append(backward[e.To], e.From)
+	}
+	return forward, backward
+}
+
+func reachFrom(adjacency [][]int, seeds []int) []bool {
+	seen := make([]bool, len(adjacency))
+	queue := make([]int, 0, len(adjacency))
+	for _, seed := range seeds {
+		if !seen[seed] {
+			seen[seed] = true
+			queue = append(queue, seed)
+		}
+	}
+	for head := 0; head < len(queue); head++ {
+		for _, next := range adjacency[queue[head]] {
+			if !seen[next] {
+				seen[next] = true
+				queue = append(queue, next)
+			}
+		}
+	}
+	return seen
 }
 
 // paramReturnIndices collects the node indices of parameters and returns.

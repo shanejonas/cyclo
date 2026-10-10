@@ -197,3 +197,72 @@ func TestDiameterMatchesShortestPaths(t *testing.T) {
 		}
 	}
 }
+
+func TestNameBoundMatchesExactFilter(t *testing.T) {
+	rng := rand.New(rand.NewSource(71))
+	alphabet := []rune("abcé读取")
+	for trial := 0; trial < 5000; trial++ {
+		a, b := randomName(rng, alphabet), randomName(rng, alphabet)
+		prefix := rng.Intn(min(len(a), len(b)) + 1)
+		copy(b[:prefix], a[:prefix])
+		matcher := newNameMatcher([][]rune{a, b})
+		if got, want := matcher.similar(a, b), ccNamesSimilar(string(a), string(b)); got != want {
+			t.Fatalf("%q %q: bounded=%v exact=%v", a, b, got, want)
+		}
+	}
+}
+
+func randomName(rng *rand.Rand, alphabet []rune) []rune {
+	name := make([]rune, rng.Intn(90)+1)
+	for i := range name {
+		name[i] = alphabet[rng.Intn(len(alphabet))]
+	}
+	return name
+}
+
+func TestWLBoundMatchesExactScore(t *testing.T) {
+	rng := rand.New(rand.NewSource(73))
+	for trial := 0; trial < 60; trial++ {
+		a, b := NewWl(randomDependenceGraph(rng)), NewWl(randomDependenceGraph(rng))
+		for _, limit := range []uint32{0, 600, 899, 900, 901, 1000} {
+			if got, want := similarityAtLeast(a, b, limit), SimilarityMilli(a, b) >= limit; got != want {
+				t.Fatalf("trial %d threshold %d: bounded=%v exact=%v", trial, limit, got, want)
+			}
+		}
+	}
+}
+
+func randomDependenceGraph(rng *rand.Rand) *Pdg {
+	pdg := &Pdg{Nodes: make([]PdgNode, rng.Intn(30)+1)}
+	kinds := []NodeKind{Param, Return, Call, Lit}
+	for i := range pdg.Nodes {
+		pdg.Nodes[i].Kind = kinds[rng.Intn(len(kinds))]
+	}
+	for i := range pdg.Nodes {
+		for j := range pdg.Nodes {
+			if rng.Intn(20) == 0 {
+				pdg.Edges = append(pdg.Edges, PdgEdge{From: i, To: j, Kind: Data})
+			}
+		}
+	}
+	return pdg
+}
+
+func TestMultiSourceChopMatchesPairUnion(t *testing.T) {
+	rng := rand.New(rand.NewSource(79))
+	for trial := 0; trial < 100; trial++ {
+		pdg := randomDependenceGraph(rng)
+		params, returns := paramReturnIndices(pdg)
+		want := map[int]bool{}
+		for _, src := range params {
+			for _, sink := range returns {
+				for _, node := range Chop(pdg, src, sink) {
+					want[node] = true
+				}
+			}
+		}
+		if got := paramToReturnChop(pdg); !reflect.DeepEqual(got, want) {
+			t.Fatalf("trial %d: multi-source=%v pair union=%v", trial, got, want)
+		}
+	}
+}
