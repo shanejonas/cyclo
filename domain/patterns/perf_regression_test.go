@@ -103,3 +103,97 @@ func TestBucketClusteringMatchesQueries(t *testing.T) {
 		}
 	}
 }
+
+func TestCompactPairsAcrossWordBoundaries(t *testing.T) {
+	p := newCCPairs(130)
+	p.add(0, 64)
+	p.add(63, 129)
+	p.add(64, 65)
+	for i := 0; i < 130; i++ {
+		for j := i + 1; j < 130; j++ {
+			want := i == 0 && j == 64 || i == 63 && j == 129 || i == 64 && j == 65
+			if p.has(i, j) != want || p.has(j, i) != want {
+				t.Fatalf("pair (%d,%d) differs", i, j)
+			}
+		}
+	}
+	if got, want := p.members(), []int{0, 63, 64, 65, 129}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("members=%v want %v", got, want)
+	}
+}
+
+func TestPairFiltersMatchOriginalPipeline(t *testing.T) {
+	rng := rand.New(rand.NewSource(53))
+	ids := []string{"a", "b", "c", "d", "e", "f"}
+	names := []string{"GetValue", "SetValue", "Other", "读取值", "", "ReadValue"}
+	for trial := 0; trial < 100; trial++ {
+		types := map[string]map[string]int{}
+		vecs := make([][]float64, len(ids))
+		for i, id := range ids {
+			vecs[i] = []float64{rng.Float64(), rng.Float64(), rng.Float64()}
+			if rng.Intn(4) == 0 {
+				continue
+			}
+			types[id] = map[string]int{}
+			for _, kind := range []string{"Call", "If", "Return", "Lit"} {
+				if count := rng.Intn(10); count > 0 {
+					types[id][kind] = count
+				}
+			}
+		}
+		got := ccCandidatePairs(vecs, names, ccASTShapes(ids, types))
+		for i, a := range ids {
+			for j := i + 1; j < len(ids); j++ {
+				bypass := len(types[a]) > 0 && len(types[ids[j]]) > 0 && AstJaccard(types[a], types[ids[j]]) >= astBypassThreshold
+				want := bypass || cosineSimilarity(vecs[i], vecs[j]) >= charVecThreshold && ccNamesSimilar(names[i], names[j])
+				if got.has(i, j) != want {
+					t.Fatalf("trial %d pair %d,%d differs", trial, i, j)
+				}
+			}
+		}
+	}
+}
+
+func TestDiameterMatchesShortestPaths(t *testing.T) {
+	rng := rand.New(rand.NewSource(61))
+	for trial := 0; trial < 30; trial++ {
+		g := Graph{labels: make([]uint64, 15), inc: make([][]Nb, 15), out: make([][]Nb, 15)}
+		dist := make([][]int, 15)
+		for i := range dist {
+			dist[i] = make([]int, 15)
+			for j := range dist[i] {
+				if i != j {
+					dist[i][j] = 1000
+				}
+			}
+		}
+		for i := 0; i < 15; i++ {
+			for j := i + 1; j < 15; j++ {
+				if rng.Intn(6) != 0 {
+					continue
+				}
+				g.out[i] = append(g.out[i], Nb{node: uint64(j)})
+				g.inc[j] = append(g.inc[j], Nb{node: uint64(i)})
+				dist[i][j], dist[j][i] = 1, 1
+			}
+		}
+		for k := 0; k < 15; k++ {
+			for i := 0; i < 15; i++ {
+				for j := 0; j < 15; j++ {
+					dist[i][j] = min(dist[i][j], dist[i][k]+dist[k][j])
+				}
+			}
+		}
+		want := 0
+		for _, row := range dist {
+			for _, d := range row {
+				if d < 1000 {
+					want = max(want, d)
+				}
+			}
+		}
+		if got := diameter(&g); got != want {
+			t.Fatalf("trial %d: diameter=%d want %d", trial, got, want)
+		}
+	}
+}

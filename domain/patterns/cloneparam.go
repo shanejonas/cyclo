@@ -1,10 +1,7 @@
 package patterns
 
-// resolveCloneGroupFacts looks up the FuncFacts for a CCGraph clone group,
-// keeping group order and dropping members without PDGs (filtered from
-// mining, like rstyle's pdg: None).
-func resolveCloneGroupFacts(facts []*FuncFacts, group []string) []*FuncFacts {
-	factByID := buildFactMap(facts)
+// cloneGroupFacts resolves members through the shared corpus index.
+func cloneGroupFacts(factByID map[string]*FuncFacts, group []string) []*FuncFacts {
 	var fns []*FuncFacts
 	for _, id := range group {
 		if f := factByID[id]; f != nil && f.Pdg != nil {
@@ -54,10 +51,14 @@ func alignCloneGroup(fns []*FuncFacts, params Params) *Cluster {
 // Deterministic: group order is preserved, alignment is deterministic, and
 // the candidate construction sorts sites.
 func ParameterizeFromCloneGroup(facts []*FuncFacts, group []string, params Params) *Candidate {
+	return parameterizeCloneGroup(newCandidateIndex(facts, nil, params), group, params)
+}
+
+func parameterizeCloneGroup(ix *candidateIndex, group []string, params Params) *Candidate {
 	if len(group) < 2 {
 		return nil
 	}
-	fns := resolveCloneGroupFacts(facts, group)
+	fns := cloneGroupFacts(ix.byID, group)
 	if len(fns) < 2 {
 		return nil
 	}
@@ -73,7 +74,6 @@ func ParameterizeFromCloneGroup(facts []*FuncFacts, group []string, params Param
 	}
 	// parameterize expects sites aligned with cluster.Members.
 	sites := sitesOf(fns, cluster)
-	ix := newCandidateIndex(facts, nil, params)
 	return parameterize(ix, sites, cluster)
 }
 
@@ -103,9 +103,10 @@ func compatibleEffects(fns []*FuncFacts) bool {
 // CCGraph clone group, returning the parameterize candidates. Groups that
 // do not yield an abstraction are skipped.
 func CloneGroupParameterizeCandidates(facts []*FuncFacts, groups [][]string, params Params) []Candidate {
+	ix := newCandidateIndex(facts, nil, params)
 	var out []Candidate
 	for _, group := range groups {
-		if c := ParameterizeFromCloneGroup(facts, group, params); c != nil {
+		if c := parameterizeCloneGroup(ix, group, params); c != nil {
 			out = append(out, *c)
 		}
 	}

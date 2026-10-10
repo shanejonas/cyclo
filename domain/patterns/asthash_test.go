@@ -72,7 +72,7 @@ func TestAstJaccardPartial(t *testing.T) {
 }
 
 func TestCCASTBypassEmpty(t *testing.T) {
-	if got := ccASTBypass([]string{"a", "b"}, nil); len(got) != 0 {
+	if got := ccASTShapes([]string{"a", "b"}, nil); got[0].bypass(got[1]) {
 		t.Fatalf("nil types should yield no bypass, got %v", got)
 	}
 }
@@ -86,11 +86,11 @@ func TestCCASTBypassHighSimilarity(t *testing.T) {
 		"f2": AstNodeMultiset(b),
 		"f3": AstNodeMultiset(c),
 	}
-	got := ccASTBypass([]string{"f1", "f2", "f3"}, types)
-	if !got[ccPairKey(0, 1)] {
+	got := ccASTShapes([]string{"f1", "f2", "f3"}, types)
+	if !got[0].bypass(got[1]) {
 		t.Fatal("structurally identical pair should be bypassed")
 	}
-	if got[ccPairKey(0, 2)] || got[ccPairKey(1, 2)] {
+	if got[0].bypass(got[2]) || got[1].bypass(got[2]) {
 		t.Fatal("structurally different pairs should not be bypassed")
 	}
 }

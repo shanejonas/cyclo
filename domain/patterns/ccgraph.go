@@ -79,7 +79,7 @@ func ccGraphGroups(pdgs map[string]*Pdg, names map[string]string, astTypes map[s
 	// Stage 0: AST pre-filter. High-similarity pairs bypass the
 	// characteristic-vector filter; nothing is removed that the paper
 	// stages would have kept.
-	astBypass := ccASTBypass(ids, astTypes)
+	shapes := ccASTShapes(ids, astTypes)
 	// Stages 1+2: cheap filters produce the candidate pair set.
 	// vecs and alignedNames are indexed by position in ids, so the
 	// O(n^2) pair loop uses slice indexing instead of map lookups.
@@ -89,10 +89,8 @@ func ccGraphGroups(pdgs map[string]*Pdg, names map[string]string, astTypes map[s
 		vecs[i] = characteristicVector(pdgs[id])
 		alignedNames[i] = names[id]
 	}
-	candidates := ccCandidatePairs(ids, vecs, alignedNames)
-	// Merge Stage 0 bypass pairs into the candidate set.
-	ccMergeBypass(candidates, astBypass)
-	if len(candidates) == 0 {
+	candidates := ccCandidatePairs(vecs, alignedNames, shapes)
+	if len(candidates.members()) == 0 {
 		return nil
 	}
 	// Stage 3: LSH-cluster the survivors' WL vectors.
@@ -140,76 +138,51 @@ func ccSortableIDs(pdgs map[string]*Pdg) []string {
 	return ids
 }
 
-// ccPairKey builds a canonical key for an unordered function pair.
-// i and j are positions in the sorted ids slice. The key is canonical:
-// ccPairKey(i, j) == ccPairKey(j, i). Integer keys avoid the heap
-// allocations and map overhead of string-concatenated keys, which
-// dominated memory at Docker scale (millions of candidate pairs).
-func ccPairKey(i, j int) int64 {
-	if i > j {
-		i, j = j, i
-	}
-	return int64(i)<<32 | int64(j)
-}
-
-// ccPairUnkey splits a pair key back into ids-slice indices.
-func ccPairUnkey(key int64) (int, int) {
-	return int(key >> 32), int(key & 0xffffffff)
-}
-
 // ccPairJob is one unordered function pair to check.
 type ccPairJob struct{ a, b string }
 
-// ccCandidatePairs returns the set of pairs passing Stages 1+2,
-// keyed by ccPairKey over positions in ids. vecs and names are aligned
-// with ids by position. Pair checks are striped across a worker pool;
-// the output is a set, so worker assignment cannot affect the result.
-func ccCandidatePairs(ids []string, vecs [][]float64, names []string) map[int64]bool {
-	workers := runtime.NumCPU()
-	runes := ccNameRunes(names)
-	found := make(chan map[int64]bool, workers)
+// ccPairFilters contains immutable pair inputs shared by striped workers.
+type ccPairFilters struct {
+	vecs   [][]float64
+	names  [][]rune
+	shapes []astShape
+}
+
+func ccCandidatePairs(vecs [][]float64, names []string, shapes []astShape) *ccPairs {
+	out := newCCPairs(len(vecs))
+	filters := ccPairFilters{vecs, ccNameRunes(names), shapes}
+	workers := min(runtime.NumCPU(), len(vecs))
 	var wg sync.WaitGroup
 	for w := 0; w < workers; w++ {
 		wg.Add(1)
 		go func(w int) {
 			defer wg.Done()
-			found <- ccFilterStripes(ids, vecs, runes, w, workers)
+			filters.stripes(out, w, workers)
 		}(w)
 	}
-	go func() {
-		wg.Wait()
-		close(found)
-	}()
-	out := map[int64]bool{}
-	for m := range found {
-		for k := range m {
-			out[k] = true
-		}
-	}
+	wg.Wait()
 	return out
 }
 
-// ccFilterStripes applies Stages 1+2 to the pairs whose outer index i
-// satisfies i%workers == worker, returning the surviving pair keys.
-// Slice indexing (no map lookups) keeps the inner loop tight.
-func ccFilterStripes(ids []string, vecs [][]float64, names [][]rune, worker, workers int) map[int64]bool {
-	out := map[int64]bool{}
-	matcher := newNameMatcher(names)
-	for i := worker; i < len(ids); i += workers {
-		vi, ni := vecs[i], names[i]
-		for j := i + 1; j < len(ids); j++ {
-			// Stage 1: characteristic-vector cosine pre-filter.
-			if cosineSimilarity(vi, vecs[j]) < charVecThreshold {
-				continue
+func (f ccPairFilters) stripes(out *ccPairs, worker, workers int) {
+	matcher := newNameMatcher(f.names)
+	for i := worker; i < len(f.vecs); i += workers {
+		for j := i + 1; j < len(f.vecs); j++ {
+			if f.accepts(i, j, matcher) {
+				out.add(i, j)
 			}
-			// Stage 2: Jaro-Winkler name filter.
-			if !matcher.similar(ni, names[j]) {
-				continue
-			}
-			out[ccPairKey(i, j)] = true
 		}
 	}
-	return out
+}
+
+func (f ccPairFilters) accepts(i, j int, matcher nameMatcher) bool {
+	if f.shapes[i].bypass(f.shapes[j]) {
+		return true
+	}
+	if cosineSimilarity(f.vecs[i], f.vecs[j]) < charVecThreshold {
+		return false
+	}
+	return matcher.similar(f.names[i], f.names[j])
 }
 
 // ccNameRunes converts each name once, outside the candidate-pair loop.
@@ -259,15 +232,10 @@ func ccNamesSimilar(a, b string) bool {
 // reused here instead of recomputed. Uses NewWlLight: the CCGraph
 // pipeline only needs histograms and node counts, so the refinement
 // history and graph adjacency are not retained.
-func ccBuildWls(ids []string, candidates map[int64]bool, pdgs map[string]*Pdg, vecs [][]float64) map[string]*Wl {
-	seen := map[int]bool{}
-	for key := range candidates {
-		i, j := ccPairUnkey(key)
-		seen[i] = true
-		seen[j] = true
-	}
+func ccBuildWls(ids []string, candidates *ccPairs, pdgs map[string]*Pdg, vecs [][]float64) map[string]*Wl {
+	seen := candidates.members()
 	out := make(map[string]*Wl, len(seen))
-	for i := range seen {
+	for _, i := range seen {
 		id := ids[i]
 		out[id] = NewWlLight(pdgs[id], vecs[i])
 	}
@@ -277,15 +245,10 @@ func ccBuildWls(ids []string, candidates map[int64]bool, pdgs map[string]*Pdg, v
 // ccBuildNeighborhoodWLs builds NeighborhoodWL instances for every function appearing in any
 // candidate pair. Only called when the neighborhood WL kernel is selected.
 // ids maps candidate-pair indices back to function IDs.
-func ccBuildNeighborhoodWLs(ids []string, candidates map[int64]bool, pdgs map[string]*Pdg) map[string]*NeighborhoodWL {
-	seen := map[int]bool{}
-	for key := range candidates {
-		i, j := ccPairUnkey(key)
-		seen[i] = true
-		seen[j] = true
-	}
+func ccBuildNeighborhoodWLs(ids []string, candidates *ccPairs, pdgs map[string]*Pdg) map[string]*NeighborhoodWL {
+	seen := candidates.members()
 	out := make(map[string]*NeighborhoodWL, len(seen))
-	for i := range seen {
+	for _, i := range seen {
 		id := ids[i]
 		out[id] = NewNeighborhoodWL(pdgs[id])
 	}
@@ -310,7 +273,7 @@ func ccLSHClusters(wls map[string]*Wl) [][]string {
 // normalizes via find), so the output matches the sequential version.
 // idToIndex maps function IDs to positions in the sorted ids slice,
 // for candidate-set lookups.
-func ccUnionSimilar(cluster []string, candidates map[int64]bool, idToIndex map[string]int, sim func(a, b string) uint32, parent map[string]string) {
+func ccUnionSimilar(cluster []string, candidates *ccPairs, idToIndex map[string]int, sim func(a, b string) uint32, parent map[string]string) {
 	workers := runtime.NumCPU()
 	found := make(chan []ccPairJob, workers)
 	var wg sync.WaitGroup
@@ -337,12 +300,12 @@ func ccUnionSimilar(cluster []string, candidates map[int64]bool, idToIndex map[s
 // closure is the Stage 4 kernel: standard WL or neighborhood-augmented WL,
 // selected by the caller. idToIndex maps function IDs to positions in the
 // sorted ids slice, for candidate-set lookups.
-func ccSimilarStripes(cluster []string, candidates map[int64]bool, idToIndex map[string]int, sim func(a, b string) uint32, worker, workers int) []ccPairJob {
+func ccSimilarStripes(cluster []string, candidates *ccPairs, idToIndex map[string]int, sim func(a, b string) uint32, worker, workers int) []ccPairJob {
 	var out []ccPairJob
 	for i := worker; i < len(cluster); i += workers {
 		for j := i + 1; j < len(cluster); j++ {
 			a, b := cluster[i], cluster[j]
-			if !candidates[ccPairKey(idToIndex[a], idToIndex[b])] {
+			if !candidates.has(idToIndex[a], idToIndex[b]) {
 				continue
 			}
 			if sim(a, b) < ccMatchThreshold {

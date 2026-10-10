@@ -194,52 +194,46 @@ func histogram(colors []uint64) []histEntry {
 	return h
 }
 
-// eccentricity is the longest shortest path from start (BFS levels).
-func (g *Graph) eccentricity(start int) int {
-	seen := make([]bool, len(g.labels))
+// eccentricityWith reuses BFS storage across diameter's starting nodes.
+func (g *Graph) eccentricityWith(start int, seen []bool, queue []int) int {
+	clear(seen)
 	seen[start] = true
-	frontier := []int{start}
-	depth := 0
-	for len(frontier) > 0 {
-		frontier = g.expandFrontier(frontier, seen)
-		if len(frontier) == 0 {
+	queue = append(queue[:0], start)
+	depth, head := 0, 0
+	for head < len(queue) {
+		end := len(queue)
+		for _, v := range queue[head:end] {
+			queue = appendNeighbours(queue, g.inc[v], seen)
+			queue = appendNeighbours(queue, g.out[v], seen)
+		}
+		if len(queue) == end {
 			return depth
 		}
+		head = end
 		depth++
 	}
 	return depth
 }
 
-// expandFrontier returns the unvisited neighbours of frontier, marking them.
-func (g *Graph) expandFrontier(frontier []int, seen []bool) []int {
-	fresh := map[int]bool{}
-	for _, v := range frontier {
-		collectNeighbours(g.inc[v], seen, fresh)
-		collectNeighbours(g.out[v], seen, fresh)
-	}
-	next := make([]int, 0, len(fresh))
-	for node := range fresh {
-		seen[node] = true
-		next = append(next, node)
-	}
-	return next
-}
-
-func collectNeighbours(nbs []Nb, seen []bool, fresh map[int]bool) {
+func appendNeighbours(queue []int, nbs []Nb, seen []bool) []int {
 	for _, nb := range nbs {
 		if !seen[nb.node] {
-			fresh[int(nb.node)] = true
+			seen[nb.node] = true
+			queue = append(queue, int(nb.node))
 		}
 	}
+	return queue
 }
 
 func diameter(g *Graph) int {
 	if len(g.labels) > diameterLimit {
 		return maxLevels
 	}
+	seen := make([]bool, len(g.labels))
+	queue := make([]int, 0, len(g.labels))
 	max := 0
 	for v := range g.labels {
-		if e := g.eccentricity(v); e > max {
+		if e := g.eccentricityWith(v, seen, queue); e > max {
 			max = e
 		}
 	}
