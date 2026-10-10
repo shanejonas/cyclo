@@ -129,6 +129,7 @@ func funcFactsOf(fp gopatterns.FuncPdg) *patterns.FuncFacts {
 		Line:                fp.Line,
 		EndLine:             fp.EndLine,
 		Pdg:                 &fp.Pdg,
+		AstTypes:            fp.AstTypes,
 		SigKey:              gopatterns.SigKeyOf(fp),
 		SelfTy:              fp.SelfTy,
 		GuardClauses:        guardHits(fp.GuardClauses),

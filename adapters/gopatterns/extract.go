@@ -34,6 +34,10 @@ type FuncPdg struct {
 	// // cyclo-allow on this function.
 	SuppressedKinds []string
 	Pdg             patterns.Pdg
+	// AstTypes is the multiset of AST node type names for the function
+	// body (see patterns.AstNodeMultiset). Used by the CCGraph Stage 0
+	// AST pre-filter.
+	AstTypes map[string]int
 	// SelfTy is the receiver's named type for methods ("pkg.Type"), empty
 	// for free functions. The miner needs it: signature groups require two
 	// or more distinct self types, and facts without SelfTy are skipped.
@@ -261,6 +265,7 @@ func extractFunc(pkg *packages.Package, fn *ast.FuncDecl, path string, ctx extra
 		EndLine:         end.Line,
 		SuppressedKinds: findSuppressedKinds(fn),
 		Pdg:             patterns.Pdg{Nodes: b.nodes, Edges: b.edges},
+		AstTypes:        patterns.AstNodeMultiset(fn),
 		SelfTy:          selfTy,
 		GuardClauses:    findGuardClauses(fn, pkg.Fset),
 		EnumDispatches:  findEnumDispatches(fn, pkg.Fset),
