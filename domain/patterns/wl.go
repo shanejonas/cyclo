@@ -194,52 +194,46 @@ func histogram(colors []uint64) []histEntry {
 	return h
 }
 
-// eccentricity is the longest shortest path from start (BFS levels).
-func (g *Graph) eccentricity(start int) int {
-	seen := make([]bool, len(g.labels))
+// eccentricityWith reuses BFS storage across diameter's starting nodes.
+func (g *Graph) eccentricityWith(start int, seen []bool, queue []int) int {
+	clear(seen)
 	seen[start] = true
-	frontier := []int{start}
-	depth := 0
-	for len(frontier) > 0 {
-		frontier = g.expandFrontier(frontier, seen)
-		if len(frontier) == 0 {
+	queue = append(queue[:0], start)
+	depth, head := 0, 0
+	for head < len(queue) {
+		end := len(queue)
+		for _, v := range queue[head:end] {
+			queue = appendNeighbours(queue, g.inc[v], seen)
+			queue = appendNeighbours(queue, g.out[v], seen)
+		}
+		if len(queue) == end {
 			return depth
 		}
+		head = end
 		depth++
 	}
 	return depth
 }
 
-// expandFrontier returns the unvisited neighbours of frontier, marking them.
-func (g *Graph) expandFrontier(frontier []int, seen []bool) []int {
-	fresh := map[int]bool{}
-	for _, v := range frontier {
-		collectNeighbours(g.inc[v], seen, fresh)
-		collectNeighbours(g.out[v], seen, fresh)
-	}
-	next := make([]int, 0, len(fresh))
-	for node := range fresh {
-		seen[node] = true
-		next = append(next, node)
-	}
-	return next
-}
-
-func collectNeighbours(nbs []Nb, seen []bool, fresh map[int]bool) {
+func appendNeighbours(queue []int, nbs []Nb, seen []bool) []int {
 	for _, nb := range nbs {
 		if !seen[nb.node] {
-			fresh[int(nb.node)] = true
+			seen[nb.node] = true
+			queue = append(queue, int(nb.node))
 		}
 	}
+	return queue
 }
 
 func diameter(g *Graph) int {
 	if len(g.labels) > diameterLimit {
 		return maxLevels
 	}
+	seen := make([]bool, len(g.labels))
+	queue := make([]int, 0, len(g.labels))
 	max := 0
 	for v := range g.labels {
-		if e := g.eccentricity(v); e > max {
+		if e := g.eccentricityWith(v, seen, queue); e > max {
 			max = e
 		}
 	}
@@ -255,6 +249,11 @@ type Wl struct {
 	diameter int
 	charVec  []float64
 	pdg      *Pdg
+	// nodeCount caches len(graph.labels). The CCGraph pipeline
+	// (SimilarityMilli, Vectorize) only needs hists and the node
+	// count, so NewWlLight omits graph/rounds/pdg and relies on
+	// this field. Populated by every constructor.
+	nodeCount int
 	// projCache lazily holds WL histograms for single-edge-kind projections,
 	// keyed by edge kind. Used by SimilarityWeighted; computed on demand so
 	// functions that never reach pair comparison pay nothing.
@@ -334,13 +333,39 @@ func NewWl(pdg *Pdg) *Wl {
 	// not the full maxLevels. Small-diameter graphs save refinement work.
 	rounds := (&g).refineRoundsDiameter(d)
 	return &Wl{
-		graph:    g,
-		rounds:   rounds,
-		hists:    histograms(rounds),
-		calls:    countCalls(pdg),
-		diameter: d,
-		charVec:  characteristicVector(pdg),
-		pdg:      pdg,
+		graph:     g,
+		rounds:    rounds,
+		hists:     histograms(rounds),
+		calls:     countCalls(pdg),
+		diameter:  d,
+		charVec:   characteristicVector(pdg),
+		pdg:       pdg,
+		nodeCount: len(g.labels),
+	}
+}
+
+// NewWlLight builds a Wl with only the fields needed for CCGraph
+// similarity (SimilarityMilli) and LSH vectorization (Vectorize):
+// hists, diameter, nodeCount, charVec, and calls. It omits graph,
+// rounds, and pdg, which are only needed by PDG alignment (align.go),
+// the WL disk cache (wlcache.go), and weighted similarity
+// (SimilarityWeighted). The caller supplies the characteristic vector
+// (already computed for Stage 1) instead of recomputing it.
+//
+// Significantly reduces retained memory when building WL instances for
+// thousands of candidate functions: the refinement history (rounds)
+// and adjacency (graph) dominate per-instance memory, and neither is
+// read by the CCGraph pipeline.
+func NewWlLight(pdg *Pdg, charVec []float64) *Wl {
+	g := buildGraph(pdg)
+	d := diameter(&g)
+	rounds := (&g).refineRoundsDiameter(d)
+	return &Wl{
+		hists:     histograms(rounds),
+		calls:     countCalls(pdg),
+		diameter:  d,
+		charVec:   charVec,
+		nodeCount: len(g.labels),
 	}
 }
 
@@ -381,7 +406,7 @@ func countCalls(pdg *Pdg) int {
 	return calls
 }
 
-func (w *Wl) nodes() int { return len(w.graph.labels) }
+func (w *Wl) nodes() int { return w.nodeCount }
 
 // levels caps refinement depth by the smaller graph's diameter.
 func levels(a, b *Wl) int {
@@ -440,6 +465,29 @@ func SimilarityMilli(a, b *Wl) uint32 {
 		return 0
 	}
 	return uint32(num * 1000 / den)
+}
+
+// similarityAtLeast answers only the threshold question. Each unvisited
+// level contributes at most the smaller graph's node count, so an upper
+// bound below the threshold safely stops the remaining intersections.
+func similarityAtLeast(a, b *Wl, limit uint32) bool {
+	h := levels(a, b)
+	remaining := uint64(h * (h + 1) / 2)
+	den := remaining * maxNodes(a, b)
+	if den == 0 {
+		return limit == 0
+	}
+	bound := uint64(min(a.nodes(), b.nodes()))
+	var num uint64
+	for i := 0; i < h; i++ {
+		if (num+remaining*bound)*1000/den < uint64(limit) {
+			return false
+		}
+		weight := uint64(h - i)
+		num += weight * uint64(intersection(a.hists[i], b.hists[i]))
+		remaining -= weight
+	}
+	return num*1000/den >= uint64(limit)
 }
 
 func maxNodes(a, b *Wl) uint64 {

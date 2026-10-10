@@ -1,6 +1,9 @@
 package quality
 
-import "slices"
+import (
+	"slices"
+	"sync"
+)
 
 // stdlibRule classifies one Go standard library package for side-effect
 // analysis. When names is empty the kind applies to every call in the
@@ -506,4 +509,23 @@ func (r stdlibRule) prefixes() []Prefix {
 		result[index] = Prefix{r.pkg + "." + name, r.kind}
 	}
 	return result
+}
+
+// ClassifyCallee returns the side-effect Kind for a callee ID (e.g.
+// "encoding/json.Marshal" or "example.com/mod/pkg.Func"). It uses the
+// stdlib classification table; unknown callees return UnknownEffect.
+// The result is cached after first build; safe for concurrent use.
+func ClassifyCallee(callee string) Kind {
+	classifyOnce.Do(buildClassifyPrefixes)
+	kind, _ := prefixKind(NormalizeCallee(callee), classifyPrefixes)
+	return kind
+}
+
+var (
+	classifyOnce     sync.Once
+	classifyPrefixes []Prefix
+)
+
+func buildClassifyPrefixes() {
+	classifyPrefixes = defaultPrefixes()
 }

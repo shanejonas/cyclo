@@ -88,57 +88,14 @@ func AstJaccard(a, b map[string]int) float64 {
 // astMultisetOverlap returns the intersection and union sizes of two
 // multisets, using min counts for intersection and max for union.
 func astMultisetOverlap(a, b map[string]int) (inter, union int) {
-	seen := map[string]bool{}
 	for k, ca := range a {
-		seen[k] = true
 		inter += min(ca, b[k])
 		union += max(ca, b[k])
 	}
 	for k, cb := range b {
-		if !seen[k] {
+		if _, ok := a[k]; !ok {
 			union += cb
 		}
 	}
 	return inter, union
-}
-
-// ccASTBypass returns the set of pair keys (ccPairKey) whose AST
-// Jaccard similarity meets the bypass threshold. ids is the sorted
-// function ID list; types maps ID to its AST node multiset. Functions
-// without a multiset are skipped (conservative: no bypass). The output
-// is a set, so iteration order cannot affect the result.
-func ccASTBypass(ids []string, types map[string]map[string]int) map[string]bool {
-	out := map[string]bool{}
-	if len(types) == 0 {
-		return out
-	}
-	for i := 0; i < len(ids); i++ {
-		ccASTBypassRow(ids, i, types, out)
-	}
-	return out
-}
-
-// ccMergeBypass merges Stage 0 bypass pair keys into the candidate set.
-func ccMergeBypass(candidates, bypass map[string]bool) {
-	for k := range bypass {
-		candidates[k] = true
-	}
-}
-
-// ccASTBypassRow checks pairs (ids[i], ids[j]) for j > i, adding those
-// that clear the bypass threshold to out.
-func ccASTBypassRow(ids []string, i int, types map[string]map[string]int, out map[string]bool) {
-	ti := types[ids[i]]
-	if len(ti) == 0 {
-		return
-	}
-	for j := i + 1; j < len(ids); j++ {
-		tj := types[ids[j]]
-		if len(tj) == 0 {
-			continue
-		}
-		if AstJaccard(ti, tj) >= astBypassThreshold {
-			out[ccPairKey(ids[i], ids[j])] = true
-		}
-	}
 }

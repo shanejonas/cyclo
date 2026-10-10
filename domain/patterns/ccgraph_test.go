@@ -96,6 +96,39 @@ func TestCCGraphClonesNameFilter(t *testing.T) {
 	}
 }
 
+func TestQualifiedNamesDoNotBypassNameFilter(t *testing.T) {
+	pdgs := map[string]*Pdg{"a": ccTestPdg(20, 1), "b": ccTestPdg(20, 100)}
+	names := map[string]string{
+		"a": "github.com/example/project/pkg.Widget.aaaaaaa",
+		"b": "github.com/example/project/pkg.Widget.zzzzzzz",
+	}
+	if got := CCGraphClones(pdgs, names); len(got) != 0 {
+		t.Fatalf("package/receiver prefix admits unrelated names: %v", got)
+	}
+	matcher := newNameMatcher(ccNameRunes([]string{names["a"], names["b"]}))
+	runes := ccNameRunes([]string{names["a"], names["b"]})
+	if matcher.similar(runes[0], runes[1]) {
+		t.Fatal("optimized matcher admits unrelated qualified names")
+	}
+}
+
+func TestQualifiedNamesMatchAcrossPackagesAndReceivers(t *testing.T) {
+	pdgs := map[string]*Pdg{"a": ccTestPdg(20, 1), "b": ccTestPdg(20, 100)}
+	names := map[string]string{"a": "example.org/a.Reader.fetchData", "b": "other.net/b.Writer.fetchDatum"}
+	if got := CCGraphClones(pdgs, names); len(got) != 1 {
+		t.Fatalf("similar method names lost across packages: %v", got)
+	}
+}
+
+func TestASTBypassStillAdmitsDifferentQualifiedNames(t *testing.T) {
+	pdgs := map[string]*Pdg{"a": ccTestPdg(20, 1), "b": ccTestPdg(20, 100)}
+	names := map[string]string{"a": "example.org/pkg.A.aaaaaaa", "b": "example.org/pkg.B.zzzzzzz"}
+	shapes := map[string]map[string]int{"a": {"Return": 1, "Call": 2}, "b": {"Return": 1, "Call": 2}}
+	if got := CCGraphClonesWithAST(pdgs, names, shapes); len(got) != 1 {
+		t.Fatalf("AST bypass lost candidates: %v", got)
+	}
+}
+
 func TestCCGraphClonesEmpty(t *testing.T) {
 	if got := CCGraphClones(nil, nil); got != nil {
 		t.Fatalf("expected nil for nil input, got %v", got)

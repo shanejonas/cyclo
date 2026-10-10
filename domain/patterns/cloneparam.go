@@ -1,10 +1,7 @@
 package patterns
 
-// resolveCloneGroupFacts looks up the FuncFacts for a CCGraph clone group,
-// keeping group order and dropping members without PDGs (filtered from
-// mining, like rstyle's pdg: None).
-func resolveCloneGroupFacts(facts []*FuncFacts, group []string) []*FuncFacts {
-	factByID := buildFactMap(facts)
+// cloneGroupFacts resolves members through the shared corpus index.
+func cloneGroupFacts(factByID map[string]*FuncFacts, group []string) []*FuncFacts {
 	var fns []*FuncFacts
 	for _, id := range group {
 		if f := factByID[id]; f != nil && f.Pdg != nil {
@@ -54,11 +51,21 @@ func alignCloneGroup(fns []*FuncFacts, params Params) *Cluster {
 // Deterministic: group order is preserved, alignment is deterministic, and
 // the candidate construction sorts sites.
 func ParameterizeFromCloneGroup(facts []*FuncFacts, group []string, params Params) *Candidate {
+	return parameterizeCloneGroup(newCandidateIndex(facts, nil, params), group, params)
+}
+
+func parameterizeCloneGroup(ix *candidateIndex, group []string, params Params) *Candidate {
 	if len(group) < 2 {
 		return nil
 	}
-	fns := resolveCloneGroupFacts(facts, group)
+	fns := cloneGroupFacts(ix.byID, group)
 	if len(fns) < 2 {
+		return nil
+	}
+	// Safety: don't propose extracting helpers from functions with
+	// incompatible side-effect profiles. If one member does IO and another
+	// is pure, a shared helper would be wrong.
+	if !compatibleEffects(fns) {
 		return nil
 	}
 	cluster := alignCloneGroup(fns, params)
@@ -67,17 +74,39 @@ func ParameterizeFromCloneGroup(facts []*FuncFacts, group []string, params Param
 	}
 	// parameterize expects sites aligned with cluster.Members.
 	sites := sitesOf(fns, cluster)
-	ix := newCandidateIndex(facts, nil, params)
 	return parameterize(ix, sites, cluster)
+}
+
+// compatibleEffects reports whether all functions in the group have the same
+// side-effect profile (union of Call node Effects). Functions with wildly
+// different effects (e.g., one does IO, another is pure) should not share
+// an extracted helper.
+func compatibleEffects(fns []*FuncFacts) bool {
+	var first uint16
+	for i, f := range fns {
+		var union uint16
+		if f.Pdg != nil {
+			for _, n := range f.Pdg.Nodes {
+				union |= n.Effects
+			}
+		}
+		if i == 0 {
+			first = union
+		} else if union != first {
+			return false
+		}
+	}
+	return true
 }
 
 // CloneGroupParameterizeCandidates runs ParameterizeFromCloneGroup on every
 // CCGraph clone group, returning the parameterize candidates. Groups that
 // do not yield an abstraction are skipped.
 func CloneGroupParameterizeCandidates(facts []*FuncFacts, groups [][]string, params Params) []Candidate {
+	ix := newCandidateIndex(facts, nil, params)
 	var out []Candidate
 	for _, group := range groups {
-		if c := ParameterizeFromCloneGroup(facts, group, params); c != nil {
+		if c := parameterizeCloneGroup(ix, group, params); c != nil {
 			out = append(out, *c)
 		}
 	}

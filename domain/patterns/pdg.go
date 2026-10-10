@@ -68,6 +68,24 @@ const (
 	Ctrl EdgeKind = "ctrl"
 )
 
+// Effect bitflags for PdgNode.Effects. A Call node's effects describe the
+// callee's side effects (from domain/quality stdlib classification).
+// Non-Call nodes use EffectNone. Effects are NOT part of WL labels or
+// CCGraph filters — they inform the abstraction layer (alignment holes,
+// parameterize safety), not detection.
+const (
+	EffectNone    uint16 = 0
+	EffectMutates uint16 = 1 << 0
+	EffectIO      uint16 = 1 << 1
+	EffectNetwork uint16 = 1 << 2
+	EffectGlobal  uint16 = 1 << 3
+	EffectUnsafe  uint16 = 1 << 4
+	EffectTime    uint16 = 1 << 5
+	EffectRandom  uint16 = 1 << 6
+	EffectPanic   uint16 = 1 << 7
+	EffectUnknown uint16 = 1 << 8
+)
+
 // PdgNode mirrors rstyle's facts::PdgNode.
 type PdgNode struct {
 	Kind NodeKind
@@ -86,7 +104,12 @@ type PdgNode struct {
 	// Detail carries operator class ("cmp:=="), field name, etc. For Op nodes
 	// only the class before ':' is labeled; never the raw operator or name.
 	Detail string
-	Line   int
+	// Effects is the callee's side-effect bitflags (Call nodes only).
+	// Populated from domain/quality stdlib classification during extraction.
+	// Used by alignment hole detection and parameterize safety checks;
+	// never part of WL labels or CCGraph similarity.
+	Effects uint16
+	Line    int
 }
 
 // PdgEdge mirrors rstyle's facts::PdgEdge.

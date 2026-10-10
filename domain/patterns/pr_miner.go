@@ -177,17 +177,14 @@ func singleConsequents(p *callPostings, a string, listA []int, minCnt int) []Min
 // instead of a full scan. Triples below minSupport skip the intersection.
 func mineDoubleAntecedent(p *callPostings, sets []CallSet) []MinedRuleDef {
 	minCnt := minCountForSupport(p.total)
-	triples := countTriples(sets)
+	names, indices := frequentCallIndices(p)
+	triples := countTriples(sets, indices)
 	var rules []MinedRuleDef
 	for key, cntABC := range triples {
 		if cntABC < minCnt {
 			continue
 		}
-		parts := parseTripleKey(key)
-		if len(parts) != 3 {
-			continue
-		}
-		a, b, c := parts[0], parts[1], parts[2]
+		a, b, c := names[key[0]], names[key[1]], names[key[2]]
 		cntAB := intersectSize(p.lists[a], p.lists[b])
 		if r, ok := makeRuleFromCounts(len(sets), cntAB, cntABC, []string{a, b}, c); ok {
 			rules = append(rules, r)
@@ -299,42 +296,50 @@ func countCoOccur(sets []CallSet, items []string) int {
 	return count
 }
 
-func countTriples(sets []CallSet) map[string]int {
-	counts := map[string]int{}
-	for _, s := range sets {
-		var calls []string
-		for c := range s.Calls {
-			calls = append(calls, c)
+// frequentCallIndices assigns sorted integer IDs only to calls that can
+// meet support. A triple cannot occur more often than any of its members.
+func frequentCallIndices(p *callPostings) ([]string, map[string]int) {
+	var names []string
+	for name, list := range p.lists {
+		if len(list) >= minCountForSupport(p.total) {
+			names = append(names, name)
 		}
-		sort.Strings(calls)
-		addTriples(calls, counts)
+	}
+	sort.Strings(names)
+	indices := make(map[string]int, len(names))
+	for i, name := range names {
+		indices[name] = i
+	}
+	return names, indices
+}
+
+func countTriples(sets []CallSet, indices map[string]int) map[[3]int]int {
+	counts := map[[3]int]int{}
+	for _, set := range sets {
+		addTriples(indexedCalls(set, indices), counts)
 	}
 	return counts
 }
 
-// addTriples counts every ordered call triple in the sorted call list.
-func addTriples(calls []string, counts map[string]int) {
+func indexedCalls(set CallSet, indices map[string]int) []int {
+	var calls []int
+	for name := range set.Calls {
+		if i, ok := indices[name]; ok {
+			calls = append(calls, i)
+		}
+	}
+	sort.Ints(calls)
+	return calls
+}
+
+func addTriples(calls []int, counts map[[3]int]int) {
 	for i := 0; i < len(calls); i++ {
 		for j := i + 1; j < len(calls); j++ {
 			for k := j + 1; k < len(calls); k++ {
-				key := calls[i] + "\x00" + calls[j] + "\x00" + calls[k]
-				counts[key]++
+				counts[[3]int{calls[i], calls[j], calls[k]}]++
 			}
 		}
 	}
-}
-
-func parseTripleKey(key string) []string {
-	var parts []string
-	start := 0
-	for i := 0; i < len(key); i++ {
-		if key[i] == 0 {
-			parts = append(parts, key[start:i])
-			start = i + 1
-		}
-	}
-	parts = append(parts, key[start:])
-	return parts
 }
 
 // MinedRuleCandidates converts violations to pattern candidates.

@@ -62,33 +62,25 @@ func FindBarrierSlices(facts []*FuncFacts) []BarrierSliceFinding {
 // is large.
 func barrierSlicesForFunc(f *FuncFacts) []BarrierSliceFinding {
 	var out []BarrierSliceFinding
-	barriers := tryBarriers(f.Pdg)
+	barriers := make([]bool, len(f.Pdg.Nodes))
+	for i, n := range f.Pdg.Nodes {
+		barriers[i] = n.Kind == Try
+	}
+	traversal := newReturnTraversal(f.Pdg, false)
 	for i, n := range f.Pdg.Nodes {
 		if n.Kind != Return {
 			continue
 		}
-		slice := BarrierSlice(f.Pdg, i, barriers)
-		if len(slice) >= minBarrierSliceNodes {
+		size := traversal.size(i, barriers)
+		if size >= minBarrierSliceNodes {
 			out = append(out, BarrierSliceFinding{
 				FuncID:    f.ID,
-				SliceSize: len(slice),
+				SliceSize: size,
 				SeedLine:  n.Line,
 			})
 		}
 	}
 	return out
-}
-
-// tryBarriers returns the set of Try node indices (error-handling idiom
-// nodes) to use as barriers.
-func tryBarriers(pdg *Pdg) map[int]bool {
-	barriers := map[int]bool{}
-	for i, n := range pdg.Nodes {
-		if n.Kind == Try {
-			barriers[i] = true
-		}
-	}
-	return barriers
 }
 
 // FindThinSlices computes the thin (producer-only) slice from each return
@@ -108,15 +100,17 @@ func FindThinSlices(facts []*FuncFacts) []ThinSliceFinding {
 // statement in one function, flagging returns with a long producer chain.
 func thinSlicesForFunc(f *FuncFacts) []ThinSliceFinding {
 	var out []ThinSliceFinding
+	traversal := newReturnTraversal(f.Pdg, true)
+	blocked := make([]bool, len(f.Pdg.Nodes))
 	for i, n := range f.Pdg.Nodes {
 		if n.Kind != Return {
 			continue
 		}
-		slice := ThinSlice(f.Pdg, i)
-		if len(slice) >= minThinSliceNodes {
+		size := traversal.size(i, blocked)
+		if size >= minThinSliceNodes {
 			out = append(out, ThinSliceFinding{
 				FuncID:    f.ID,
-				SliceSize: len(slice),
+				SliceSize: size,
 				SeedLine:  n.Line,
 			})
 		}
@@ -144,18 +138,54 @@ func FindChops(facts []*FuncFacts) []ChopFinding {
 	return out
 }
 
-// paramToReturnChop unions the chop from every param to every return.
+// paramToReturnChop unions all param-to-return chops. Distributing the
+// union over intersection gives reachability from any parameter intersected
+// with reachability to any return, so two traversals replace all pair scans.
 func paramToReturnChop(pdg *Pdg) map[int]bool {
 	params, returns := paramReturnIndices(pdg)
 	union := map[int]bool{}
-	for _, src := range params {
-		for _, sink := range returns {
-			for _, n := range Chop(pdg, src, sink) {
-				union[n] = true
-			}
+	if len(params) == 0 || len(returns) == 0 {
+		return union
+	}
+	forward, backward := dependenceAdjacency(pdg)
+	fwd := reachFrom(forward, params)
+	bwd := reachFrom(backward, returns)
+	for n, reached := range fwd {
+		if reached && bwd[n] {
+			union[n] = true
 		}
 	}
 	return union
+}
+
+func dependenceAdjacency(pdg *Pdg) ([][]int, [][]int) {
+	forward := make([][]int, len(pdg.Nodes))
+	backward := make([][]int, len(pdg.Nodes))
+	for _, e := range pdg.Edges {
+		forward[e.From] = append(forward[e.From], e.To)
+		backward[e.To] = append(backward[e.To], e.From)
+	}
+	return forward, backward
+}
+
+func reachFrom(adjacency [][]int, seeds []int) []bool {
+	seen := make([]bool, len(adjacency))
+	queue := make([]int, 0, len(adjacency))
+	for _, seed := range seeds {
+		if !seen[seed] {
+			seen[seed] = true
+			queue = append(queue, seed)
+		}
+	}
+	for head := 0; head < len(queue); head++ {
+		for _, next := range adjacency[queue[head]] {
+			if !seen[next] {
+				seen[next] = true
+				queue = append(queue, next)
+			}
+		}
+	}
+	return seen
 }
 
 // paramReturnIndices collects the node indices of parameters and returns.

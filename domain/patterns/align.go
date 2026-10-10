@@ -23,24 +23,24 @@ const (
 	HoleLiteral HoleKind = "literal"
 	HoleField   HoleKind = "field"
 	HoleOp      HoleKind = "op"
+	HoleEffect  HoleKind = "effect"
 )
 
-// Prefix is the hole variable prefix of the kind: T, M, F, L, D, O.
+// Prefix is the hole variable prefix of the kind: T, M, F, L, D, O, E.
 func (k HoleKind) Prefix() byte {
-	switch k {
-	case HoleType:
-		return 'T'
-	case HoleMethod:
-		return 'M'
-	case HoleFreeFn:
-		return 'F'
-	case HoleLiteral:
-		return 'L'
-	case HoleField:
-		return 'D'
-	default:
-		return 'O'
+	if p, ok := holeKindPrefixes[k]; ok {
+		return p
 	}
+	return 'O'
+}
+
+var holeKindPrefixes = map[HoleKind]byte{
+	HoleType:    'T',
+	HoleMethod:  'M',
+	HoleFreeFn:  'F',
+	HoleLiteral: 'L',
+	HoleField:   'D',
+	HoleEffect:  'E',
 }
 
 // HoleVar is the variable name of the index-th hole of a kind: T0, M1, ...
@@ -588,6 +588,50 @@ func typeDiffs(a, b *PdgNode) []holeDiff {
 	return []holeDiff{{HoleType, a.TyClass, b.TyClass}}
 }
 
+// effectDiff reports when two aligned Call nodes have different side-effect
+// profiles. Effect differences are holes: the abstraction must account for
+// what each side does, not just what it calls.
+func effectDiff(a, b *PdgNode) (holeDiff, bool) {
+	if a.Kind != Call || b.Kind != Call {
+		return holeDiff{}, false
+	}
+	if a.Effects == b.Effects {
+		return holeDiff{}, false
+	}
+	return holeDiff{HoleEffect, effectName(a.Effects), effectName(b.Effects)}, true
+}
+
+// effectName renders effect bitflags for hole display.
+func effectName(e uint16) string {
+	if e == EffectNone {
+		return "pure"
+	}
+	var parts []string
+	for _, ef := range effectFlagNames {
+		if e&ef.bit != 0 {
+			parts = append(parts, ef.name)
+		}
+	}
+	return strings.Join(parts, "|")
+}
+
+type effectFlagName struct {
+	bit  uint16
+	name string
+}
+
+var effectFlagNames = []effectFlagName{
+	{EffectMutates, "mutates"},
+	{EffectIO, "io"},
+	{EffectNetwork, "network"},
+	{EffectGlobal, "global"},
+	{EffectUnsafe, "unsafe"},
+	{EffectTime, "time"},
+	{EffectRandom, "random"},
+	{EffectPanic, "panic"},
+	{EffectUnknown, "unknown"},
+}
+
 // nodeDiffs collects every hole between two aligned nodes.
 func nodeDiffs(a, b *PdgNode) []holeDiff {
 	var out []holeDiff
@@ -595,6 +639,9 @@ func nodeDiffs(a, b *PdgNode) []holeDiff {
 		out = append(out, d)
 	}
 	if d, ok := textDiff(a, b); ok {
+		out = append(out, d)
+	}
+	if d, ok := effectDiff(a, b); ok {
 		out = append(out, d)
 	}
 	return append(out, typeDiffs(a, b)...)
@@ -730,7 +777,7 @@ func steps(c *ctx, levelCtxs []*ctx, v Variant) []step {
 }
 
 // alignVariant runs the pipeline and scores the final matching.
-func alignVariant(c *ctx, v Variant) (Alignment, []Stage) {
+func alignVariant(c *ctx, v Variant, record bool) (Alignment, []Stage) {
 	depth := len(c.wa.rounds)
 	if l := c.levelsUsed(); l < depth {
 		depth = l
@@ -746,9 +793,11 @@ func alignVariant(c *ctx, v Variant) (Alignment, []Stage) {
 	var stages []Stage
 	for _, s := range steps(c, levelCtxs, v) {
 		m = s.run(m)
-		stages = append(stages, Stage{Name: s.name, Pairs: m.pairs()})
+		if record {
+			stages = append(stages, Stage{Name: s.name, Pairs: m.pairs()})
+		}
 	}
-	pairs := stages[len(stages)-1].Pairs
+	pairs := m.pairs()
 	larger := max(len(c.ca), len(c.cb), 1)
 	return Alignment{
 		Pairs:         pairs,
@@ -759,16 +808,16 @@ func alignVariant(c *ctx, v Variant) (Alignment, []Stage) {
 
 // Align aligns two PDGs: the default (Baseline) pipeline variant.
 func Align(pa *Pdg, wa *Wl, pb *Pdg, wb *Wl) Alignment {
-	al, _ := AlignStaged(pa, wa, pb, wb)
+	al, _ := alignVariant(newCtx(pa, wa, pb, wb), Baseline, false)
 	return al
 }
 
 // AlignStaged is Align, also reporting the matching after every step.
 func AlignStaged(pa *Pdg, wa *Wl, pb *Pdg, wb *Wl) (Alignment, []Stage) {
-	return alignVariant(newCtx(pa, wa, pb, wb), Baseline)
+	return alignVariant(newCtx(pa, wa, pb, wb), Baseline, true)
 }
 
 // AlignVariant runs one pipeline variant, for the ablation.
 func AlignVariant(pa *Pdg, wa *Wl, pb *Pdg, wb *Wl, v Variant) (Alignment, []Stage) {
-	return alignVariant(newCtx(pa, wa, pb, wb), v)
+	return alignVariant(newCtx(pa, wa, pb, wb), v, true)
 }
