@@ -28,7 +28,7 @@ const (
 // suspiciously divergent pair: members similar enough to be clones
 // (>= inconsistentMinSim) but different enough to suggest inconsistent
 // changes (< inconsistentDivergent).
-func FindInconsistentClones(groups [][]string, pdgs map[string]*Pdg) [][]string {
+func FindInconsistentClones(groups [][]string, pdgs map[string]*MiningGraph) [][]string {
 	var out [][]string
 	for _, group := range groups {
 		if hasDivergentPair(group, pdgs) {
@@ -40,7 +40,7 @@ func FindInconsistentClones(groups [][]string, pdgs map[string]*Pdg) [][]string 
 
 // hasDivergentPair reports whether any pair in the group falls in the
 // suspicious similarity band.
-func hasDivergentPair(group []string, pdgs map[string]*Pdg) bool {
+func hasDivergentPair(group []string, pdgs map[string]*MiningGraph) bool {
 	wls := buildGroupWls(group, pdgs)
 	for i := 0; i < len(group); i++ {
 		for j := i + 1; j < len(group); j++ {
@@ -64,7 +64,7 @@ func isDivergentPair(a, b string, wls map[string]*Wl) bool {
 }
 
 // buildGroupWls builds WL vectors for group members that have PDGs.
-func buildGroupWls(group []string, pdgs map[string]*Pdg) map[string]*Wl {
+func buildGroupWls(group []string, pdgs map[string]*MiningGraph) map[string]*Wl {
 	out := make(map[string]*Wl, len(group))
 	for _, id := range group {
 		if pdg := pdgs[id]; pdg != nil {
@@ -76,7 +76,7 @@ func buildGroupWls(group []string, pdgs map[string]*Pdg) map[string]*Wl {
 
 // InconsistentCloneCandidates converts divergent CCGraph groups into pattern
 // candidates for the report pipeline.
-func InconsistentCloneCandidates(groups [][]string, facts []*FuncFacts) []Candidate {
+func InconsistentCloneCandidates(groups [][]string, facts []*MiningFacts) []Candidate {
 	factByID := buildFactMap(facts)
 	var out []Candidate
 	for _, group := range groups {
@@ -89,7 +89,7 @@ func InconsistentCloneCandidates(groups [][]string, facts []*FuncFacts) []Candid
 
 // makeInconsistentCandidate builds one candidate from a divergent group.
 // Groups with fewer than two resolvable sites are dropped.
-func makeInconsistentCandidate(group []string, factByID map[string]*FuncFacts) (Candidate, bool) {
+func makeInconsistentCandidate(group []string, factByID map[string]*MiningFacts) (Candidate, bool) {
 	var sites []Site
 	for _, id := range group {
 		f := factByID[id]

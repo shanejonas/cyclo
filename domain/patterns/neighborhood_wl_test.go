@@ -33,7 +33,7 @@ func TestNeighborhoodWLGappedClones(t *testing.T) {
 	fb := NewWl(base)
 	cases := []struct {
 		name string
-		pdg  *Pdg
+		pdg  *MiningGraph
 	}{
 		{"identical", gapBase()},
 		{"minus1", dropNode(base, 7)},
@@ -52,7 +52,7 @@ func TestNeighborhoodWLGappedClones(t *testing.T) {
 // 900 match threshold.
 func TestNeighborhoodWLUnrelatedLow(t *testing.T) {
 	a := NewNeighborhoodWL(gapBase())
-	b := NewNeighborhoodWL(&Pdg{
+	b := NewNeighborhoodWL(&MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: Param, TyClass: "int", Line: 1},
 			{Kind: Lit, LitKind: "int", Line: 2},
@@ -73,7 +73,7 @@ func TestNeighborhoodWLUnrelatedLow(t *testing.T) {
 // TestNeighborhoodWLPipelineRuns exercises the neighborhood-WL entry point end to end on a tiny
 // corpus: two identical functions must group together.
 func TestNeighborhoodWLPipelineRuns(t *testing.T) {
-	pdgs := map[string]*Pdg{
+	pdgs := map[string]*MiningGraph{
 		"a": gapBase(),
 		"b": gapBase(),
 	}

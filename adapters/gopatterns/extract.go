@@ -1,12 +1,6 @@
-// Package gopatterns extracts rstyle-schema program-dependence graphs from Go
-// functions. It is the Phase 1 foundation of the patterns-miner port: the PDG
-// extractor whose output feeds the (Phase 2) normalize → WL → cluster → align
-// → candidates pipeline.
-//
-// Unlike adapters/goquality (quality policy facts), this package produces
-// structural dependence graphs for abstraction mining. It is intentionally
-// decoupled from goquality: different schema, different selection needs, and
-// Phase 1 must not touch existing quality paths.
+// Package gopatterns extracts the shared native PDG IR from typed Go source.
+// Cyclo's abstraction labels live in interned profile metadata. Pattern mining
+// derives its temporary view from this graph through domain/patterns.Run.
 package gopatterns
 
 import (
@@ -20,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/shanejonas/cyclo/domain/patterns"
+	"github.com/shanejonas/cyclo/domain/pdg"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -33,7 +28,7 @@ type FuncPdg struct {
 	// SuppressedKinds are pattern kinds suppressed via //lint:ignore or
 	// // cyclo-allow on this function.
 	SuppressedKinds []string
-	Pdg             patterns.Pdg
+	Pdg             pdg.Graph
 	// AstTypes is the multiset of AST node type names for the function
 	// body (see patterns.AstNodeMultiset). Used by the CCGraph Stage 0
 	// AST pre-filter.
@@ -111,8 +106,13 @@ func Extract(ctx context.Context, root string, paths []string) (*Extraction, err
 		return nil, err
 	}
 	out := &Extraction{}
+	pool := pdg.NewBuilder()
 	for _, pkg := range pkgs {
-		out.Funcs = append(out.Funcs, packagePdgs(pkg, abs)...)
+		funcs, err := packagePdgs(pkg, abs, pool)
+		if err != nil {
+			return nil, err
+		}
+		out.Funcs = append(out.Funcs, funcs...)
 		out.AnemicModels = append(out.AnemicModels, findAnemicModels(pkg, abs)...)
 		out.MissingIdentities = append(out.MissingIdentities, findMissingIdentities(pkg, abs)...)
 		out.DomainServices = append(out.DomainServices, findDomainServices(pkg, abs)...)
@@ -149,28 +149,44 @@ func loadPatternPackages(ctx context.Context, dir string, query []string) ([]*pa
 	return pkgs, nil
 }
 
-func packagePdgs(pkg *packages.Package, root string) []FuncPdg {
-	out := []FuncPdg{}
+func packagePdgs(pkg *packages.Package, root string, pool *pdg.Builder) ([]FuncPdg, error) {
+	var out []FuncPdg
 	ctx := newExtractCtx(pkg, root)
+	ctx.pool = pool
 	for _, file := range pkg.Syntax {
-		filename := pkg.Fset.PositionFor(file.Pos(), false).Filename
-		rel, err := filepath.Rel(root, filename)
+		funcs, err := filePdgs(pkg, file, root, ctx)
 		if err != nil {
+			return nil, err
+		}
+		out = append(out, funcs...)
+	}
+	return out, nil
+}
+
+func filePdgs(pkg *packages.Package, file *ast.File, root string, ctx extractCtx) ([]FuncPdg, error) {
+	filename := pkg.Fset.PositionFor(file.Pos(), false).Filename
+	rel, err := filepath.Rel(root, filename)
+	if err != nil {
+		return nil, fmt.Errorf("PDG source path: %w", err)
+	}
+	var out []FuncPdg
+	for _, decl := range file.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Body == nil {
 			continue
 		}
-		for _, decl := range file.Decls {
-			fn, ok := decl.(*ast.FuncDecl)
-			if !ok || fn.Body == nil {
-				continue
-			}
-			out = append(out, extractFunc(pkg, fn, filepath.ToSlash(rel), ctx))
+		graph, err := extractFunc(pkg, fn, filepath.ToSlash(rel), ctx)
+		if err != nil {
+			return nil, err
 		}
+		out = append(out, graph)
 	}
-	return out
+	return out, nil
 }
 
 // extractCtx carries per-package maps for entity pairing.
 type extractCtx struct {
+	pool       *pdg.Builder
 	structLocs map[string]structLoc
 	mutated    map[string]bool
 }
@@ -235,14 +251,18 @@ func patternInput(root, input string) (string, error) {
 func SigKeyOf(fp FuncPdg) string {
 	var params []string
 	for _, node := range fp.Pdg.Nodes {
-		if node.Kind == patterns.Param {
-			params = append(params, node.TyClass)
+		if node.MatchLabel == 0 {
+			continue
+		}
+		label := fp.Pdg.Tables.MatchLabels[node.MatchLabel-1]
+		if fp.Pdg.Tables.Text(label.Kind) == string(patterns.Param) {
+			params = append(params, fp.Pdg.Tables.Text(label.TypeClass))
 		}
 	}
 	return "fn(" + strings.Join(params, ",") + ")"
 }
 
-func extractFunc(pkg *packages.Package, fn *ast.FuncDecl, path string, ctx extractCtx) FuncPdg {
+func extractFunc(pkg *packages.Package, fn *ast.FuncDecl, path string, ctx extractCtx) (FuncPdg, error) {
 	name := fn.Name.Name
 	selfTy := ""
 	if object, ok := pkg.TypesInfo.Defs[fn.Name].(*types.Func); ok {
@@ -251,20 +271,17 @@ func extractFunc(pkg *packages.Package, fn *ast.FuncDecl, path string, ctx extra
 	}
 	pos := pkg.Fset.PositionFor(fn.Pos(), false)
 	end := pkg.Fset.PositionFor(fn.End(), false)
-	b := &builder{
-		info:  pkg.TypesInfo,
-		fset:  pkg.Fset,
-		binds: map[types.Object]int{},
+	graph, err := buildGraph(pkg, fn, path, ctx.pool)
+	if err != nil {
+		return FuncPdg{}, err
 	}
-	b.params(fn)
-	b.stmt(fn.Body)
 	return FuncPdg{
 		Name:            name,
 		Path:            path,
 		Line:            pos.Line,
 		EndLine:         end.Line,
 		SuppressedKinds: findSuppressedKinds(fn),
-		Pdg:             patterns.Pdg{Nodes: b.nodes, Edges: b.edges},
+		Pdg:             graph,
 		AstTypes:        patterns.AstNodeMultiset(fn),
 		SelfTy:          selfTy,
 		GuardClauses:    findGuardClauses(fn, pkg.Fset),
@@ -301,7 +318,7 @@ func extractFunc(pkg *packages.Package, fn *ast.FuncDecl, path string, ctx extra
 		TypedNilHits: findTypedNilHits(fn, pkg.Fset, pkg.TypesInfo),
 		// ErrorCheckSites tracks per-call error checking for deviant_behavior.
 		ErrorCheckSites: findErrorCheckSites(fn, pkg.Fset, pkg.TypesInfo),
-	}
+	}, nil
 }
 
 // primitiveParams returns the function's basic-typed parameters as
@@ -346,13 +363,14 @@ type loopCtx struct {
 // (first binding wins, like rstyle): a variable use resolves to its
 // declaration/parameter/loop-variable node.
 type builder struct {
-	info  *types.Info
-	fset  *token.FileSet
-	nodes []patterns.PdgNode
-	edges []patterns.PdgEdge
-	binds map[types.Object]int
-	ctrl  []ctrlFrame
-	loops []loopCtx
+	info      *types.Info
+	fset      *token.FileSet
+	ir        *irBuilder
+	origin    ast.Node
+	parameter int
+	binds     map[types.Object]int
+	ctrl      []ctrlFrame
+	loops     []loopCtx
 }
 
 // none is returned by expr when an expression produces no PDG node
@@ -365,11 +383,10 @@ func (b *builder) line(pos token.Pos) int {
 
 // node appends a node, wiring a Ctrl edge from the enclosing control owner.
 func (b *builder) node(n patterns.PdgNode) int {
-	index := len(b.nodes)
-	b.nodes = append(b.nodes, n)
+	index := b.matchingNode(n)
 	if len(b.ctrl) > 0 {
 		top := b.ctrl[len(b.ctrl)-1]
-		b.edges = append(b.edges, patterns.PdgEdge{From: top.owner, To: index, Kind: patterns.Ctrl, ArgPos: top.arm})
+		b.ir.miningEdge(top.owner, index, top.arm, pdg.ControlEdge)
 	}
 	return index
 }
@@ -378,7 +395,7 @@ func (b *builder) data(from, to, pos int) {
 	if from == none {
 		return
 	}
-	b.edges = append(b.edges, patterns.PdgEdge{From: from, To: to, Kind: patterns.Data, ArgPos: pos})
+	b.ir.miningEdge(from, to, pos, pdg.Data)
 }
 
 func (b *builder) under(owner, arm int, f func()) {

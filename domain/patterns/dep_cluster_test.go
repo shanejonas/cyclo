@@ -4,7 +4,7 @@ import "testing"
 
 func TestStronglyConnectedBasic(t *testing.T) {
 	// 0 -> 1 -> 2 -> 0 (cycle), 3 isolated.
-	pdg := &Pdg{
+	pdg := &MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: "Op", Line: 1},
 			{Kind: "Op", Line: 2},
@@ -28,7 +28,7 @@ func TestStronglyConnectedBasic(t *testing.T) {
 
 func TestStronglyConnectedNoCycle(t *testing.T) {
 	// 0 -> 1 -> 2 (no cycle): no SCCs of size 2+.
-	pdg := &Pdg{
+	pdg := &MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: "Op", Line: 1},
 			{Kind: "Op", Line: 2},

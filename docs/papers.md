@@ -9,8 +9,8 @@ PDG extractor) unlocks.
 
 | Paper | Year | Venue | Pattern kind | Fidelity |
 |---|---|---|---|---|
-| Zou et al. (CCGraph) | 2020 | ASE | `ccgraph_clone` | Exact |
-| Gabel, Jiang, Su | 2008 | ICSE | LSH layer in CCGraph | Adapted |
+| Zou et al. (CCGraph) | 2020 | ASE | `ccgraph_clone` | Adapted |
+| Gabel, Jiang, Su | 2008 | ICSE | Removed LSH adaptation | Not implemented |
 | Li et al. (CP-Miner) | 2004 | OSDI | `inconsistent_clone` | Adapted |
 | Li & Zhou (PR-Miner) | 2005 | FSE | `mined_rule` | Adapted |
 | Engler et al. | 2001 | SOSP | `deviant_behavior` | Inspired by |
@@ -24,9 +24,11 @@ PDG extractor) unlocks.
 | Bulychev & Minea (Anti-unification) | 2008 | — | `parameterize` fixer | Exact |
 
 **Fidelity levels:**
+
 - **Exact:** Implemented as the paper describes, with paper's thresholds/parameters.
 - **Adapted:** Core idea from the paper, modified for cyclo's architecture or Go.
 - **Inspired by:** Paper motivated the approach; implementation differs significantly.
+- **Not implemented:** No current implementation of the paper; any removed adaptation is documented below.
 
 ---
 
@@ -43,49 +45,28 @@ graph matching via the Weisfeiler-Lehman (WL) graph kernel, plus a two-stage
 filtering strategy using characteristic vectors to prune candidates before the
 expensive kernel computation.
 
-**The pipeline (from the paper):**
-1. **Characteristic vectors** (7-dimensional PDG numerical features) → cosine similarity ≥ **0.9**
-2. **Jaro-Winkler** string similarity on function or method names, excluding import paths and receiver names → ratio ≥ **0.5**
-3. **WL vectors** (512-dim) → locality-sensitive hashing for candidate clustering
-4. **WL graph kernel** similarity → threshold **0.9** for final clone verdict
+**The current pipeline in cyclo (adapted from the paper):**
 
-**How cyclo implements it:** Exact. All three thresholds match the paper:
-- `charVecThreshold = 0.9` ("we set a threshold of 0.9 for numerical similarity filtering")
-- `ccStage2NameThreshold = 0.5` ("we only filter those PDG pairs which Jaro-Winkler distance ratio less than 0.5")
-- `ccMatchThreshold = 900` (0.9, "we verify the two PDGs are code clones when their similarity is greater than or equal to 0.9")
+1. Build nine numerical PDG features: declaration, assignment, control, call and other node counts; control, data and execution edge counts; and reference-binding count.
+2. Admit a pair when feature cosine similarity is ≥ **0.9**, or short function-name Jaro-Winkler similarity is ≥ **0.5**. Missing source features or names permit conservative admission. The report route also admits pairs through its AST similarity bypass.
+3. Build light WL summaries for functions in admitted pairs. Retain histograms and node counts, without refinement history or graph adjacency.
+4. Verify **every admitted pair** with the WL kernel at ≥ **900/1000**, then group accepted pairs by connected components. There is no LSH stage or 512-dimensional retrieval vector.
 
-**What cyclo added beyond the paper:**
-- Parallelized pairwise stages (Jaro-Winkler filter and WL kernel verification) across `runtime.NumCPU()` workers
-- Slice-indexed inner loops (eliminated per-pair map lookups)
-- Hardware `math.Sqrt` replacing a custom Newton-method sqrt in cosine similarity
-- The paper's order is preserved exactly — parallelism doesn't change results
+**Fidelity:** Adapted. Admission uses numerical match OR name fallback. Full
+parameter strings, size filters, and the paper's exact matching policies are not
+yet reproduced. Go reference bindings and approximate must-precede execution
+edges supply two of the numerical features. See [the source audit](pdg/paper-audit.md)
+and [the profile contract](pdg/ccgraph-profile.md). These local policies do not
+establish compat conformance or reproduction of the original paper.
 
-**In cyclo:** `ccgraph_clone` pattern kind. `domain/patterns/ccgraph.go`, `domain/patterns/wl.go`, `domain/patterns/lsh.go`.
+**What cyclo adds:** AST bypass, parallel pair checks, shared IR label hashes,
+cached vector norms, a safe WL upper bound, and bounded match batches. These
+additions are separate from the paper's algorithm. Removing LSH retains these
+filters; it does not enable exhaustive matching over all usable functions.
+
+**In cyclo:** `ccgraph_clone` pattern kind. `domain/patterns/ccgraph.go`, `domain/patterns/wl.go`.
 
 **Note:** CCGraph replaced cyclo's earlier `semantic_clone` implementation (Komondoor & Horwitz style BFS subgraph enumeration), which caused 6-minute/4GB hangs on large codebases. The old code is deleted.
-
----
-
-### LSH-Vectorized Clone Discovery — Gabel, Jiang & Su, ICSE 2008
-
-**Paper:** "Scalable detection of semantic clones"
-**DOI:** 10.1145/1368088.1368132
-
-**The insight:** Subgraph isomorphism is too slow at repository scale. Map each PDG
-subgraph to a characteristic vector (capturing node labels + structural context),
-then cluster vectors with locality-sensitive hashing. Similar vectors land in the
-same buckets without O(n²) pairwise comparison. Finds Type-4 (semantic) clones —
-code that's semantically equivalent but syntactically different.
-
-**How cyclo uses it:** The LSH layer inside CCGraph. After the two-stage filter,
-WL histograms are vectorized to 512 dimensions and clustered with LSH (16 tables,
-4 hashes, deterministic seed). Only bucket-mates get the expensive WL kernel
-verification.
-
-**Fidelity:** Adapted. Gabel's paper is about the vectorization approach generally;
-cyclo uses it as CCGraph's scaling layer specifically.
-
-**In cyclo:** `domain/patterns/lsh.go`. Referenced in `ccgraph.go` as "Scaling layer (Gabel et al.)".
 
 ---
 
@@ -331,6 +312,24 @@ as tainted, propagate to fixpoint, flag sinks with tainted dangerous args.
 ---
 
 ## Removed
+
+### LSH Adaptation — Gabel, Jiang & Su, ICSE 2008
+
+**Paper:** "Scalable detection of semantic clones"
+**DOI:** 10.1145/1368088.1368132
+
+**The insight:** Select meaningful PDG subgraphs, map them to AST forests, and
+use DECKARD vectors and size-partitioned LSH near-neighbor search. This is not
+whole-function WL vectorization. Sources: [Gabel §2.2–3.3](https://web.cs.ucdavis.edu/~su/publications/icse08-clone.pdf)
+and [DECKARD §3.3](https://web.cs.ucdavis.edu/~su/publications/icse07.pdf).
+
+**Status in cyclo:** Removed. The former whole-function WL/sign-hash adaptation
+expanded collisions into connected components and provided no pruning on the
+measured corpora. Clone detection now verifies every characteristic/name/AST-admitted
+pair with WL, without LSH. This is not a Gabel implementation.
+See the historical [LSH audit](pdg/lsh-audit.md) and [tuning results](pdg/lsh-tuning.md).
+
+---
 
 ### Semantic Clones via BFS Enumeration — Komondoor & Horwitz, SAS 2001
 

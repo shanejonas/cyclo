@@ -8,7 +8,7 @@ type returnTraversal struct {
 	queue    []int
 }
 
-func newReturnTraversal(pdg *Pdg, thin bool) *returnTraversal {
+func newReturnTraversal(pdg *MiningGraph, thin bool) *returnTraversal {
 	backward := make([][]int, len(pdg.Nodes))
 	for _, e := range pdg.Edges {
 		if thin && (e.Kind != Data || !isProducer(pdg.Nodes[e.From])) {

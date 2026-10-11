@@ -66,7 +66,7 @@ func TestAnemicModelWiredIntoRun(t *testing.T) {
 		EndLine:  8,
 		Funcs:    []string{"AddItem", "RemoveItem", "Checkout"},
 	}}
-	report := Run(nil, Options{AnemicModels: hits})
+	report := RunMining(nil, Options{AnemicModels: hits})
 	found := false
 	for _, c := range report.Candidates {
 		if c.Kind == AnemicModel {
@@ -90,7 +90,7 @@ func TestRunEmitsNoDuplicateCandidates(t *testing.T) {
 		EndLine:  8,
 		Funcs:    []string{"AddItem", "RemoveItem", "Checkout"},
 	}}
-	report := Run(nil, Options{AnemicModels: hits})
+	report := RunMining(nil, Options{AnemicModels: hits})
 	// Exact check: one hit in, one candidate out for anemic_model.
 	anemic := 0
 	for _, c := range report.Candidates {

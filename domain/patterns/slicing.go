@@ -46,7 +46,7 @@ type ChopFinding struct {
 // using Try nodes (the `if err != nil { return err }` idiom) as barriers.
 // This shows the happy-path dependencies of each return, excluding error
 // handling. Flags functions where any return's slice is large.
-func FindBarrierSlices(facts []*FuncFacts) []BarrierSliceFinding {
+func FindBarrierSlices(facts []*MiningFacts) []BarrierSliceFinding {
 	var out []BarrierSliceFinding
 	for _, f := range facts {
 		if f == nil || f.Pdg == nil {
@@ -60,7 +60,7 @@ func FindBarrierSlices(facts []*FuncFacts) []BarrierSliceFinding {
 // barrierSlicesForFunc computes the barrier slice from each return statement
 // in one function, flagging returns whose slice (excluding error handling)
 // is large.
-func barrierSlicesForFunc(f *FuncFacts) []BarrierSliceFinding {
+func barrierSlicesForFunc(f *MiningFacts) []BarrierSliceFinding {
 	var out []BarrierSliceFinding
 	barriers := make([]bool, len(f.Pdg.Nodes))
 	for i, n := range f.Pdg.Nodes {
@@ -85,7 +85,7 @@ func barrierSlicesForFunc(f *FuncFacts) []BarrierSliceFinding {
 
 // FindThinSlices computes the thin (producer-only) slice from each return
 // statement. Flags functions where any return's producer chain is long.
-func FindThinSlices(facts []*FuncFacts) []ThinSliceFinding {
+func FindThinSlices(facts []*MiningFacts) []ThinSliceFinding {
 	var out []ThinSliceFinding
 	for _, f := range facts {
 		if f == nil || f.Pdg == nil {
@@ -98,7 +98,7 @@ func FindThinSlices(facts []*FuncFacts) []ThinSliceFinding {
 
 // thinSlicesForFunc computes the thin (producer-only) slice from each return
 // statement in one function, flagging returns with a long producer chain.
-func thinSlicesForFunc(f *FuncFacts) []ThinSliceFinding {
+func thinSlicesForFunc(f *MiningFacts) []ThinSliceFinding {
 	var out []ThinSliceFinding
 	traversal := newReturnTraversal(f.Pdg, true)
 	blocked := make([]bool, len(f.Pdg.Nodes))
@@ -121,7 +121,7 @@ func thinSlicesForFunc(f *FuncFacts) []ThinSliceFinding {
 // FindChops computes the chop from function parameters to return statements
 // (the statements on the input-to-output dependence path). Flags functions
 // where the chop is large.
-func FindChops(facts []*FuncFacts) []ChopFinding {
+func FindChops(facts []*MiningFacts) []ChopFinding {
 	var out []ChopFinding
 	for _, f := range facts {
 		if f == nil || f.Pdg == nil {
@@ -141,7 +141,7 @@ func FindChops(facts []*FuncFacts) []ChopFinding {
 // paramToReturnChop unions all param-to-return chops. Distributing the
 // union over intersection gives reachability from any parameter intersected
 // with reachability to any return, so two traversals replace all pair scans.
-func paramToReturnChop(pdg *Pdg) map[int]bool {
+func paramToReturnChop(pdg *MiningGraph) map[int]bool {
 	params, returns := paramReturnIndices(pdg)
 	union := map[int]bool{}
 	if len(params) == 0 || len(returns) == 0 {
@@ -158,7 +158,7 @@ func paramToReturnChop(pdg *Pdg) map[int]bool {
 	return union
 }
 
-func dependenceAdjacency(pdg *Pdg) ([][]int, [][]int) {
+func dependenceAdjacency(pdg *MiningGraph) ([][]int, [][]int) {
 	forward := make([][]int, len(pdg.Nodes))
 	backward := make([][]int, len(pdg.Nodes))
 	for _, e := range pdg.Edges {
@@ -189,7 +189,7 @@ func reachFrom(adjacency [][]int, seeds []int) []bool {
 }
 
 // paramReturnIndices collects the node indices of parameters and returns.
-func paramReturnIndices(pdg *Pdg) (params, returns []int) {
+func paramReturnIndices(pdg *MiningGraph) (params, returns []int) {
 	for i, n := range pdg.Nodes {
 		switch n.Kind {
 		case Param:
@@ -203,7 +203,7 @@ func paramReturnIndices(pdg *Pdg) (params, returns []int) {
 
 // BarrierSliceCandidates converts barrier slice findings to candidates.
 // Detection-only: FixSpec is nil.
-func BarrierSliceCandidates(findings []BarrierSliceFinding, facts []*FuncFacts) []Candidate {
+func BarrierSliceCandidates(findings []BarrierSliceFinding, facts []*MiningFacts) []Candidate {
 	factByID := buildFactMap(facts)
 	var out []Candidate
 	for _, fl := range findings {
@@ -230,7 +230,7 @@ func BarrierSliceCandidates(findings []BarrierSliceFinding, facts []*FuncFacts) 
 
 // ThinSliceCandidates converts thin slice findings to candidates.
 // Detection-only: FixSpec is nil.
-func ThinSliceCandidates(findings []ThinSliceFinding, facts []*FuncFacts) []Candidate {
+func ThinSliceCandidates(findings []ThinSliceFinding, facts []*MiningFacts) []Candidate {
 	factByID := buildFactMap(facts)
 	var out []Candidate
 	for _, fl := range findings {
@@ -257,7 +257,7 @@ func ThinSliceCandidates(findings []ThinSliceFinding, facts []*FuncFacts) []Cand
 
 // ChopCandidates converts chop findings to candidates.
 // Detection-only: FixSpec is nil.
-func ChopCandidates(findings []ChopFinding, facts []*FuncFacts) []Candidate {
+func ChopCandidates(findings []ChopFinding, facts []*MiningFacts) []Candidate {
 	factByID := buildFactMap(facts)
 	var out []Candidate
 	for _, fl := range findings {

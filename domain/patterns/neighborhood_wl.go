@@ -148,7 +148,7 @@ func (ws *neighborhoodWLWorkspace) neighborhoodColorsFast(g *Graph, v, k int, ou
 // and each node, the k-hop neighborhood's WL colors are aggregated into the
 // level histogram. Uses reused workspace buffers; no per-neighborhood
 // allocations, no subgraph construction.
-func NewNeighborhoodWL(pdg *Pdg) *NeighborhoodWL {
+func NewNeighborhoodWL(pdg *MiningGraph) *NeighborhoodWL {
 	g := buildGraph(pdg)
 	ws := newNeighborhoodWLWorkspace(len(g.labels))
 	w := &NeighborhoodWL{

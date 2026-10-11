@@ -98,7 +98,7 @@ type acquisition struct {
 
 // FindObligationViolations finds resources acquired without a deferred
 // release. Each violation is a candidate bug for the LLM to judge.
-func FindObligationViolations(facts []*FuncFacts) []ObligationViolation {
+func FindObligationViolations(facts []*MiningFacts) []ObligationViolation {
 	var out []ObligationViolation
 	for _, f := range facts {
 		if f.Pdg == nil {
@@ -110,7 +110,7 @@ func FindObligationViolations(facts []*FuncFacts) []ObligationViolation {
 }
 
 // violationsInFunc checks one function's acquisitions for missing defers.
-func violationsInFunc(f *FuncFacts) []ObligationViolation {
+func violationsInFunc(f *MiningFacts) []ObligationViolation {
 	pdg := f.Pdg
 	deferred := deferredCallNodes(pdg)
 	fwd := forwardDataAdj(pdg)
@@ -132,7 +132,7 @@ func violationsInFunc(f *FuncFacts) []ObligationViolation {
 }
 
 // findAcquisitions returns all resource acquisitions in a PDG.
-func findAcquisitions(pdg *Pdg, funcID string) []acquisition {
+func findAcquisitions(pdg *MiningGraph, funcID string) []acquisition {
 	var out []acquisition
 	for i, n := range pdg.Nodes {
 		if n.Kind != Call {
@@ -169,13 +169,13 @@ func matchAcquisition(calleeID string) (obligationRule, bool) {
 
 // deferredCallNodes returns the Call node indices wrapped by a Defer node.
 // `defer f()` lowers to a Call node with a Data edge into a Defer node.
-func deferredCallNodes(pdg *Pdg) map[int]bool {
+func deferredCallNodes(pdg *MiningGraph) map[int]bool {
 	deferNodes := collectDeferNodes(pdg)
 	return collectDeferredCalls(pdg, deferNodes)
 }
 
 // collectDeferNodes returns the indices of all Defer nodes.
-func collectDeferNodes(pdg *Pdg) map[int]bool {
+func collectDeferNodes(pdg *MiningGraph) map[int]bool {
 	out := map[int]bool{}
 	for i, n := range pdg.Nodes {
 		if n.Kind == Defer {
@@ -186,7 +186,7 @@ func collectDeferNodes(pdg *Pdg) map[int]bool {
 }
 
 // collectDeferredCalls returns Call nodes with a Data edge into a Defer node.
-func collectDeferredCalls(pdg *Pdg, deferNodes map[int]bool) map[int]bool {
+func collectDeferredCalls(pdg *MiningGraph, deferNodes map[int]bool) map[int]bool {
 	out := map[int]bool{}
 	for _, e := range pdg.Edges {
 		if e.Kind == Data && deferNodes[e.To] && pdg.Nodes[e.From].Kind == Call {
@@ -197,7 +197,7 @@ func collectDeferredCalls(pdg *Pdg, deferNodes map[int]bool) map[int]bool {
 }
 
 // forwardDataAdj builds forward adjacency over Data edges.
-func forwardDataAdj(pdg *Pdg) map[int][]int {
+func forwardDataAdj(pdg *MiningGraph) map[int][]int {
 	adj := map[int][]int{}
 	for _, e := range pdg.Edges {
 		if e.Kind == Data {
@@ -210,7 +210,7 @@ func forwardDataAdj(pdg *Pdg) map[int][]int {
 // hasDeferredRelease reports whether a deferred release call is data-linked
 // to the acquisition — e.g. `defer f.Close()` where f came from `os.Open`,
 // or `defer mu.Unlock()` where mu was the `mu.Lock()` receiver.
-func hasDeferredRelease(pdg *Pdg, acq acquisition, deferred map[int]bool, fwd map[int][]int) bool {
+func hasDeferredRelease(pdg *MiningGraph, acq acquisition, deferred map[int]bool, fwd map[int][]int) bool {
 	root := acq.node
 	if acq.receiverIsRes {
 		if recv := dataSourceAt(pdg, acq.node, 0); recv >= 0 {
@@ -236,7 +236,7 @@ func isReleaseCall(n PdgNode, release string) bool {
 
 // dataSourceAt returns the source of the Data edge into node at argPos,
 // or -1 if none.
-func dataSourceAt(pdg *Pdg, node, argPos int) int {
+func dataSourceAt(pdg *MiningGraph, node, argPos int) int {
 	for _, e := range pdg.Edges {
 		if e.To == node && e.Kind == Data && e.ArgPos == argPos {
 			return e.From
@@ -246,7 +246,7 @@ func dataSourceAt(pdg *Pdg, node, argPos int) int {
 }
 
 // anyDataSourceReached reports whether any Data source of node was reached.
-func anyDataSourceReached(pdg *Pdg, node int, reached map[int]bool) bool {
+func anyDataSourceReached(pdg *MiningGraph, node int, reached map[int]bool) bool {
 	for _, e := range pdg.Edges {
 		if e.To == node && e.Kind == Data && reached[e.From] {
 			return true
@@ -276,8 +276,8 @@ func reachableFrom(fwd map[int][]int, start, maxDepth int) map[int]bool {
 }
 
 // ObligationCandidates converts obligation violations to candidates.
-func ObligationCandidates(violations []ObligationViolation, facts []*FuncFacts) []Candidate {
-	factByID := map[string]*FuncFacts{}
+func ObligationCandidates(violations []ObligationViolation, facts []*MiningFacts) []Candidate {
+	factByID := map[string]*MiningFacts{}
 	for _, f := range facts {
 		factByID[f.ID] = f
 	}

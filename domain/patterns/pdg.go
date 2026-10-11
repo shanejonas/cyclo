@@ -66,6 +66,7 @@ const (
 	Data EdgeKind = "data"
 	// Ctrl is a control-dependence edge. ArgPos is the arm index.
 	Ctrl EdgeKind = "ctrl"
+	Exec EdgeKind = "exec"
 )
 
 // Effect bitflags for PdgNode.Effects. A Call node's effects describe the
@@ -120,10 +121,11 @@ type PdgEdge struct {
 	ArgPos int
 }
 
-// Pdg is the dependence graph of one function body. Like rstyle's facts::Pdg:
-// no execution-order edges, so reordering independent statements does not
-// change it.
-type Pdg struct {
-	Nodes []PdgNode
-	Edges []PdgEdge
+// MiningGraph is a temporary abstraction-matching view of the canonical IR.
+// It uses rstyle labels and includes source execution dependencies.
+type MiningGraph struct {
+	baseLabels *baseLabelCache
+	Paper      *PaperCharacteristics
+	Nodes      []PdgNode
+	Edges      []PdgEdge
 }

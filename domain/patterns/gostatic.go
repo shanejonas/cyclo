@@ -34,7 +34,7 @@ const (
 )
 
 // nilErrCandidates builds candidates from NilErrHit findings.
-func nilErrCandidates(facts []*FuncFacts) []Candidate {
+func nilErrCandidates(facts []*MiningFacts) []Candidate {
 	var out []Candidate
 	for _, f := range facts {
 		if isSuppressed(f.SuppressedKinds, NilErr) {
@@ -67,7 +67,7 @@ func nilErrCandidates(facts []*FuncFacts) []Candidate {
 }
 
 // forceTypeAssertCandidates builds candidates from ForceTypeAssertHit findings.
-func forceTypeAssertCandidates(facts []*FuncFacts) []Candidate {
+func forceTypeAssertCandidates(facts []*MiningFacts) []Candidate {
 	var out []Candidate
 	for _, f := range facts {
 		if isSuppressed(f.SuppressedKinds, ForceTypeAssert) {
@@ -100,7 +100,7 @@ func forceTypeAssertCandidates(facts []*FuncFacts) []Candidate {
 }
 
 // typedNilCandidates builds candidates from TypedNilHit findings.
-func typedNilCandidates(facts []*FuncFacts) []Candidate {
+func typedNilCandidates(facts []*MiningFacts) []Candidate {
 	var out []Candidate
 	for _, f := range facts {
 		if isSuppressed(f.SuppressedKinds, TypedNil) {

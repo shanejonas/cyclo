@@ -22,7 +22,7 @@ const mutableIdentityScoreMilli = 350
 //   - ID exists: rewrite the comparison to use identity (standard fix).
 //   - No ID (paired with missing_identity): add the ID field first. After
 //     re-mining, the standard rewrite fires. The phased fixer handles this.
-func entityIdentityCandidates(facts []*FuncFacts) []Candidate {
+func entityIdentityCandidates(facts []*MiningFacts) []Candidate {
 	var out []Candidate
 	for _, f := range facts {
 		for _, hit := range f.EntityIdentities {
@@ -40,7 +40,7 @@ func entityIdentityCandidates(facts []*FuncFacts) []Candidate {
 
 // noIDCandidate builds the candidate for attribute equality without an ID.
 // The fixer adds the ID field; the comparison rewrite happens next phase.
-func noIDCandidate(f *FuncFacts, hit EntityIdentityHit) Candidate {
+func noIDCandidate(f *MiningFacts, hit EntityIdentityHit) Candidate {
 	return Candidate{
 		Kind:       EntityIdentity,
 		ScoreMilli: entityIdentityScoreMilli,
@@ -72,7 +72,7 @@ func noIDCandidate(f *FuncFacts, hit EntityIdentityHit) Candidate {
 }
 
 // rewriteCandidate builds the candidate for rewriting to identity comparison.
-func rewriteCandidate(f *FuncFacts, hit EntityIdentityHit) Candidate {
+func rewriteCandidate(f *MiningFacts, hit EntityIdentityHit) Candidate {
 	return Candidate{
 		Kind:       EntityIdentity,
 		ScoreMilli: entityIdentityScoreMilli,
@@ -142,7 +142,7 @@ func missingIdentityCandidates(hits []MissingIdentityHit) []Candidate {
 // mutableIdentityCandidates builds detection-only candidates for ID mutation.
 // These have no FixSpec: there's no safe mechanical fix for moving an
 // assignment into a constructor.
-func mutableIdentityCandidates(facts []*FuncFacts) []Candidate {
+func mutableIdentityCandidates(facts []*MiningFacts) []Candidate {
 	var out []Candidate
 	for _, f := range facts {
 		for _, hit := range f.MutableIdentities {

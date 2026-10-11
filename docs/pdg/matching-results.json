@@ -1,0 +1,698 @@
+{
+  "source": {
+    "project": "Moby/Docker",
+    "commit": "9fabd6d",
+    "scope": "Linux root module; tests and nested modules excluded"
+  },
+  "pipeline_runs": {
+    "before": [
+      {
+        "stages": [
+          {
+            "name": "features",
+            "milliseconds": 23.484,
+            "allocated_bytes": 3961496,
+            "allocations": 15195
+          },
+          {
+            "name": "pair_filters",
+            "milliseconds": 508.816,
+            "allocated_bytes": 7859072,
+            "allocations": 7736
+          },
+          {
+            "name": "wl_features",
+            "milliseconds": 282.176,
+            "allocated_bytes": 124187784,
+            "allocations": 3157152
+          },
+          {
+            "name": "lsh",
+            "milliseconds": 200.581,
+            "allocated_bytes": 38879952,
+            "allocations": 10329
+          },
+          {
+            "name": "verify",
+            "milliseconds": 25.492,
+            "allocated_bytes": 4792168,
+            "allocations": 6991
+          }
+        ],
+        "Functions": 7592,
+        "PossiblePairs": 28815436,
+        "Candidates": 4190873,
+        "WLGraphs": 7592,
+        "Clusters": 1,
+        "LargestCluster": 7592,
+        "VerificationPairs": 4190873,
+        "ClonePairs": 26680,
+        "GroupDigest": "c9cef7fb34c436e66560218a4c3b57a30b6ebd6a636271151ee96e9330780348"
+      },
+      {
+        "stages": [
+          {
+            "name": "features",
+            "milliseconds": 28.398,
+            "allocated_bytes": 3961496,
+            "allocations": 15195
+          },
+          {
+            "name": "pair_filters",
+            "milliseconds": 446.189,
+            "allocated_bytes": 7875032,
+            "allocations": 7754
+          },
+          {
+            "name": "wl_features",
+            "milliseconds": 327.242,
+            "allocated_bytes": 124187752,
+            "allocations": 3157152
+          },
+          {
+            "name": "lsh",
+            "milliseconds": 205.436,
+            "allocated_bytes": 38879952,
+            "allocations": 10329
+          },
+          {
+            "name": "verify",
+            "milliseconds": 24.205,
+            "allocated_bytes": 4791352,
+            "allocations": 6987
+          }
+        ],
+        "Functions": 7592,
+        "PossiblePairs": 28815436,
+        "Candidates": 4190873,
+        "WLGraphs": 7592,
+        "Clusters": 1,
+        "LargestCluster": 7592,
+        "VerificationPairs": 4190873,
+        "ClonePairs": 26680,
+        "GroupDigest": "c9cef7fb34c436e66560218a4c3b57a30b6ebd6a636271151ee96e9330780348"
+      },
+      {
+        "stages": [
+          {
+            "name": "features",
+            "milliseconds": 25.548,
+            "allocated_bytes": 3961496,
+            "allocations": 15195
+          },
+          {
+            "name": "pair_filters",
+            "milliseconds": 451.715,
+            "allocated_bytes": 7864392,
+            "allocations": 7742
+          },
+          {
+            "name": "wl_features",
+            "milliseconds": 294.207,
+            "allocated_bytes": 124187768,
+            "allocations": 3157152
+          },
+          {
+            "name": "lsh",
+            "milliseconds": 186.024,
+            "allocated_bytes": 38879952,
+            "allocations": 10329
+          },
+          {
+            "name": "verify",
+            "milliseconds": 24.731,
+            "allocated_bytes": 4791832,
+            "allocations": 6988
+          }
+        ],
+        "Functions": 7592,
+        "PossiblePairs": 28815436,
+        "Candidates": 4190873,
+        "WLGraphs": 7592,
+        "Clusters": 1,
+        "LargestCluster": 7592,
+        "VerificationPairs": 4190873,
+        "ClonePairs": 26680,
+        "GroupDigest": "c9cef7fb34c436e66560218a4c3b57a30b6ebd6a636271151ee96e9330780348"
+      }
+    ],
+    "after": [
+      {
+        "stages": [
+          {
+            "name": "shared_labels",
+            "milliseconds": 14.701,
+            "allocated_bytes": 666504,
+            "allocations": 3137
+          },
+          {
+            "name": "features",
+            "milliseconds": 15.828,
+            "allocated_bytes": 3961480,
+            "allocations": 15194
+          },
+          {
+            "name": "pair_filters",
+            "milliseconds": 401.615,
+            "allocated_bytes": 7919672,
+            "allocations": 7731
+          },
+          {
+            "name": "wl_features",
+            "milliseconds": 270.535,
+            "allocated_bytes": 121889032,
+            "allocations": 3045639
+          },
+          {
+            "name": "lsh",
+            "milliseconds": 174.154,
+            "allocated_bytes": 38879952,
+            "allocations": 10329
+          },
+          {
+            "name": "verify",
+            "milliseconds": 19.488,
+            "allocated_bytes": 4791352,
+            "allocations": 6987
+          }
+        ],
+        "Functions": 7592,
+        "PossiblePairs": 28815436,
+        "Candidates": 4190873,
+        "WLGraphs": 7592,
+        "Clusters": 1,
+        "LargestCluster": 7592,
+        "VerificationPairs": 4190873,
+        "ClonePairs": 26680,
+        "GroupDigest": "c9cef7fb34c436e66560218a4c3b57a30b6ebd6a636271151ee96e9330780348"
+      },
+      {
+        "stages": [
+          {
+            "name": "shared_labels",
+            "milliseconds": 22.975,
+            "allocated_bytes": 666536,
+            "allocations": 3138
+          },
+          {
+            "name": "features",
+            "milliseconds": 21.652,
+            "allocated_bytes": 3961480,
+            "allocations": 15194
+          },
+          {
+            "name": "pair_filters",
+            "milliseconds": 426.062,
+            "allocated_bytes": 7914240,
+            "allocations": 7724
+          },
+          {
+            "name": "wl_features",
+            "milliseconds": 307.555,
+            "allocated_bytes": 121889032,
+            "allocations": 3045639
+          },
+          {
+            "name": "lsh",
+            "milliseconds": 178.768,
+            "allocated_bytes": 38879952,
+            "allocations": 10329
+          },
+          {
+            "name": "verify",
+            "milliseconds": 24.017,
+            "allocated_bytes": 4791352,
+            "allocations": 6987
+          }
+        ],
+        "Functions": 7592,
+        "PossiblePairs": 28815436,
+        "Candidates": 4190873,
+        "WLGraphs": 7592,
+        "Clusters": 1,
+        "LargestCluster": 7592,
+        "VerificationPairs": 4190873,
+        "ClonePairs": 26680,
+        "GroupDigest": "c9cef7fb34c436e66560218a4c3b57a30b6ebd6a636271151ee96e9330780348"
+      },
+      {
+        "stages": [
+          {
+            "name": "shared_labels",
+            "milliseconds": 22.929,
+            "allocated_bytes": 666520,
+            "allocations": 3138
+          },
+          {
+            "name": "features",
+            "milliseconds": 21.985,
+            "allocated_bytes": 3961480,
+            "allocations": 15194
+          },
+          {
+            "name": "pair_filters",
+            "milliseconds": 414.997,
+            "allocated_bytes": 7924992,
+            "allocations": 7737
+          },
+          {
+            "name": "wl_features",
+            "milliseconds": 273.703,
+            "allocated_bytes": 121888984,
+            "allocations": 3045639
+          },
+          {
+            "name": "lsh",
+            "milliseconds": 174.45,
+            "allocated_bytes": 38879952,
+            "allocations": 10329
+          },
+          {
+            "name": "verify",
+            "milliseconds": 20.519,
+            "allocated_bytes": 4790872,
+            "allocations": 6986
+          }
+        ],
+        "Functions": 7592,
+        "PossiblePairs": 28815436,
+        "Candidates": 4190873,
+        "WLGraphs": 7592,
+        "Clusters": 1,
+        "LargestCluster": 7592,
+        "VerificationPairs": 4190873,
+        "ClonePairs": 26680,
+        "GroupDigest": "c9cef7fb34c436e66560218a4c3b57a30b6ebd6a636271151ee96e9330780348"
+      }
+    ]
+  },
+  "pipeline_median_ms": {
+    "before": 1031.47,
+    "after": 928.583
+  },
+  "exhaustive_runs": [
+    {
+      "functions": 7592,
+      "pairs": 28815436,
+      "reference_clones": 32627,
+      "retained": 26680,
+      "vector_misses": 2,
+      "name_misses": 5945,
+      "lsh_misses": 0,
+      "exhaustive_ms": 1040.735,
+      "bounded_ms": 39.984
+    },
+    {
+      "functions": 7592,
+      "pairs": 28815436,
+      "reference_clones": 32627,
+      "retained": 26680,
+      "vector_misses": 2,
+      "name_misses": 5945,
+      "lsh_misses": 0,
+      "exhaustive_ms": 1061.55,
+      "bounded_ms": 34.83
+    },
+    {
+      "functions": 7592,
+      "pairs": 28815436,
+      "reference_clones": 32627,
+      "retained": 26680,
+      "vector_misses": 2,
+      "name_misses": 5945,
+      "lsh_misses": 0,
+      "exhaustive_ms": 1044.049,
+      "bounded_ms": 34.123
+    }
+  ],
+  "full_report_single_runs": {
+    "before": {
+      "wall_seconds": 4.639641307061538,
+      "peak_rss_kib": 530608,
+      "exit_code": 0
+    },
+    "after": {
+      "wall_seconds": 4.185134388040751,
+      "peak_rss_kib": 530608,
+      "exit_code": 0
+    }
+  },
+  "dataset": {
+    "path": ".tmp-build/docker-clone-reference.json",
+    "bytes": 1181588,
+    "sha256": "67aeeddaad121eeb909ba77ff3f74a30ebb42086f88234c040d4c31c5f61c559"
+  },
+  "paper_admission_fix": {
+    "before": "cached features, numerical AND name or AST bypass",
+    "after": "Algorithm 1 alternative admission, bounded accepted-pair batches",
+    "pipeline_runs": {
+      "before": [
+        {
+          "stages": [
+            {
+              "name": "shared_labels",
+              "milliseconds": 15.508,
+              "allocated_bytes": 666536,
+              "allocations": 3138
+            },
+            {
+              "name": "features",
+              "milliseconds": 16.224,
+              "allocated_bytes": 3961480,
+              "allocations": 15194
+            },
+            {
+              "name": "pair_filters",
+              "milliseconds": 415.736,
+              "allocated_bytes": 7914352,
+              "allocations": 7725
+            },
+            {
+              "name": "wl_features",
+              "milliseconds": 286.767,
+              "allocated_bytes": 121889032,
+              "allocations": 3045639
+            },
+            {
+              "name": "lsh",
+              "milliseconds": 174.809,
+              "allocated_bytes": 38879952,
+              "allocations": 10329
+            },
+            {
+              "name": "verify",
+              "milliseconds": 21.349,
+              "allocated_bytes": 4791208,
+              "allocations": 6989
+            }
+          ],
+          "Functions": 7592,
+          "PossiblePairs": 28815436,
+          "Candidates": 4190873,
+          "WLGraphs": 7592,
+          "Clusters": 1,
+          "LargestCluster": 7592,
+          "VerificationPairs": 4190873,
+          "ClonePairs": 26680,
+          "GroupDigest": "c9cef7fb34c436e66560218a4c3b57a30b6ebd6a636271151ee96e9330780348"
+        },
+        {
+          "stages": [
+            {
+              "name": "shared_labels",
+              "milliseconds": 22.503,
+              "allocated_bytes": 666536,
+              "allocations": 3138
+            },
+            {
+              "name": "features",
+              "milliseconds": 20.389,
+              "allocated_bytes": 3961480,
+              "allocations": 15194
+            },
+            {
+              "name": "pair_filters",
+              "milliseconds": 391.127,
+              "allocated_bytes": 7919672,
+              "allocations": 7731
+            },
+            {
+              "name": "wl_features",
+              "milliseconds": 269.011,
+              "allocated_bytes": 121889032,
+              "allocations": 3045640
+            },
+            {
+              "name": "lsh",
+              "milliseconds": 185.923,
+              "allocated_bytes": 38879952,
+              "allocations": 10329
+            },
+            {
+              "name": "verify",
+              "milliseconds": 23.65,
+              "allocated_bytes": 4791352,
+              "allocations": 6987
+            }
+          ],
+          "Functions": 7592,
+          "PossiblePairs": 28815436,
+          "Candidates": 4190873,
+          "WLGraphs": 7592,
+          "Clusters": 1,
+          "LargestCluster": 7592,
+          "VerificationPairs": 4190873,
+          "ClonePairs": 26680,
+          "GroupDigest": "c9cef7fb34c436e66560218a4c3b57a30b6ebd6a636271151ee96e9330780348"
+        },
+        {
+          "stages": [
+            {
+              "name": "shared_labels",
+              "milliseconds": 20.43,
+              "allocated_bytes": 666536,
+              "allocations": 3138
+            },
+            {
+              "name": "features",
+              "milliseconds": 20.339,
+              "allocated_bytes": 3961480,
+              "allocations": 15194
+            },
+            {
+              "name": "pair_filters",
+              "milliseconds": 374.681,
+              "allocated_bytes": 7914352,
+              "allocations": 7725
+            },
+            {
+              "name": "wl_features",
+              "milliseconds": 265.187,
+              "allocated_bytes": 121888984,
+              "allocations": 3045639
+            },
+            {
+              "name": "lsh",
+              "milliseconds": 190.595,
+              "allocated_bytes": 38879952,
+              "allocations": 10329
+            },
+            {
+              "name": "verify",
+              "milliseconds": 21.623,
+              "allocated_bytes": 4791352,
+              "allocations": 6987
+            }
+          ],
+          "Functions": 7592,
+          "PossiblePairs": 28815436,
+          "Candidates": 4190873,
+          "WLGraphs": 7592,
+          "Clusters": 1,
+          "LargestCluster": 7592,
+          "VerificationPairs": 4190873,
+          "ClonePairs": 26680,
+          "GroupDigest": "c9cef7fb34c436e66560218a4c3b57a30b6ebd6a636271151ee96e9330780348"
+        }
+      ],
+      "after": [
+        {
+          "stages": [
+            {
+              "name": "shared_labels",
+              "milliseconds": 18.262,
+              "allocated_bytes": 666552,
+              "allocations": 3138
+            },
+            {
+              "name": "features",
+              "milliseconds": 15.9,
+              "allocated_bytes": 3961480,
+              "allocations": 15194
+            },
+            {
+              "name": "pair_filters",
+              "milliseconds": 399.654,
+              "allocated_bytes": 7914352,
+              "allocations": 7725
+            },
+            {
+              "name": "wl_features",
+              "milliseconds": 288.537,
+              "allocated_bytes": 121889096,
+              "allocations": 3045640
+            },
+            {
+              "name": "lsh",
+              "milliseconds": 181.537,
+              "allocated_bytes": 38879952,
+              "allocations": 10329
+            },
+            {
+              "name": "verify",
+              "milliseconds": 41.056,
+              "allocated_bytes": 3431944,
+              "allocations": 7255
+            }
+          ],
+          "Functions": 7592,
+          "PossiblePairs": 28815436,
+          "Candidates": 17992778,
+          "WLGraphs": 7592,
+          "Clusters": 1,
+          "LargestCluster": 7592,
+          "VerificationPairs": 17992778,
+          "ClonePairs": 32627,
+          "GroupDigest": "b2d9e7d7912cfa78697d92553103c6889ca8b9c60b3be8399631cc2f44519978"
+        },
+        {
+          "stages": [
+            {
+              "name": "shared_labels",
+              "milliseconds": 16.143,
+              "allocated_bytes": 666520,
+              "allocations": 3137
+            },
+            {
+              "name": "features",
+              "milliseconds": 13.578,
+              "allocated_bytes": 3961480,
+              "allocations": 15194
+            },
+            {
+              "name": "pair_filters",
+              "milliseconds": 364.641,
+              "allocated_bytes": 7914352,
+              "allocations": 7725
+            },
+            {
+              "name": "wl_features",
+              "milliseconds": 297.911,
+              "allocated_bytes": 121889000,
+              "allocations": 3045639
+            },
+            {
+              "name": "lsh",
+              "milliseconds": 171.854,
+              "allocated_bytes": 38879952,
+              "allocations": 10329
+            },
+            {
+              "name": "verify",
+              "milliseconds": 37.565,
+              "allocated_bytes": 3431720,
+              "allocations": 7253
+            }
+          ],
+          "Functions": 7592,
+          "PossiblePairs": 28815436,
+          "Candidates": 17992778,
+          "WLGraphs": 7592,
+          "Clusters": 1,
+          "LargestCluster": 7592,
+          "VerificationPairs": 17992778,
+          "ClonePairs": 32627,
+          "GroupDigest": "b2d9e7d7912cfa78697d92553103c6889ca8b9c60b3be8399631cc2f44519978"
+        },
+        {
+          "stages": [
+            {
+              "name": "shared_labels",
+              "milliseconds": 20.267,
+              "allocated_bytes": 666520,
+              "allocations": 3137
+            },
+            {
+              "name": "features",
+              "milliseconds": 19.635,
+              "allocated_bytes": 3961480,
+              "allocations": 15194
+            },
+            {
+              "name": "pair_filters",
+              "milliseconds": 389.094,
+              "allocated_bytes": 7919672,
+              "allocations": 7731
+            },
+            {
+              "name": "wl_features",
+              "milliseconds": 281.661,
+              "allocated_bytes": 121894320,
+              "allocations": 3045645
+            },
+            {
+              "name": "lsh",
+              "milliseconds": 170.855,
+              "allocated_bytes": 38879952,
+              "allocations": 10329
+            },
+            {
+              "name": "verify",
+              "milliseconds": 40.74,
+              "allocated_bytes": 3432840,
+              "allocations": 7263
+            }
+          ],
+          "Functions": 7592,
+          "PossiblePairs": 28815436,
+          "Candidates": 17992778,
+          "WLGraphs": 7592,
+          "Clusters": 1,
+          "LargestCluster": 7592,
+          "VerificationPairs": 17992778,
+          "ClonePairs": 32627,
+          "GroupDigest": "b2d9e7d7912cfa78697d92553103c6889ca8b9c60b3be8399631cc2f44519978"
+        }
+      ]
+    },
+    "pipeline_median_ms": {
+      "before": 912.6030000000001,
+      "after": 922.252
+    },
+    "complete_report_runs": {
+      "before": [
+        {
+          "wall_seconds": 4.107445272849873,
+          "peak_rss_kib": 504984,
+          "exit_code": 0
+        },
+        {
+          "wall_seconds": 4.2867086317855865,
+          "peak_rss_kib": 522924,
+          "exit_code": 0
+        },
+        {
+          "wall_seconds": 4.118936541955918,
+          "peak_rss_kib": 517820,
+          "exit_code": 0
+        }
+      ],
+      "after": [
+        {
+          "wall_seconds": 4.234229685971513,
+          "peak_rss_kib": 507148,
+          "exit_code": 0
+        },
+        {
+          "wall_seconds": 4.1287034950219095,
+          "peak_rss_kib": 510432,
+          "exit_code": 0
+        },
+        {
+          "wall_seconds": 4.174164213007316,
+          "peak_rss_kib": 495744,
+          "exit_code": 0
+        }
+      ]
+    },
+    "complete_report_median_seconds": {
+      "before": 4.118936541955918,
+      "after": 4.174164213007316
+    },
+    "complete_report_median_peak_rss_kib": {
+      "before": 517820,
+      "after": 507148
+    },
+    "exhaustive_validation": "=== RUN   TestMeasureExhaustiveClones\n    exhaustive_measure_test.go:92: functions=7592 pairs=28815436 reference_clones=32627 retained=32627 numerical_failures=2 string_failures=5945 lsh_misses=0 exhaustive_ms=1067.554 bounded_ms=35.651\n--- PASS: TestMeasureExhaustiveClones (3.22s)\nPASS\n"
+  }
+}

@@ -42,7 +42,7 @@ func pMacro(detail string) PdgNode {
 	return PdgNode{Kind: macroKind, Detail: detail, Line: 1}
 }
 
-func pKinds(pdg *Pdg) []NodeKind {
+func pKinds(pdg *MiningGraph) []NodeKind {
 	kinds := make([]NodeKind, len(pdg.Nodes))
 	for i, n := range pdg.Nodes {
 		kinds[i] = n.Kind
@@ -50,7 +50,7 @@ func pKinds(pdg *Pdg) []NodeKind {
 	return kinds
 }
 
-func sortedEdges(pdg *Pdg) []PdgEdge {
+func sortedEdges(pdg *MiningGraph) []PdgEdge {
 	edges := append([]PdgEdge{}, pdg.Edges...)
 	sort.Slice(edges, func(i, j int) bool {
 		a, b := edges[i], edges[j]
@@ -68,7 +68,7 @@ func sortedEdges(pdg *Pdg) []PdgEdge {
 	return edges
 }
 
-func sameGraph(a, b *Pdg) bool {
+func sameGraph(a, b *MiningGraph) bool {
 	if len(a.Nodes) != len(b.Nodes) {
 		return false
 	}
@@ -90,16 +90,16 @@ func mustParse(t *testing.T, text string) Rules {
 }
 
 // `return Err(Bad("x"))`
-func nestedConstant() *Pdg {
-	return &Pdg{
+func nestedConstant() *MiningGraph {
+	return &MiningGraph{
 		Nodes: []PdgNode{pLit("str", `"x"`), pOp("ctor"), pOp("ctor"), pn(Return)},
 		Edges: []PdgEdge{pData(0, 1, 0), pData(1, 2, 0), pData(2, 3, 0)},
 	}
 }
 
 // `if !a.ok() && !b.ok() {..}`
-func negatedPair() *Pdg {
-	return &Pdg{
+func negatedPair() *MiningGraph {
+	return &MiningGraph{
 		Nodes: []PdgNode{
 			pCall("k::A::ok"), pCall("k::B::ok"),
 			pOp("!"), pOp("!"), pOp("&&"), pn(Branch),
@@ -112,8 +112,8 @@ func negatedPair() *Pdg {
 }
 
 // `for x in xs { out.push(x.method()) }` over a collection: no rule fires.
-func emitLoop() *Pdg {
-	return &Pdg{
+func emitLoop() *MiningGraph {
+	return &MiningGraph{
 		Nodes: []PdgNode{
 			pn(Param), pn(Param), pn(Iterate),
 			pCall("alloc::vec::Vec::push"), pCall("k::Dog::bark"), pn(Return),
@@ -126,8 +126,8 @@ func emitLoop() *Pdg {
 }
 
 // `if let Some(v) = p.find() { hit(v) } else { miss() }`
-func ifLet() *Pdg {
-	return &Pdg{
+func ifLet() *MiningGraph {
+	return &MiningGraph{
 		Nodes: []PdgNode{
 			pn(Param), pCall("k::R::find"), pn(Let), pn(Branch),
 			pCall("k::R::hit"), pCall("k::R::miss"), pn(Return),
@@ -140,8 +140,8 @@ func ifLet() *Pdg {
 }
 
 // `match p.find() { Some(v) => hit(v), None => miss() }`
-func twoArmMatch() *Pdg {
-	return &Pdg{
+func twoArmMatch() *MiningGraph {
+	return &MiningGraph{
 		Nodes: []PdgNode{
 			pn(Param), pCall("k::R::find"), pn(Match),
 			pCall("k::R::hit"), pCall("k::R::miss"), pn(Return),
@@ -155,7 +155,7 @@ func twoArmMatch() *Pdg {
 
 // literalChainOtherScrutinee: the else-if chain with the inner condition on
 // a different value, so the chain must stay nested.
-func literalChainOtherScrutinee() *Pdg {
+func literalChainOtherScrutinee() *MiningGraph {
 	pdg := literalChain()
 	pdg.Nodes = append(pdg.Nodes, pn(Param))
 	other := len(pdg.Nodes) - 1
@@ -172,8 +172,8 @@ func literalChainOtherScrutinee() *Pdg {
 
 // `if code == 200 { a } else if code == 404 { b } else { c }` (three arms).
 // Go spelling: the extractor emits "cmp:==" details.
-func literalChain() *Pdg {
-	return &Pdg{
+func literalChain() *MiningGraph {
+	return &MiningGraph{
 		Nodes: []PdgNode{
 			pn(Param), pn(Branch), pOp("cmp:=="), pLit("int", "200"),
 			pCall("k::R::a"), pn(Branch), pOp("cmp:=="), pLit("int", "404"),
@@ -188,8 +188,8 @@ func literalChain() *Pdg {
 	}
 }
 
-func matchOnCode() *Pdg {
-	return &Pdg{
+func matchOnCode() *MiningGraph {
+	return &MiningGraph{
 		Nodes: []PdgNode{
 			pn(Param), pn(Match),
 			pCall("k::R::a"), pCall("k::R::b"), pCall("k::R::c"), pn(Return),
@@ -203,9 +203,9 @@ func matchOnCode() *Pdg {
 }
 
 // `for n in 1..=3 { body(n) }`
-func rangeForm() *Pdg {
+func rangeForm() *MiningGraph {
 	call := pCall("core::ops::range::{impl#7}::new")
-	return &Pdg{
+	return &MiningGraph{
 		Nodes: []PdgNode{
 			pn(Iterate), call, pLit("int", "1"), pLit("int", "3"), pCall("k::R::body"),
 		},
@@ -218,10 +218,10 @@ func rangeForm() *Pdg {
 
 // `let mut n = 0; while n < 3 { n += 1; body(n) }`.
 // Go spellings: "cmp:<" and "assignop:+=".
-func whileForm() *Pdg {
+func whileForm() *MiningGraph {
 	loop := pn(Loop)
 	loop.Detail = "while"
-	return &Pdg{
+	return &MiningGraph{
 		Nodes: []PdgNode{
 			pLit("int", "0"), loop, pn(Branch), pOp("cmp:<"),
 			pLit("int", "3"), pOp("assignop:+="), pLit("int", "1"), pCall("k::R::body"),
@@ -236,10 +236,10 @@ func whileForm() *Pdg {
 }
 
 // `i := 0; for i < 3 { use(i); i++ }`: the Go manual-counter spelling.
-func incWhileForm() *Pdg {
+func incWhileForm() *MiningGraph {
 	loop := pn(Loop)
 	loop.Detail = "for"
-	return &Pdg{
+	return &MiningGraph{
 		Nodes: []PdgNode{
 			pLit("int", "0"), loop, pn(Branch), pOp("cmp:<"),
 			pLit("int", "3"), pOp("inc:++"), pCall("k::R::use"),
@@ -254,8 +254,8 @@ func incWhileForm() *Pdg {
 }
 
 // `match call(p) { Ok(v) => v, Err(e) => return Err(e) }` then `use(v)`.
-func explicitPropagation() *Pdg {
-	return &Pdg{
+func explicitPropagation() *MiningGraph {
+	return &MiningGraph{
 		Nodes: []PdgNode{
 			pn(Param), pn(Match), pn(Return), pOp("ctor"), pMacro("whatever"),
 		},
@@ -268,8 +268,8 @@ func explicitPropagation() *Pdg {
 
 // `if nil != err { return err }`: the residual Go shape the extractor misses
 // (nil on the left of !=).
-func goResidualNeq() *Pdg {
-	return &Pdg{
+func goResidualNeq() *MiningGraph {
+	return &MiningGraph{
 		Nodes: []PdgNode{
 			pCall("k::R::getErr"), pLit("nil", "nil"), pOp("cmp:!="),
 			pn(Branch), pn(Return), pCall("k::R::use"),
@@ -282,8 +282,8 @@ func goResidualNeq() *Pdg {
 }
 
 // `if err == nil { work() } else { return err }`: inverted polarity.
-func goResidualEq() *Pdg {
-	return &Pdg{
+func goResidualEq() *MiningGraph {
+	return &MiningGraph{
 		Nodes: []PdgNode{
 			pCall("k::R::getErr"), pLit("nil", "nil"), pOp("cmp:=="),
 			pn(Branch), pCall("k::R::work"), pn(Return),
@@ -297,8 +297,8 @@ func goResidualEq() *Pdg {
 
 // The extractor's own Try encoding: Try takes the error value at 0, the
 // Return takes it at 0 and is Ctrl-dependent on the Try (arm 0).
-func existingTry() *Pdg {
-	return &Pdg{
+func existingTry() *MiningGraph {
+	return &MiningGraph{
 		Nodes: []PdgNode{pCall("k::R::getErr"), pn(Try), pn(Return)},
 		Edges: []PdgEdge{pData(0, 1, 0), pData(0, 2, 0), pCtrl(1, 2, 0)},
 	}
@@ -317,7 +317,7 @@ func TestConstantCtorTreeBecomesOneCtor(t *testing.T) {
 func TestControlEdgesIntoAbsorbedNodesMoveToFoldedCtor(t *testing.T) {
 	pdg := nestedConstant()
 	nodes := append([]PdgNode{pn(Branch)}, pdg.Nodes...)
-	pdg = &Pdg{Nodes: nodes, Edges: []PdgEdge{
+	pdg = &MiningGraph{Nodes: nodes, Edges: []PdgEdge{
 		pCtrl(0, 2, 0), pData(1, 2, 0), pData(2, 3, 0), pData(3, 4, 0),
 	}}
 	out := Canonicalize(pdg, mustParse(t, "ctor,pred"))
@@ -336,7 +336,7 @@ func TestControlEdgesIntoAbsorbedNodesMoveToFoldedCtor(t *testing.T) {
 }
 
 func TestUnitVariantLiteralBecomesCtor(t *testing.T) {
-	pdg := &Pdg{
+	pdg := &MiningGraph{
 		Nodes: []PdgNode{
 			pLit("path", "Mode::Fast"), pn(Return), pOp("tuple"), pOp("ctor"),
 		},
@@ -352,7 +352,7 @@ func TestUnitVariantLiteralBecomesCtor(t *testing.T) {
 }
 
 func TestPlainPathLiteralsStayLiterals(t *testing.T) {
-	pdg := &Pdg{
+	pdg := &MiningGraph{
 		Nodes: []PdgNode{pLit("path", "LIMIT"), pn(Return)},
 		Edges: []PdgEdge{pData(0, 1, 0)},
 	}
@@ -362,7 +362,7 @@ func TestPlainPathLiteralsStayLiterals(t *testing.T) {
 }
 
 func TestNonConstantCtorChainMergesIntoOuterCtor(t *testing.T) {
-	pdg := &Pdg{
+	pdg := &MiningGraph{
 		Nodes: []PdgNode{pCall("alloc::vec::Vec::push"), pOp("ctor"), pOp("ctor"), pn(Return)},
 		Edges: []PdgEdge{pData(0, 1, 0), pData(1, 2, 0), pData(2, 3, 0)},
 	}
@@ -376,7 +376,7 @@ func TestNonConstantCtorChainMergesIntoOuterCtor(t *testing.T) {
 }
 
 func TestCompositeLiteralFoldsLikeACtor(t *testing.T) {
-	pdg := &Pdg{
+	pdg := &MiningGraph{
 		Nodes: []PdgNode{
 			pLit("int", "1"), pLit("int", "2"), pOp("composite:{}"), pn(Return),
 		},
@@ -395,7 +395,7 @@ func TestCompositeLiteralFoldsLikeACtor(t *testing.T) {
 }
 
 func TestLiteralSharedWithACallIsNotFolded(t *testing.T) {
-	pdg := &Pdg{
+	pdg := &MiningGraph{
 		Nodes: []PdgNode{pLit("str", `"x"`), pOp("ctor"), pCall("k::R::push")},
 		Edges: []PdgEdge{pData(0, 1, 0), pData(0, 2, 1)},
 	}
@@ -421,11 +421,11 @@ func TestNegatedConjunctionLeavesTwoCallsFeedingBranch(t *testing.T) {
 }
 
 func TestSingleCallPredicateMatchesNegatedForm(t *testing.T) {
-	plain := &Pdg{
+	plain := &MiningGraph{
 		Nodes: []PdgNode{pCall("k::A::ok"), pn(Branch)},
 		Edges: []PdgEdge{pData(0, 1, 0)},
 	}
-	negated := &Pdg{
+	negated := &MiningGraph{
 		Nodes: []PdgNode{pCall("k::A::ok"), pOp("!"), pn(Branch)},
 		Edges: []PdgEdge{pData(0, 1, 0), pData(1, 2, 0)},
 	}
@@ -439,7 +439,7 @@ func TestSingleCallPredicateMatchesNegatedForm(t *testing.T) {
 }
 
 func TestCombinatorsOverNonCallsLeftAlone(t *testing.T) {
-	pdg := &Pdg{
+	pdg := &MiningGraph{
 		Nodes: []PdgNode{pLit("bool", "true"), pOp("!"), pn(Branch)},
 		Edges: []PdgEdge{pData(0, 1, 0), pData(1, 2, 0)},
 	}
@@ -450,7 +450,7 @@ func TestCombinatorsOverNonCallsLeftAlone(t *testing.T) {
 
 func TestRulesAreIdempotentAndNeverGrow(t *testing.T) {
 	rules := mustParse(t, "ctor,pred")
-	for _, pdg := range []*Pdg{nestedConstant(), negatedPair(), emitLoop()} {
+	for _, pdg := range []*MiningGraph{nestedConstant(), negatedPair(), emitLoop()} {
 		once := Canonicalize(pdg, rules)
 		if !sameGraph(Canonicalize(once, rules), once) {
 			t.Fatal("not idempotent")
@@ -551,7 +551,7 @@ func TestElseIfOnDifferentScrutineeStaysNested(t *testing.T) {
 }
 
 func TestPlainBooleanBranchBecomesCase(t *testing.T) {
-	pdg := &Pdg{
+	pdg := &MiningGraph{
 		Nodes: []PdgNode{pCall("k::R::ok"), pn(Branch)},
 		Edges: []PdgEdge{pData(0, 1, 0)},
 	}
@@ -565,14 +565,14 @@ func TestPlainBooleanBranchBecomesCase(t *testing.T) {
 }
 
 func TestUnreachableTailDroppedButMacroWithInputsKept(t *testing.T) {
-	pdg := &Pdg{
+	pdg := &MiningGraph{
 		Nodes: []PdgNode{pn(Param), pMacro("$crate::panic::unreachable_2021")},
 	}
 	rules := mustParse(t, "exit")
 	if got := Canonicalize(pdg, rules); len(got.Nodes) != 1 {
 		t.Fatalf("nodes = %d, want 1", len(got.Nodes))
 	}
-	used := &Pdg{
+	used := &MiningGraph{
 		Nodes: pdg.Nodes,
 		Edges: []PdgEdge{pData(0, 1, 0)},
 	}
@@ -582,7 +582,7 @@ func TestUnreachableTailDroppedButMacroWithInputsKept(t *testing.T) {
 }
 
 func TestCaseRulesAreIdempotent(t *testing.T) {
-	for _, pdg := range []*Pdg{ifLet(), twoArmMatch(), literalChain(), matchOnCode()} {
+	for _, pdg := range []*MiningGraph{ifLet(), twoArmMatch(), literalChain(), matchOnCode()} {
 		once := Canonicalize(pdg, RulesAll)
 		if !sameGraph(Canonicalize(once, RulesAll), once) {
 			t.Fatal("not idempotent")
@@ -656,8 +656,8 @@ func TestRangeWithNonLiteralBoundStaysIterate(t *testing.T) {
 }
 
 func TestCounterComparisonHasOneClassWhateverTheOperator(t *testing.T) {
-	with := func(detail string) *Pdg {
-		pdg := &Pdg{
+	with := func(detail string) *MiningGraph {
+		pdg := &MiningGraph{
 			Nodes: []PdgNode{pn(Loop), pLit("int", "3"), pOp(detail), pn(Branch)},
 			Edges: []PdgEdge{pData(0, 2, 0), pData(1, 2, 1), pData(2, 3, 0)},
 		}
@@ -681,7 +681,7 @@ func TestCounterComparisonHasOneClassWhateverTheOperator(t *testing.T) {
 }
 
 func TestComparisonOfNonCounterLeftAlone(t *testing.T) {
-	pdg := &Pdg{
+	pdg := &MiningGraph{
 		Nodes: []PdgNode{pn(Param), pLit("int", "3"), pOp("cmp:<"), pn(Branch)},
 		Edges: []PdgEdge{pData(0, 2, 0), pData(1, 2, 1), pData(2, 3, 0)},
 	}
@@ -691,7 +691,7 @@ func TestComparisonOfNonCounterLeftAlone(t *testing.T) {
 }
 
 func TestCounterRulesAreIdempotentAndShrink(t *testing.T) {
-	for _, pdg := range []*Pdg{rangeForm(), whileForm(), incWhileForm()} {
+	for _, pdg := range []*MiningGraph{rangeForm(), whileForm(), incWhileForm()} {
 		once := Canonicalize(pdg, RulesAll)
 		if !sameGraph(Canonicalize(once, RulesAll), once) {
 			t.Fatal("not idempotent")
@@ -783,7 +783,7 @@ func TestExistingTryIsNotDoubleConverted(t *testing.T) {
 }
 
 func TestDeferWrappingSurvives(t *testing.T) {
-	pdg := &Pdg{
+	pdg := &MiningGraph{
 		Nodes: []PdgNode{pn(Defer), pCall("k::R::cleanup"), pn(Return)},
 		Edges: []PdgEdge{pData(1, 0, 0), pData(1, 2, 0)},
 	}
@@ -793,7 +793,7 @@ func TestDeferWrappingSurvives(t *testing.T) {
 }
 
 func TestDeferWrappingSurvivesPredicateCollapse(t *testing.T) {
-	pdg := &Pdg{
+	pdg := &MiningGraph{
 		Nodes: []PdgNode{
 			pCall("k::A::ok"), pCall("k::B::ok"), pOp("logic:&&"),
 			pCall("k::R::f"), pn(Defer),
@@ -803,7 +803,7 @@ func TestDeferWrappingSurvivesPredicateCollapse(t *testing.T) {
 		},
 	}
 	out := Canonicalize(pdg, mustParse(t, "pred"))
-	want := &Pdg{
+	want := &MiningGraph{
 		Nodes: []PdgNode{pCall("k::A::ok"), pCall("k::B::ok"), pCall("k::R::f"), pn(Defer)},
 		Edges: []PdgEdge{pData(0, 2, 0), pData(1, 2, 0), pData(2, 3, 0)},
 	}
@@ -813,7 +813,7 @@ func TestDeferWrappingSurvivesPredicateCollapse(t *testing.T) {
 }
 
 func TestGoNodeWrappingSurvives(t *testing.T) {
-	pdg := &Pdg{
+	pdg := &MiningGraph{
 		Nodes: []PdgNode{pn(Go), pCall("k::R::work"), pn(Return)},
 		Edges: []PdgEdge{pData(1, 0, 0), pData(1, 2, 0)},
 	}

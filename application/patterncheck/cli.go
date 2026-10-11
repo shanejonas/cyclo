@@ -23,7 +23,7 @@ Mine the codebase for latent shared abstractions: structurally parallel
 functions that suggest interfaces, params structs, or generics, plus
 inverted conditionals that want to be guard clauses.
 Informational only: always exits 0, never a quality gate.
-  --format FORMAT   text (default) or json
+  --format FORMAT   text (default), json report, or pdg-json graph export
   --threshold N     minimum WL similarity (0-1000) for clustering [default 600]
   --cache           reuse WL refinements from .cyclo/patterns-cache.json,
                     speeding up repeat runs on large repos
@@ -42,15 +42,19 @@ type options struct {
 }
 
 // Run extracts PDGs for paths, mines them for abstraction candidates, and
-// writes the report. It returns nil on success regardless of how many (or
+// writes the report, or exports native graphs when pdg-json is selected.
+// It returns nil on success regardless of how many (or
 // how few) candidates the miner finds; only extraction, analysis, or IO
 // failures are errors.
 func Run(ctx context.Context, args []string, output io.Writer) error {
-	report, err := GetReport(ctx, args)
+	opts, err := parseOptions(args)
 	if err != nil {
 		return err
 	}
-	opts, err := parseOptions(args)
+	if opts.format == "pdg-json" {
+		return exportPDGs(ctx, opts, output)
+	}
+	report, err := GetReport(ctx, args)
 	if err != nil {
 		return err
 	}
@@ -215,8 +219,11 @@ func parseOptions(args []string) (options, error) {
 }
 
 func (opts options) validate() error {
-	if !slices.Contains([]string{"text", "json"}, opts.format) {
-		return fmt.Errorf("format must be text or json")
+	if !slices.Contains([]string{"text", "json", "pdg-json"}, opts.format) {
+		return fmt.Errorf("format must be text, json or pdg-json")
+	}
+	if opts.format == "pdg-json" && opts.useCache {
+		return fmt.Errorf("--cache is not available for pdg-json export")
 	}
 	if opts.threshold > 1000 {
 		return fmt.Errorf("threshold must be between 0 and 1000")

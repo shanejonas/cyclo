@@ -3,7 +3,7 @@ package patterns
 import "testing"
 
 func TestTypeSwitchCandidates(t *testing.T) {
-	facts := []*FuncFacts{{
+	facts := []*MiningFacts{{
 		ID:      "main.speakAll",
 		Name:    "speakAll",
 		Path:    "main.go",
@@ -38,7 +38,7 @@ func TestTypeSwitchCandidates(t *testing.T) {
 }
 
 func TestTypeSwitchCandidatesEmpty(t *testing.T) {
-	facts := []*FuncFacts{{ID: "main.f", Name: "f"}}
+	facts := []*MiningFacts{{ID: "main.f", Name: "f"}}
 	if cands := typeSwitchCandidates(facts); len(cands) != 0 {
 		t.Errorf("expected 0 candidates, got %d", len(cands))
 	}

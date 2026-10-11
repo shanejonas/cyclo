@@ -1,0 +1,146 @@
+{
+  "scope": "Moby/Docker commit 9fabd6d; Linux root module; tests and nested modules excluded",
+  "baseline": "Compact IR before execution/reference analysis; report baseline includes Algorithm 1 alternative admission and shared matching features",
+  "graph_runs": {
+    "before": [
+      {
+        "allocated_bytes": 427427880,
+        "allocations": 2812165,
+        "edges": 261714,
+        "elapsed_ms": 665.196,
+        "functions": 7601,
+        "go_version": "go1.27.1",
+        "mode": "graph-new",
+        "nodes": 215616,
+        "peak_process_rss_kib": 495372,
+        "retained_heap_bytes": 58337768,
+        "root": "/tmp/cyclo-docker-source"
+      },
+      {
+        "allocated_bytes": 427537296,
+        "allocations": 2812179,
+        "edges": 261714,
+        "elapsed_ms": 601.887,
+        "functions": 7601,
+        "go_version": "go1.27.1",
+        "mode": "graph-new",
+        "nodes": 215616,
+        "peak_process_rss_kib": 512048,
+        "retained_heap_bytes": 58334144,
+        "root": "/tmp/cyclo-docker-source"
+      },
+      {
+        "allocated_bytes": 427592400,
+        "allocations": 2812189,
+        "edges": 261714,
+        "elapsed_ms": 587.581,
+        "functions": 7601,
+        "go_version": "go1.27.1",
+        "mode": "graph-new",
+        "nodes": 215616,
+        "peak_process_rss_kib": 493648,
+        "retained_heap_bytes": 58342600,
+        "root": "/tmp/cyclo-docker-source"
+      }
+    ],
+    "after": [
+      {
+        "allocated_bytes": 461926480,
+        "allocations": 3281818,
+        "edges": 321124,
+        "elapsed_ms": 647.343,
+        "functions": 7601,
+        "go_version": "go1.27.1",
+        "mode": "graph-new",
+        "nodes": 215616,
+        "peak_process_rss_kib": 504796,
+        "retained_heap_bytes": 61866976,
+        "root": "/tmp/cyclo-docker-source"
+      },
+      {
+        "allocated_bytes": 461872832,
+        "allocations": 3281817,
+        "edges": 321124,
+        "elapsed_ms": 655.162,
+        "functions": 7601,
+        "go_version": "go1.27.1",
+        "mode": "graph-new",
+        "nodes": 215616,
+        "peak_process_rss_kib": 504168,
+        "retained_heap_bytes": 61868904,
+        "root": "/tmp/cyclo-docker-source"
+      },
+      {
+        "allocated_bytes": 461872072,
+        "allocations": 3281814,
+        "edges": 321124,
+        "elapsed_ms": 564.469,
+        "functions": 7601,
+        "go_version": "go1.27.1",
+        "mode": "graph-new",
+        "nodes": 215616,
+        "peak_process_rss_kib": 481776,
+        "retained_heap_bytes": 61868808,
+        "root": "/tmp/cyclo-docker-source"
+      }
+    ]
+  },
+  "full_report_runs": {
+    "before": [
+      {
+        "wall_seconds": 4.2873756408225745,
+        "peak_rss_kib": 539752,
+        "exit_code": 0
+      },
+      {
+        "wall_seconds": 4.1569261541590095,
+        "peak_rss_kib": 508852,
+        "exit_code": 0
+      },
+      {
+        "wall_seconds": 4.3945929009933025,
+        "peak_rss_kib": 525636,
+        "exit_code": 0
+      }
+    ],
+    "after": [
+      {
+        "wall_seconds": 4.295047302963212,
+        "peak_rss_kib": 535380,
+        "exit_code": 0
+      },
+      {
+        "wall_seconds": 4.3845091259572655,
+        "peak_rss_kib": 501876,
+        "exit_code": 0
+      },
+      {
+        "wall_seconds": 4.317566737998277,
+        "peak_rss_kib": 521948,
+        "exit_code": 0
+      }
+    ]
+  },
+  "medians": {
+    "before": {
+      "retained_graph_bytes": 58337768,
+      "graph_construction_ms": 601.887,
+      "full_report_seconds": 4.2873756408225745,
+      "full_report_peak_rss_kib": 525636
+    },
+    "after": {
+      "retained_graph_bytes": 61868808,
+      "graph_construction_ms": 647.343,
+      "full_report_seconds": 4.317566737998277,
+      "full_report_peak_rss_kib": 521948
+    }
+  },
+  "reference_validation": "=== RUN   TestMeasureExhaustiveClones\n    exhaustive_measure_test.go:92: functions=7592 pairs=28815436 reference_clones=32603 retained=32184 numerical_failures=574 string_failures=5945 lsh_misses=0 exhaustive_ms=1237.384 bounded_ms=33.173\n--- PASS: TestMeasureExhaustiveClones (3.76s)\nPASS\n",
+  "unknown_reference_counts": 19,
+  "native_execution_edges": 59410,
+  "projected_execution_edges": 39116,
+  "corpus": {
+    "path": ".tmp-build/docker-nine-corpus.json",
+    "sha256": "383c551eaaa7b25a87aa703a05e6aa32ba4c0ed0ba3aafdc3435e9fea4e1056a"
+  }
+}

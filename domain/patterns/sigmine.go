@@ -22,7 +22,7 @@ type Member struct {
 // SigGroup is a set of inherent methods sharing one normalized signature,
 // spanning at least two distinct self types.
 type SigGroup struct {
-	// Key is the normalized signature (FuncFacts.SigKey).
+	// Key is the normalized signature (MiningFacts.SigKey).
 	Key string
 	// Members are inherent methods, one per site; at least two distinct SelfTy.
 	Members []Member
@@ -50,7 +50,7 @@ func shortName(name string) string {
 	return name
 }
 
-func memberOf(f *FuncFacts) Member {
+func memberOf(f *MiningFacts) Member {
 	return Member{
 		Path:   f.Path,
 		Line:   f.Line,
@@ -147,7 +147,7 @@ func build(key string, entries []bucketEntry, total int) *SigGroup {
 
 // buckets collects methods by normalized signature key, skipping nil facts,
 // free functions (no SelfTy), and unnormalized functions (no SigKey).
-func buckets(facts []*FuncFacts) (map[string][]bucketEntry, int) {
+func buckets(facts []*MiningFacts) (map[string][]bucketEntry, int) {
 	buckets := map[string][]bucketEntry{}
 	total := 0
 	for _, f := range facts {
@@ -189,7 +189,7 @@ func sortGroups(groups []SigGroup) {
 // (Renamed from Mine: candidates.go's layer-2 main entry takes the name Mine
 // per its contract `func Mine(facts, groups, params) Mined`, and Go has no
 // overloading.)
-func MineGroups(facts []*FuncFacts) []SigGroup {
+func MineGroups(facts []*MiningFacts) []SigGroup {
 	buckets, total := buckets(facts)
 	groups := mineGroups(buckets, total)
 	sortGroups(groups)

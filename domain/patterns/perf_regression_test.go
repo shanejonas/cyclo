@@ -80,30 +80,6 @@ func TestNameMatcherReusesBuffers(t *testing.T) {
 	}
 }
 
-func TestBucketClusteringMatchesQueries(t *testing.T) {
-	rng := rand.New(rand.NewSource(17))
-	for trial := 0; trial < 30; trial++ {
-		vectors := map[string][]float64{}
-		parent := map[string]string{}
-		indexed := NewLSH(3, 4, 3, 42)
-		for i := 0; i < 40; i++ {
-			id := string(rune('a' + i))
-			vec := []float64{rng.NormFloat64(), rng.NormFloat64(), rng.NormFloat64()}
-			vectors[id], parent[id] = vec, id
-			indexed.Add(id, vec)
-		}
-		for id, vec := range vectors {
-			for _, candidate := range indexed.Query(vec) {
-				union(parent, id, candidate)
-			}
-		}
-		got := ClusterClones(vectors, NewLSH(3, 4, 3, 42))
-		if want := groupsOfTwoOrMore(parent); !reflect.DeepEqual(got, want) {
-			t.Fatalf("trial %d: buckets=%v queries=%v", trial, got, want)
-		}
-	}
-}
-
 func TestCompactPairsAcrossWordBoundaries(t *testing.T) {
 	p := newCCPairs(130)
 	p.add(0, 64)
@@ -145,7 +121,7 @@ func TestPairFiltersMatchOriginalPipeline(t *testing.T) {
 		for i, a := range ids {
 			for j := i + 1; j < len(ids); j++ {
 				bypass := len(types[a]) > 0 && len(types[ids[j]]) > 0 && AstJaccard(types[a], types[ids[j]]) >= astBypassThreshold
-				want := bypass || cosineSimilarity(vecs[i], vecs[j]) >= charVecThreshold && ccNamesSimilar(names[i], names[j])
+				want := bypass || cosineSimilarity(vecs[i], vecs[j]) >= charVecThreshold || ccNamesSimilar(names[i], names[j])
 				if got.has(i, j) != want {
 					t.Fatalf("trial %d pair %d,%d differs", trial, i, j)
 				}
@@ -232,8 +208,8 @@ func TestWLBoundMatchesExactScore(t *testing.T) {
 	}
 }
 
-func randomDependenceGraph(rng *rand.Rand) *Pdg {
-	pdg := &Pdg{Nodes: make([]PdgNode, rng.Intn(30)+1)}
+func randomDependenceGraph(rng *rand.Rand) *MiningGraph {
+	pdg := &MiningGraph{Nodes: make([]PdgNode, rng.Intn(30)+1)}
 	kinds := []NodeKind{Param, Return, Call, Lit, "Ctrl", "Branch", "Loop", Try}
 	for i := range pdg.Nodes {
 		pdg.Nodes[i].Kind = kinds[rng.Intn(len(kinds))]

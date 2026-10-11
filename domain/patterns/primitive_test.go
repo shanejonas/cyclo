@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func primitiveFact(name, path string, line int, params []ParamInfo) *FuncFacts {
-	return &FuncFacts{
+func primitiveFact(name, path string, line int, params []ParamInfo) *MiningFacts {
+	return &MiningFacts{
 		ID:      "pkg." + name,
 		Name:    name,
 		Path:    path,
@@ -17,7 +17,7 @@ func primitiveFact(name, path string, line int, params []ParamInfo) *FuncFacts {
 }
 
 func TestPrimitiveObsessionDetectsEmail(t *testing.T) {
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		primitiveFact("SendEmail", "a.go", 10, []ParamInfo{{Name: "recipientEmail", Type: "string"}, {Name: "subject", Type: "string"}}),
 		primitiveFact("ValidateEmail", "b.go", 20, []ParamInfo{{Name: "email", Type: "string"}}),
 	}
@@ -41,7 +41,7 @@ func TestPrimitiveObsessionDetectsEmail(t *testing.T) {
 }
 
 func TestPrimitiveObsessionNeedsTwoFuncs(t *testing.T) {
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		primitiveFact("SendEmail", "a.go", 10, []ParamInfo{{Name: "email", Type: "string"}}),
 	}
 	if cs := primitiveObsessionCandidates(facts); len(cs) != 0 {
@@ -50,7 +50,7 @@ func TestPrimitiveObsessionNeedsTwoFuncs(t *testing.T) {
 }
 
 func TestPrimitiveObsessionIgnoresNonConceptParams(t *testing.T) {
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		primitiveFact("F", "a.go", 10, []ParamInfo{{Name: "count", Type: "int"}}),
 		primitiveFact("G", "b.go", 20, []ParamInfo{{Name: "total", Type: "int"}}),
 	}
@@ -62,7 +62,7 @@ func TestPrimitiveObsessionIgnoresNonConceptParams(t *testing.T) {
 func TestPrimitiveObsessionIgnoresNonPrimitiveTypes(t *testing.T) {
 	// Params only carries basic types by construction; a struct param never
 	// reaches the detector. This guards the type filter if that changes.
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		primitiveFact("F", "a.go", 10, []ParamInfo{{Name: "email", Type: "Email"}}),
 		primitiveFact("G", "b.go", 20, []ParamInfo{{Name: "email", Type: "Email"}}),
 	}
@@ -72,7 +72,7 @@ func TestPrimitiveObsessionIgnoresNonPrimitiveTypes(t *testing.T) {
 }
 
 func TestPrimitiveObsessionGroupsByConceptNotName(t *testing.T) {
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		primitiveFact("A", "a.go", 10, []ParamInfo{{Name: "userEmail", Type: "string"}}),
 		primitiveFact("B", "b.go", 20, []ParamInfo{{Name: "emailAddress", Type: "string"}}),
 	}
@@ -83,11 +83,11 @@ func TestPrimitiveObsessionGroupsByConceptNotName(t *testing.T) {
 }
 
 func TestPrimitiveObsessionWiredIntoRun(t *testing.T) {
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		primitiveFact("SendEmail", "a.go", 10, []ParamInfo{{Name: "email", Type: "string"}}),
 		primitiveFact("ValidateEmail", "b.go", 20, []ParamInfo{{Name: "email", Type: "string"}}),
 	}
-	report := Run(facts, Options{})
+	report := RunMining(facts, Options{})
 	found := false
 	for _, c := range report.Candidates {
 		if c.Kind == PrimitiveObsession {

@@ -5,7 +5,7 @@ import "testing"
 func TestChopBasic(t *testing.T) {
 	// PDG: 0 -> 1 -> 2 -> 3, plus 0 -> 2 (skip edge).
 	// Chop from 0 to 3 should include all nodes on paths.
-	pdg := &Pdg{
+	pdg := &MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: "Param", Line: 1},
 			{Kind: "Op", Line: 2},
@@ -28,7 +28,7 @@ func TestChopBasic(t *testing.T) {
 func TestChopExcludesIrrelevant(t *testing.T) {
 	// PDG: 0 -> 1 -> 3, and 2 -> 3 (2 is not on path from 0).
 	// Chop from 0 to 3 should exclude 2.
-	pdg := &Pdg{
+	pdg := &MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: "Param", Line: 1},
 			{Kind: "Op", Line: 2},

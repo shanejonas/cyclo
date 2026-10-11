@@ -21,7 +21,7 @@ type WlCache struct {
 // wlCacheVersion versions the cache format AND the WL computation. Bump it
 // whenever label(), the kernel, or canonicalization changes, so stale
 // entries from an older miner are never reused.
-const wlCacheVersion = 2
+const wlCacheVersion = 3
 
 // wlCacheFile is the JSON-serialized cache with a version header.
 type wlCacheFile struct {
@@ -45,7 +45,7 @@ func NewWlCache() *WlCache {
 
 // pdgKey hashes the PDG's semantic content (kinds, labels, edges) with FNV-1a.
 // Line numbers are excluded: shifting a function in its file is not a change.
-func pdgKey(pdg *Pdg) string {
+func pdgKey(pdg *MiningGraph) string {
 	h := fnvOffset64
 	write := func(s string) {
 		for i := 0; i < len(s); i++ {
@@ -76,7 +76,7 @@ func pdgKey(pdg *Pdg) string {
 // Get returns the cached WL refinement for pdg, rebuilding the graph from
 // the PDG (cheap) while reusing the rounds, histograms inputs, diameter,
 // call count, and characteristic vector.
-func (c *WlCache) Get(pdg *Pdg) (*Wl, bool) {
+func (c *WlCache) Get(pdg *MiningGraph) (*Wl, bool) {
 	if c == nil {
 		return nil, false
 	}
@@ -100,7 +100,7 @@ func (c *WlCache) Get(pdg *Pdg) (*Wl, bool) {
 }
 
 // Put stores w's refinement under pdg's content key.
-func (c *WlCache) Put(pdg *Pdg, w *Wl) {
+func (c *WlCache) Put(pdg *MiningGraph, w *Wl) {
 	if c == nil {
 		return
 	}

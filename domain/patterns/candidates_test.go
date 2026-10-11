@@ -9,8 +9,8 @@ import (
 
 // ---- fixtures: port of candidates.rs's tests_support ----
 
-func candSample(name string) *FuncFacts {
-	return &FuncFacts{
+func candSample(name string) *MiningFacts {
+	return &MiningFacts{
 		ID:   "k." + name,
 		Name: name,
 		Path: "src/lib.go",
@@ -18,7 +18,7 @@ func candSample(name string) *FuncFacts {
 	}
 }
 
-func candGetter(ty, name string) *FuncFacts {
+func candGetter(ty, name string) *MiningFacts {
 	f := candSample(name)
 	f.ID = "k." + ty + "." + name
 	f.Name = ty + "." + name
@@ -30,7 +30,7 @@ func candGetter(ty, name string) *FuncFacts {
 
 // emitLoopTy mirrors rstyle's pdgtest::emit_loop (`for x in xs {
 // out.push(x.name()) }`).
-func emitLoopTy(calleeID, sigClass string) *Pdg {
+func emitLoopTy(calleeID, sigClass string) *MiningGraph {
 	param := func(tyClass string) PdgNode {
 		n := pn(Param)
 		n.TyClass = tyClass
@@ -40,7 +40,7 @@ func emitLoopTy(calleeID, sigClass string) *Pdg {
 	push.SigClass = "fn(_, _) -> ()"
 	get := pCall(calleeID)
 	get.SigClass = sigClass
-	return &Pdg{
+	return &MiningGraph{
 		Nodes: []PdgNode{
 			param("&[_]"),
 			param("&[_]"),
@@ -69,7 +69,7 @@ func byteSum(s string) int {
 	return sum
 }
 
-func candCaller(ty, name string) *FuncFacts {
+func candCaller(ty, name string) *MiningFacts {
 	f := candSample("emit_" + strings.ToLower(ty))
 	f.Pdg = emitLoopTy("k."+ty+"."+name, "fn(_) -> string")
 	f.Path = "src/emit.go"
@@ -78,8 +78,8 @@ func candCaller(ty, name string) *FuncFacts {
 	return f
 }
 
-func candCorpus() []*FuncFacts {
-	return []*FuncFacts{
+func candCorpus() []*MiningFacts {
+	return []*MiningFacts{
 		candGetter("Dog", "bark"),
 		candGetter("Cat", "meow"),
 		candCaller("Dog", "bark"),
@@ -87,7 +87,7 @@ func candCorpus() []*FuncFacts {
 	}
 }
 
-func runCandidates(facts []*FuncFacts) Mined {
+func runCandidates(facts []*MiningFacts) Mined {
 	return Mine(facts, MineGroups(facts), DefaultParams())
 }
 
@@ -231,7 +231,7 @@ func TestShortGoPaths(t *testing.T) {
 	}
 }
 
-func testEvidence(group *SigGroup, defs []*FuncFacts, existingTrait string) *candidateEvidence {
+func testEvidence(group *SigGroup, defs []*MiningFacts, existingTrait string) *candidateEvidence {
 	return &candidateEvidence{
 		kind:          TraitMethod,
 		breakdown:     Breakdown{Support: 2, LiftMilli: 0, Holes: 1, CoverageMilli: 1000},
@@ -241,7 +241,7 @@ func testEvidence(group *SigGroup, defs []*FuncFacts, existingTrait string) *can
 }
 
 func TestTraitTextProposesNewInterface(t *testing.T) {
-	facts := []*FuncFacts{candGetter("Dog", "bark"), candGetter("Cat", "meow")}
+	facts := []*MiningFacts{candGetter("Dog", "bark"), candGetter("Cat", "meow")}
 	groups := MineGroups(facts)
 	_, refactor := traitText(testEvidence(&groups[0], facts, ""))
 	if !strings.HasPrefix(refactor, "consider a shared interface with") {
@@ -250,7 +250,7 @@ func TestTraitTextProposesNewInterface(t *testing.T) {
 }
 
 func TestTraitTextExtendsExistingInterface(t *testing.T) {
-	facts := []*FuncFacts{candGetter("Dog", "bark"), candGetter("Cat", "meow")}
+	facts := []*MiningFacts{candGetter("Dog", "bark"), candGetter("Cat", "meow")}
 	groups := MineGroups(facts)
 	_, refactor := traitText(testEvidence(&groups[0], facts, "k.public.Signature.is_valid"))
 	if !strings.HasPrefix(refactor, "add `method` (signature shape `fn(_) -> string`) to existing interface `Signature`") {
@@ -266,7 +266,7 @@ func TestExistingTraitForMatchesSameOwners(t *testing.T) {
 	dog.SelfTy = "k.Dog"
 	cat := candGetter("Cat", "meow")
 	cat.SelfTy = "k.Cat"
-	facts := []*FuncFacts{dog, cat}
+	facts := []*MiningFacts{dog, cat}
 	groups := MineGroups(facts)
 	defs := facts
 	verdicts := []traitVerdict{{group: &groups[0], defs: defs}}
@@ -288,7 +288,7 @@ func TestExistingTraitForMatchesSameOwners(t *testing.T) {
 // to "_", so the element type rides on the Iterate node, whose WL label
 // hides TyClass (Param labels include it, so differing params would never
 // pair and no hole would form).
-func typeOnlyCaller(elemTy string) *FuncFacts {
+func typeOnlyCaller(elemTy string) *MiningFacts {
 	f := candCaller("X", "x")
 	f.ID = "k.emit_" + strings.ToLower(elemTy)
 	f.Name = "emit_" + strings.ToLower(elemTy)
@@ -299,8 +299,8 @@ func typeOnlyCaller(elemTy string) *FuncFacts {
 	return f
 }
 
-func typeOnlyCorpus() []*FuncFacts {
-	facts := []*FuncFacts{typeOnlyCaller("Dog"), typeOnlyCaller("Cat")}
+func typeOnlyCorpus() []*MiningFacts {
+	facts := []*MiningFacts{typeOnlyCaller("Dog"), typeOnlyCaller("Cat")}
 	return append(facts, candGetter("Dog", "own"), candGetter("Cat", "own"))
 }
 
@@ -345,7 +345,7 @@ func TestExternalTypeHolesShownToo(t *testing.T) {
 
 // externalOnly mirrors the Rust fixture: callers that differ only in an
 // external callee: no workspace type, no trait.
-func externalOnly(callee string) *FuncFacts {
+func externalOnly(callee string) *MiningFacts {
 	f := candCaller("Dog", "x")
 	f.Pdg.Nodes[4] = pCall(callee)
 	f.Pdg.Nodes[4].SigClass = "fn(_) -> string"
@@ -353,7 +353,7 @@ func externalOnly(callee string) *FuncFacts {
 }
 
 func TestExternalCalleeOnlyProposesParameterizedHelper(t *testing.T) {
-	facts := []*FuncFacts{externalOnly("ext.A.go"), externalOnly("ext.B.go")}
+	facts := []*MiningFacts{externalOnly("ext.A.go"), externalOnly("ext.B.go")}
 	mined := runCandidates(facts)
 	if len(mined.Candidates) != 1 {
 		t.Fatalf("candidates = %+v, want 1", candidateKinds(mined))
@@ -385,8 +385,8 @@ func TestExternalCalleeHolesKeepTheirOwner(t *testing.T) {
 }
 
 func TestParameterizeSkips(t *testing.T) {
-	pair := func() []*FuncFacts {
-		return []*FuncFacts{externalOnly("ext.A.go"), externalOnly("ext.B.go")}
+	pair := func() []*MiningFacts {
+		return []*MiningFacts{externalOnly("ext.A.go"), externalOnly("ext.B.go")}
 	}
 	tests := pair()
 	for _, f := range tests {
@@ -456,7 +456,7 @@ func guardedParams() Params {
 }
 
 // oneCallBodies mirrors the Rust fixture: each body keeps one call.
-func oneCallBodies(input NodeKind) []*FuncFacts {
+func oneCallBodies(input NodeKind) []*MiningFacts {
 	facts := typeOnlyCorpus()
 	for _, f := range facts[:2] {
 		f.Pdg.Nodes[3] = pn(Param)
@@ -570,7 +570,7 @@ func TestSizeRatioFilterAppliedBeforeWL(t *testing.T) {
 }
 
 func TestCommonSignatureScoresBelowRareOne(t *testing.T) {
-	var others []*FuncFacts
+	var others []*MiningFacts
 	for i := 0; i < 12; i++ {
 		f := candSample(fmt.Sprintf("solo%d", i))
 		f.SigKey = fmt.Sprintf("fn(_) -> p%d", i)
@@ -578,7 +578,7 @@ func TestCommonSignatureScoresBelowRareOne(t *testing.T) {
 		others = append(others, f)
 	}
 	rareFacts := append(candCorpus(), others...)
-	var crowd []*FuncFacts
+	var crowd []*MiningFacts
 	for i := 0; i < 40; i++ {
 		crowd = append(crowd, candGetter(fmt.Sprintf("T%d", i), "label"))
 	}
@@ -599,8 +599,8 @@ func TestEnumDispatchProposesDispatchTable(t *testing.T) {
 	dispatcher.Line = 10
 	dispatcher.EndLine = 30
 	dispatcher.EnumDispatches = []EnumDispatchHit{{Line: 15, NumCases: 3}}
-	facts := []*FuncFacts{dispatcher}
-	report := Run(facts, Options{})
+	facts := []*MiningFacts{dispatcher}
+	report := RunMining(facts, Options{})
 	var found *Candidate
 	for i, c := range report.Candidates {
 		if c.Kind == EnumDispatch {
@@ -669,7 +669,7 @@ func TestTraitSuggestionDescribesErasedShapes(t *testing.T) {
 	}
 	for _, key := range cases {
 		t.Run(key, func(t *testing.T) {
-			facts := []*FuncFacts{candGetter("Dog", "processOutput"), candGetter("Cat", "processOutput")}
+			facts := []*MiningFacts{candGetter("Dog", "processOutput"), candGetter("Cat", "processOutput")}
 			_, suggestion := traitText(testEvidence(&SigGroup{Key: key}, facts, ""))
 			if !strings.Contains(suggestion, "`processOutput` (signature shape `"+key+"`)") {
 				t.Fatalf("missing shape: %s", suggestion)

@@ -114,6 +114,9 @@ func edgeTag(kind EdgeKind, argPos int) uint64 {
 	if kind == Ctrl {
 		isCtrl = 1
 	}
+	if kind == Exec {
+		isCtrl = 2
+	}
 	return combine(isCtrl, uint64(argPos))
 }
 
@@ -130,10 +133,10 @@ type Graph struct {
 	out    [][]Nb
 }
 
-func adjacency(n int, pdg *Pdg, forward bool) [][]Nb {
+func adjacency(n int, pdg *MiningGraph, forward, execution bool) [][]Nb {
 	lists := make([][]Nb, n)
 	for _, e := range pdg.Edges {
-		if e.From >= n || e.To >= n {
+		if !wlEdgeAllowed(e, n, execution) {
 			continue
 		}
 		at, node := e.From, uint64(e.To)
@@ -145,13 +148,19 @@ func adjacency(n int, pdg *Pdg, forward bool) [][]Nb {
 	return lists
 }
 
-func buildGraph(pdg *Pdg) Graph {
+func buildGraph(pdg *MiningGraph) Graph { return buildProfileGraph(pdg, false) }
+
+func wlEdgeAllowed(e PdgEdge, n int, execution bool) bool {
+	return e.From < n && e.To < n && (execution || e.Kind != Exec)
+}
+
+func buildProfileGraph(pdg *MiningGraph, execution bool) Graph {
 	n := len(pdg.Nodes)
 	labels := make([]uint64, n)
 	for i, node := range pdg.Nodes {
-		labels[i] = fnv1a([]byte(label(node)))
+		labels[i] = pdg.baseLabels.hash(node)
 	}
-	return Graph{labels: labels, inc: adjacency(n, pdg, false), out: adjacency(n, pdg, true)}
+	return Graph{labels: labels, inc: adjacency(n, pdg, false, execution), out: adjacency(n, pdg, true, execution)}
 }
 
 func digest(own, salt uint64, neighbours []Nb, prev []uint64) uint64 {
@@ -248,9 +257,9 @@ type Wl struct {
 	calls    int
 	diameter int
 	charVec  []float64
-	pdg      *Pdg
+	pdg      *MiningGraph
 	// nodeCount caches len(graph.labels). The CCGraph pipeline
-	// (SimilarityMilli, Vectorize) only needs hists and the node
+	// (SimilarityMilli) only needs hists and the node
 	// count, so NewWlLight omits graph/rounds/pdg and relies on
 	// this field. Populated by every constructor.
 	nodeCount int
@@ -261,16 +270,29 @@ type Wl struct {
 }
 
 // characteristicVector counts node kinds and edge kinds for CCGraph-style
-// pre-filtering: [decl, assign, control, call, other, ctrlEdges, dataEdges].
-func characteristicVector(pdg *Pdg) []float64 {
-	vec := make([]float64, 7)
+// pre-filtering. Native views use all nine canonical source characteristics.
+func characteristicVector(pdg *MiningGraph) []float64 {
+	if pdg.Paper != nil {
+		if !pdg.Paper.ReferenceKnown {
+			return nil
+		}
+		return pdg.Paper.Counts[:]
+	}
+	return miningCharacteristics(pdg, false)
+}
+
+func miningCharacteristics(pdg *MiningGraph, execution bool) []float64 {
+	vec := make([]float64, 9)
 	countNodes(pdg, vec)
 	countEdges(pdg, vec)
+	if !execution {
+		return vec[:7]
+	}
 	return vec
 }
 
 // countNodes tallies node kinds into the characteristic vector.
-func countNodes(pdg *Pdg, vec []float64) {
+func countNodes(pdg *MiningGraph, vec []float64) {
 	for _, n := range pdg.Nodes {
 		vec[nodeKindIndex(n.Kind)]++
 	}
@@ -293,18 +315,23 @@ func nodeKindIndex(kind NodeKind) int {
 }
 
 // countEdges tallies edge kinds into the characteristic vector.
-func countEdges(pdg *Pdg, vec []float64) {
+func countEdges(pdg *MiningGraph, vec []float64) {
 	for _, e := range pdg.Edges {
 		if e.Kind == Ctrl {
 			vec[5]++
 		} else if e.Kind == Data {
 			vec[6]++
+		} else if e.Kind == Exec {
+			vec[7]++
 		}
 	}
 }
 
 // cosineSimilarity returns the cosine of the angle between two vectors.
 func cosineSimilarity(a, b []float64) float64 {
+	if len(a) != len(b) {
+		return 0
+	}
 	var dot, normA, normB float64
 	for i := range a {
 		dot += a[i] * b[i]
@@ -326,7 +353,7 @@ func charVecSimilar(a, b *Wl) bool {
 const charVecThreshold = 0.9
 
 // NewWl builds the WL refinement of a PDG.
-func NewWl(pdg *Pdg) *Wl {
+func NewWl(pdg *MiningGraph) *Wl {
 	g := buildGraph(pdg)
 	d := diameter(&g)
 	// CCGraph optimization: only compute rounds up to diameter+1 (capped),
@@ -338,14 +365,14 @@ func NewWl(pdg *Pdg) *Wl {
 		hists:     histograms(rounds),
 		calls:     countCalls(pdg),
 		diameter:  d,
-		charVec:   characteristicVector(pdg),
+		charVec:   miningCharacteristics(pdg, false),
 		pdg:       pdg,
 		nodeCount: len(g.labels),
 	}
 }
 
 // NewWlLight builds a Wl with only the fields needed for CCGraph
-// similarity (SimilarityMilli) and LSH vectorization (Vectorize):
+// similarity (SimilarityMilli):
 // hists, diameter, nodeCount, charVec, and calls. It omits graph,
 // rounds, and pdg, which are only needed by PDG alignment (align.go),
 // the WL disk cache (wlcache.go), and weighted similarity
@@ -356,8 +383,8 @@ func NewWl(pdg *Pdg) *Wl {
 // thousands of candidate functions: the refinement history (rounds)
 // and adjacency (graph) dominate per-instance memory, and neither is
 // read by the CCGraph pipeline.
-func NewWlLight(pdg *Pdg, charVec []float64) *Wl {
-	g := buildGraph(pdg)
+func NewWlLight(pdg *MiningGraph, charVec []float64) *Wl {
+	g := buildProfileGraph(pdg, true)
 	d := diameter(&g)
 	rounds := (&g).refineRoundsDiameter(d)
 	return &Wl{
@@ -396,7 +423,7 @@ func histograms(rounds [][]uint64) [][]histEntry {
 	return hists
 }
 
-func countCalls(pdg *Pdg) int {
+func countCalls(pdg *MiningGraph) int {
 	calls := 0
 	for _, n := range pdg.Nodes {
 		if n.Kind == Call {
@@ -521,7 +548,7 @@ const (
 // control similarity must capture the skeleton (branching/looping shape),
 // not data distinctions like which function is called. The data projection
 // keeps full labels.
-func buildProjection(pdg *Pdg, kind EdgeKind) Graph {
+func buildProjection(pdg *MiningGraph, kind EdgeKind) Graph {
 	n := len(pdg.Nodes)
 	labels := make([]uint64, n)
 	for i, node := range pdg.Nodes {
@@ -536,7 +563,7 @@ func buildProjection(pdg *Pdg, kind EdgeKind) Graph {
 }
 
 // projectionAdjacency builds the in/out adjacency lists over one edge kind.
-func projectionAdjacency(pdg *Pdg, n int, kind EdgeKind) (inc, out [][]Nb) {
+func projectionAdjacency(pdg *MiningGraph, n int, kind EdgeKind) (inc, out [][]Nb) {
 	inc = make([][]Nb, n)
 	out = make([][]Nb, n)
 	for _, e := range pdg.Edges {
@@ -602,7 +629,7 @@ func SimilarityWeighted(a, b *Wl) uint32 {
 }
 
 // hasControlEdges reports whether the PDG has any control-flow edges.
-func hasControlEdges(pdg *Pdg) bool {
+func hasControlEdges(pdg *MiningGraph) bool {
 	for _, e := range pdg.Edges {
 		if e.Kind == Ctrl {
 			return true

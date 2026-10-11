@@ -34,7 +34,7 @@ const factoryMaxFields = 4
 
 // aggregateCandidates finds pairs of struct types mutated together in 2+
 // functions. Such types likely belong under one aggregate root.
-func aggregateCandidates(facts []*FuncFacts) []Candidate {
+func aggregateCandidates(facts []*MiningFacts) []Candidate {
 	pairFuncs := coModifiedPairs(facts)
 	var out []Candidate
 	for k, funcs := range pairFuncs {
@@ -54,7 +54,7 @@ func aggregateCandidates(facts []*FuncFacts) []Candidate {
 
 // coModifiedPairs maps each co-modified type pair to the functions that
 // modify both types.
-func coModifiedPairs(facts []*FuncFacts) map[[2]string]map[string]bool {
+func coModifiedPairs(facts []*MiningFacts) map[[2]string]map[string]bool {
 	seen := map[[2]string]map[string]bool{}
 	for _, f := range facts {
 		types := distinctTypes(f.AggregateMods)
@@ -72,7 +72,7 @@ func coModifiedPairs(facts []*FuncFacts) map[[2]string]map[string]bool {
 }
 
 // aggregateCandidate builds the detection-only candidate for a type pair.
-func aggregateCandidate(k [2]string, facts []*FuncFacts, funcs map[string]bool) Candidate {
+func aggregateCandidate(k [2]string, facts []*MiningFacts, funcs map[string]bool) Candidate {
 	names := make([]string, 0, len(funcs))
 	for id := range funcs {
 		names = append(names, id)
@@ -111,7 +111,7 @@ func distinctTypes(hits []AggregateModHit) []string {
 }
 
 // candidateSites builds Sites for the named function IDs.
-func candidateSites(facts []*FuncFacts, ids []string) []Site {
+func candidateSites(facts []*MiningFacts, ids []string) []Site {
 	want := map[string]bool{}
 	for _, id := range ids {
 		want[id] = true
@@ -133,7 +133,7 @@ func candidateSites(facts []*FuncFacts, ids []string) []Site {
 
 // repositoryCandidates flags functions making direct db calls outside
 // repository files. One candidate per function.
-func repositoryCandidates(facts []*FuncFacts) []Candidate {
+func repositoryCandidates(facts []*MiningFacts) []Candidate {
 	var out []Candidate
 	for _, f := range facts {
 		if len(f.DbCalls) == 0 {
@@ -176,7 +176,7 @@ func repositoryCandidates(facts []*FuncFacts) []Candidate {
 // built with construction logic in 2+ functions. Plain field assignment
 // doesn't qualify — the factory must encapsulate validation, defaults,
 // or error handling to be worth the indirection.
-func factoryCandidates(facts []*FuncFacts) []Candidate {
+func factoryCandidates(facts []*MiningFacts) []Candidate {
 	byType, firstLine := groupFactoryLits(facts)
 	var out []Candidate
 	for k, funcs := range byType {
@@ -203,7 +203,7 @@ type factoryTypeKey struct {
 // groupFactoryLits groups factory hits by struct type, tracking the
 // functions that build each type and the first literal line. Only hits
 // with construction logic are counted — plain field assignment is skipped.
-func groupFactoryLits(facts []*FuncFacts) (map[factoryTypeKey]map[string]bool, map[factoryTypeKey]int) {
+func groupFactoryLits(facts []*MiningFacts) (map[factoryTypeKey]map[string]bool, map[factoryTypeKey]int) {
 	byType := map[factoryTypeKey]map[string]bool{}
 	firstLine := map[factoryTypeKey]int{}
 	for _, f := range facts {
@@ -234,7 +234,7 @@ func factoryHitQualifies(h FactoryHit) bool {
 }
 
 // factoryCandidate builds the fixable candidate for a struct type.
-func factoryCandidate(k factoryTypeKey, facts []*FuncFacts, funcs map[string]bool, line int) Candidate {
+func factoryCandidate(k factoryTypeKey, facts []*MiningFacts, funcs map[string]bool, line int) Candidate {
 	names := make([]string, 0, len(funcs))
 	for id := range funcs {
 		names = append(names, id)
@@ -271,7 +271,7 @@ const specificationScoreMilli = 450
 // repeated in 2+ functions. Such rules want a named predicate: a method
 // on the type when it's local, a plain function otherwise (idiomatic Go;
 // the Evans Specification struct is not used).
-func specificationCandidates(facts []*FuncFacts) []Candidate {
+func specificationCandidates(facts []*MiningFacts) []Candidate {
 	byRule, first, fileOf := groupSpecRules(facts)
 	var out []Candidate
 	for k, funcs := range byRule {
@@ -297,7 +297,7 @@ type specRuleKey struct {
 
 // groupSpecRules groups specification hits by rule key, tracking the
 // functions containing each rule and the first hit for fixer context.
-func groupSpecRules(facts []*FuncFacts) (map[specRuleKey]map[string]bool, map[specRuleKey]SpecificationHit, map[specRuleKey]string) {
+func groupSpecRules(facts []*MiningFacts) (map[specRuleKey]map[string]bool, map[specRuleKey]SpecificationHit, map[specRuleKey]string) {
 	byRule := map[specRuleKey]map[string]bool{}
 	first := map[specRuleKey]SpecificationHit{}
 	fileOf := map[specRuleKey]string{}
@@ -327,7 +327,7 @@ func shortTypeName(typeName string) string {
 }
 
 // specificationCandidate builds the fixable candidate for a business rule.
-func specificationCandidate(k specRuleKey, facts []*FuncFacts, funcs map[string]bool, hit SpecificationHit, file string) Candidate {
+func specificationCandidate(k specRuleKey, facts []*MiningFacts, funcs map[string]bool, hit SpecificationHit, file string) Candidate {
 	names := make([]string, 0, len(funcs))
 	for id := range funcs {
 		names = append(names, id)

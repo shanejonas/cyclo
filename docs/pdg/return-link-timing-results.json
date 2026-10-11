@@ -1,0 +1,86 @@
+[
+  {
+    "mode": "patterns",
+    "run": 1,
+    "route": "before",
+    "seconds": 3.860096557997167,
+    "peak_rss_mib": 586.890625
+  },
+  {
+    "mode": "patterns",
+    "run": 1,
+    "route": "after",
+    "seconds": 4.103596467059106,
+    "peak_rss_mib": 619.1796875
+  },
+  {
+    "mode": "patterns",
+    "run": 2,
+    "route": "after",
+    "seconds": 4.009713777108118,
+    "peak_rss_mib": 623.58203125
+  },
+  {
+    "mode": "patterns",
+    "run": 2,
+    "route": "before",
+    "seconds": 3.9217773620039225,
+    "peak_rss_mib": 605.26171875
+  },
+  {
+    "mode": "patterns",
+    "run": 3,
+    "route": "before",
+    "seconds": 4.098393470980227,
+    "peak_rss_mib": 589.0078125
+  },
+  {
+    "mode": "patterns",
+    "run": 3,
+    "route": "after",
+    "seconds": 3.9721641959622502,
+    "peak_rss_mib": 636.16015625
+  },
+  {
+    "mode": "pdg-json",
+    "run": 1,
+    "route": "before",
+    "seconds": 6.4192893269937485,
+    "peak_rss_mib": 660.24609375
+  },
+  {
+    "mode": "pdg-json",
+    "run": 1,
+    "route": "after",
+    "seconds": 6.7663426289800555,
+    "peak_rss_mib": 739.37109375
+  },
+  {
+    "mode": "pdg-json",
+    "run": 2,
+    "route": "after",
+    "seconds": 6.513014981057495,
+    "peak_rss_mib": 647.74609375
+  },
+  {
+    "mode": "pdg-json",
+    "run": 2,
+    "route": "before",
+    "seconds": 6.659857355058193,
+    "peak_rss_mib": 726.90625
+  },
+  {
+    "mode": "pdg-json",
+    "run": 3,
+    "route": "before",
+    "seconds": 7.058106349082664,
+    "peak_rss_mib": 669.37109375
+  },
+  {
+    "mode": "pdg-json",
+    "run": 3,
+    "route": "after",
+    "seconds": 6.686390129849315,
+    "peak_rss_mib": 675.609375
+  }
+]

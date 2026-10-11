@@ -103,7 +103,7 @@ func TestDomainServiceWiredIntoRun(t *testing.T) {
 		EndLine:  30,
 		Types:    []string{"Account", "Money"},
 	}}
-	report := Run(nil, Options{DomainServices: hits})
+	report := RunMining(nil, Options{DomainServices: hits})
 	found := false
 	for _, c := range report.Candidates {
 		if c.Kind == DomainService {

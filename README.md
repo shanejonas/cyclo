@@ -298,3 +298,14 @@ go run ./examples/cyclo-hunt path/to/input.go
 
 See [the Cyclo checker guide](examples/cyclo-hunt/README.md) for its supported inputs
 and checks. The exploratory fixture generators have been removed.
+
+## Export the compat PDG IR
+
+```sh
+cyclo patterns --format pdg-json . > pdg.json
+```
+
+Writes a JSON array with one compat draft 0.1.0 document per function. Export skips
+pattern mining and preserves extraction limits as explicit evidence. The existing
+`patterns --format json` option still writes the pattern report.
+See [the PDG export contract](docs/pdg/README.md#json-export) for storage and validation details.

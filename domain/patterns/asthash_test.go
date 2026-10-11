@@ -97,7 +97,7 @@ func TestCCASTBypassHighSimilarity(t *testing.T) {
 
 func TestCCGraphClonesWithASTMatchesPlain(t *testing.T) {
 	// With nil AST types, the AST path must match the plain path exactly.
-	pdgs := map[string]*Pdg{
+	pdgs := map[string]*MiningGraph{
 		"f1": ccTestPdg(20, 1),
 		"f2": ccTestPdg(20, 100),
 		"f3": ccTestPdg(5, 200),
@@ -132,7 +132,7 @@ func TestCCGraphClonesWithASTFindsSyntacticClone(t *testing.T) {
 		t.Fatalf("test setup broken: AST similarity %f < %f", got, astBypassThreshold)
 	}
 	// PDGs with different node counts so Stage 1 likely rejects.
-	pdgs := map[string]*Pdg{
+	pdgs := map[string]*MiningGraph{
 		"f1": ccTestPdg(20, 1),
 		"f2": ccTestPdg(8, 100),
 	}

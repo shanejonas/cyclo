@@ -1,8 +1,8 @@
 package patterns
 
 // cloneGroupFacts resolves members through the shared corpus index.
-func cloneGroupFacts(factByID map[string]*FuncFacts, group []string) []*FuncFacts {
-	var fns []*FuncFacts
+func cloneGroupFacts(factByID map[string]*MiningFacts, group []string) []*MiningFacts {
+	var fns []*MiningFacts
 	for _, id := range group {
 		if f := factByID[id]; f != nil && f.Pdg != nil {
 			fns = append(fns, f)
@@ -15,8 +15,8 @@ func cloneGroupFacts(factByID map[string]*FuncFacts, group []string) []*FuncFact
 // the cluster with hole columns. Nil when alignment fails to join members.
 // buildCluster tries the top-3 templates by similarity and keeps the
 // alignment with the most joined members.
-func alignCloneGroup(fns []*FuncFacts, params Params) *Cluster {
-	pdgs := make([]*Pdg, len(fns))
+func alignCloneGroup(fns []*MiningFacts, params Params) *Cluster {
+	pdgs := make([]*MiningGraph, len(fns))
 	for i, f := range fns {
 		pdgs[i] = f.Pdg
 	}
@@ -40,7 +40,7 @@ func alignCloneGroup(fns []*FuncFacts, params Params) *Cluster {
 // and proposes the extracted helper with the differing parts as parameters.
 //
 // Takes:
-//   - facts: all FuncFacts for ID lookup
+//   - facts: all MiningFacts for ID lookup
 //   - group: a CCGraph clone group (function IDs from CCGraphClones)
 //   - params: clustering params for the alignment (thresholds, max holes)
 //
@@ -50,7 +50,7 @@ func alignCloneGroup(fns []*FuncFacts, params Params) *Cluster {
 //
 // Deterministic: group order is preserved, alignment is deterministic, and
 // the candidate construction sorts sites.
-func ParameterizeFromCloneGroup(facts []*FuncFacts, group []string, params Params) *Candidate {
+func ParameterizeFromCloneGroup(facts []*MiningFacts, group []string, params Params) *Candidate {
 	return parameterizeCloneGroup(newCandidateIndex(facts, nil, params), group, params)
 }
 
@@ -81,7 +81,7 @@ func parameterizeCloneGroup(ix *candidateIndex, group []string, params Params) *
 // side-effect profile (union of Call node Effects). Functions with wildly
 // different effects (e.g., one does IO, another is pure) should not share
 // an extracted helper.
-func compatibleEffects(fns []*FuncFacts) bool {
+func compatibleEffects(fns []*MiningFacts) bool {
 	var first uint16
 	for i, f := range fns {
 		var union uint16
@@ -102,7 +102,7 @@ func compatibleEffects(fns []*FuncFacts) bool {
 // CloneGroupParameterizeCandidates runs ParameterizeFromCloneGroup on every
 // CCGraph clone group, returning the parameterize candidates. Groups that
 // do not yield an abstraction are skipped.
-func CloneGroupParameterizeCandidates(facts []*FuncFacts, groups [][]string, params Params) []Candidate {
+func CloneGroupParameterizeCandidates(facts []*MiningFacts, groups [][]string, params Params) []Candidate {
 	ix := newCandidateIndex(facts, nil, params)
 	var out []Candidate
 	for _, group := range groups {

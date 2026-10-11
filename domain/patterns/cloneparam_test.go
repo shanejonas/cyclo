@@ -2,12 +2,12 @@ package patterns
 
 import "testing"
 
-// cloneParamTestFacts builds two FuncFacts with similar PDGs that differ in
+// cloneParamTestFacts builds two MiningFacts with similar PDGs that differ in
 // one literal (a hole for parameterization). Each PDG has 2+ calls so the
 // functions pass hasSubstance.
-func cloneParamTestFacts() []*FuncFacts {
+func cloneParamTestFacts() []*MiningFacts {
 	// Two 5-node PDGs differing only in one literal node's Detail.
-	mkPdg := func(detail string) *Pdg {
+	mkPdg := func(detail string) *MiningGraph {
 		nodes := []PdgNode{
 			{Kind: Call, Line: 1, Detail: "call:fetch"},
 			{Kind: Op, Line: 2, Detail: "add:int"},
@@ -21,9 +21,9 @@ func cloneParamTestFacts() []*FuncFacts {
 			{From: 2, To: 3, Kind: Data},
 			{From: 3, To: 4, Kind: Data},
 		}
-		return &Pdg{Nodes: nodes, Edges: edges}
+		return &MiningGraph{Nodes: nodes, Edges: edges}
 	}
-	return []*FuncFacts{
+	return []*MiningFacts{
 		{ID: "pkg.Foo", Name: "Foo", Path: "a.go", Line: 10, EndLine: 20, Pdg: mkPdg("lit:1")},
 		{ID: "pkg.Bar", Name: "Bar", Path: "b.go", Line: 30, EndLine: 40, Pdg: mkPdg("lit:2")},
 	}
@@ -53,7 +53,7 @@ func TestParameterizeFromCloneGroupMissingIDs(t *testing.T) {
 }
 
 func TestParameterizeFromCloneGroupNoPdgs(t *testing.T) {
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		{ID: "pkg.A", Name: "A", Path: "a.go", Line: 1, EndLine: 5},
 		{ID: "pkg.B", Name: "B", Path: "b.go", Line: 1, EndLine: 5},
 	}

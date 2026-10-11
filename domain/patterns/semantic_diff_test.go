@@ -3,7 +3,7 @@ package patterns
 import "testing"
 
 func TestSemanticDiffIdentical(t *testing.T) {
-	pdg := &Pdg{
+	pdg := &MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: "Param", TyClass: "int", Line: 1},
 			{Kind: "Op", TyClass: "int", Line: 2},
@@ -13,7 +13,7 @@ func TestSemanticDiffIdentical(t *testing.T) {
 		},
 	}
 	// Same structure, different lines: cosmetic.
-	pdg2 := &Pdg{
+	pdg2 := &MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: "Param", TyClass: "int", Line: 10},
 			{Kind: "Op", TyClass: "int", Line: 20},
@@ -29,7 +29,7 @@ func TestSemanticDiffIdentical(t *testing.T) {
 }
 
 func TestSemanticDiffChanged(t *testing.T) {
-	pdg := &Pdg{
+	pdg := &MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: "Param", TyClass: "int", Line: 1},
 			{Kind: "Op", TyClass: "int", Line: 2},
@@ -39,7 +39,7 @@ func TestSemanticDiffChanged(t *testing.T) {
 		},
 	}
 	// Added a node: semantic change.
-	pdg2 := &Pdg{
+	pdg2 := &MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: "Param", TyClass: "int", Line: 1},
 			{Kind: "Op", TyClass: "int", Line: 2},

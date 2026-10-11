@@ -6,7 +6,7 @@ import (
 )
 
 func TestEnumDispatchCandidatesProposeTable(t *testing.T) {
-	facts := []*FuncFacts{{
+	facts := []*MiningFacts{{
 		ID:             "p.process",
 		Name:           "process",
 		Path:           "process.go",
@@ -44,7 +44,7 @@ func TestEnumDispatchCandidatesProposeTable(t *testing.T) {
 }
 
 func TestEnumDispatchCandidatesNoneWithoutHits(t *testing.T) {
-	facts := []*FuncFacts{{
+	facts := []*MiningFacts{{
 		ID:   "p.clean",
 		Name: "clean",
 		Path: "clean.go",
@@ -56,7 +56,7 @@ func TestEnumDispatchCandidatesNoneWithoutHits(t *testing.T) {
 }
 
 func TestRunIncludesEnumDispatch(t *testing.T) {
-	facts := []*FuncFacts{{
+	facts := []*MiningFacts{{
 		ID:             "p.process",
 		Name:           "process",
 		Path:           "process.go",
@@ -64,7 +64,7 @@ func TestRunIncludesEnumDispatch(t *testing.T) {
 		EndLine:        30,
 		EnumDispatches: []EnumDispatchHit{{Line: 15, NumCases: 2}},
 	}}
-	report := Run(facts, Options{})
+	report := RunMining(facts, Options{})
 	found := false
 	for _, c := range report.Candidates {
 		if c.Kind == EnumDispatch {

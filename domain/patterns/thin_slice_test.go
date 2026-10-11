@@ -5,7 +5,7 @@ import "testing"
 func TestThinSliceExcludesControl(t *testing.T) {
 	// PDG: 0 (param) -> 1 (op, data), 0 -> 2 (ctrl), 2 -> 1 (ctrl).
 	// Thin slice from 1 should include 0 (data producer) but not 2 (control).
-	pdg := &Pdg{
+	pdg := &MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: "Param", Line: 1},
 			{Kind: "Op", Line: 2},

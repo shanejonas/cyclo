@@ -16,7 +16,7 @@ func TestBuildClusterTriesMultipleTemplates(t *testing.T) {
 	// graphs[0], graphs[1], graphs[2] are a chain: 0~1 similar, 1~2 similar,
 	// 0~2 less similar. The medoid by similarity might be 1, but if 1
 	// doesn't align well, 0 should work as template for the 0~1 pair.
-	pdgs := []*Pdg{graphs[0], graphs[1], graphs[2]}
+	pdgs := []*MiningGraph{graphs[0], graphs[1], graphs[2]}
 	params := clusterParams()
 	params.MinCoverageMilli = 0 // Align stub reports 0; WL does the selecting
 
@@ -51,7 +51,7 @@ func TestBuildClusterTriesMultipleTemplates(t *testing.T) {
 func TestUnionPreservesFlatPairs(t *testing.T) {
 	graphs := windowGraphs()
 	wls := []*Wl{NewWl(graphs[0]), NewWl(graphs[1])}
-	pdgs := []*Pdg{graphs[0], graphs[1]}
+	pdgs := []*MiningGraph{graphs[0], graphs[1]}
 	params := clusterParams()
 
 	flat := SimilarityMilli(wls[0], wls[1])

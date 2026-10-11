@@ -8,8 +8,8 @@ import (
 
 // stringMethod mirrors sigmine.rs's test fixture: a getter-like method with
 // a normalized signature shared across types, one owner per concrete SelfTy.
-func stringMethod(selfTy, name string) *FuncFacts {
-	return &FuncFacts{
+func stringMethod(selfTy, name string) *MiningFacts {
+	return &MiningFacts{
 		ID:     "k::" + selfTy + "." + name,
 		Name:   selfTy + "." + name,
 		Path:   "src/example.go",
@@ -19,8 +19,8 @@ func stringMethod(selfTy, name string) *FuncFacts {
 	}
 }
 
-func selfGetter(selfTy, name, retClass string) *FuncFacts {
-	return &FuncFacts{
+func selfGetter(selfTy, name, retClass string) *MiningFacts {
+	return &MiningFacts{
 		ID:     "k::" + selfTy + "." + name,
 		Name:   selfTy + "." + name,
 		Path:   "src/example.go",
@@ -30,17 +30,17 @@ func selfGetter(selfTy, name, retClass string) *FuncFacts {
 	}
 }
 
-func traited(f *FuncFacts) *FuncFacts {
+func traited(f *MiningFacts) *MiningFacts {
 	f.Implements = true
 	return f
 }
 
 func TestMineGroupNeedsTwoDistinctSelfTypes(t *testing.T) {
-	sameType := []*FuncFacts{stringMethod("Dog", "bark"), stringMethod("Dog", "howl")}
+	sameType := []*MiningFacts{stringMethod("Dog", "bark"), stringMethod("Dog", "howl")}
 	if got := MineGroups(sameType); len(got) != 0 {
 		t.Fatalf("same self type must not form a group, got %v", got)
 	}
-	two := []*FuncFacts{stringMethod("Dog", "bark"), stringMethod("Cat", "meow")}
+	two := []*MiningFacts{stringMethod("Dog", "bark"), stringMethod("Cat", "meow")}
 	groups := MineGroups(two)
 	if len(groups) != 1 {
 		t.Fatalf("expected 1 group, got %d", len(groups))
@@ -54,7 +54,7 @@ func TestMineGroupNeedsTwoDistinctSelfTypes(t *testing.T) {
 }
 
 func TestMineTraitImplMembersAreExcludedButCounted(t *testing.T) {
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		stringMethod("Dog", "bark"),
 		stringMethod("Cat", "meow"),
 		traited(stringMethod("Cow", "speak")),
@@ -75,7 +75,7 @@ func TestMineTraitImplMembersAreExcludedButCounted(t *testing.T) {
 	if group.SpecificityMilli != 0 {
 		t.Fatalf("expected specificity 0, got %d", group.SpecificityMilli)
 	}
-	onlyTraited := []*FuncFacts{
+	onlyTraited := []*MiningFacts{
 		traited(stringMethod("Cow", "speak")),
 		traited(stringMethod("Hen", "speak")),
 	}
@@ -85,7 +85,7 @@ func TestMineTraitImplMembersAreExcludedButCounted(t *testing.T) {
 }
 
 func TestMineRareSignatureOutranksGetterSignature(t *testing.T) {
-	var facts []*FuncFacts
+	var facts []*MiningFacts
 	for i := 0; i < 10; i++ {
 		facts = append(facts, stringMethod(fmt.Sprintf("T%d", i), fmt.Sprintf("label%d", i)))
 	}
@@ -114,7 +114,7 @@ func TestMineRareSignatureOutranksGetterSignature(t *testing.T) {
 }
 
 func TestMineSameNameBoostApplies(t *testing.T) {
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		stringMethod("Dog", "name"),
 		stringMethod("Cat", "name"),
 		selfGetter("Rock", "x", "Other"),
@@ -133,7 +133,7 @@ func TestMineSameNameBoostApplies(t *testing.T) {
 }
 
 func TestMineBoostScalesWithShareOfTypesThatShareTheName(t *testing.T) {
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		stringMethod("Dog", "name"),
 		stringMethod("Cat", "name"),
 		stringMethod("Cow", "moo"),
@@ -160,7 +160,7 @@ func TestMineBoostScalesWithShareOfTypesThatShareTheName(t *testing.T) {
 }
 
 func TestMineSameSelfTyWithDifferentConcreteArgsFormsAGroup(t *testing.T) {
-	facts := []*FuncFacts{stringMethod("Wrapper[u8]", "name"), stringMethod("Wrapper[u16]", "name")}
+	facts := []*MiningFacts{stringMethod("Wrapper[u8]", "name"), stringMethod("Wrapper[u16]", "name")}
 	groups := MineGroups(facts)
 	if len(groups) != 1 {
 		t.Fatalf("expected 1 group, got %d", len(groups))
@@ -174,14 +174,14 @@ func TestMineSameSelfTyWithDifferentConcreteArgsFormsAGroup(t *testing.T) {
 }
 
 func TestMineSameSelfTyWithParamArgsOnlyIsOneOwner(t *testing.T) {
-	facts := []*FuncFacts{stringMethod("Wrapper[T0]", "name"), stringMethod("Wrapper[T0]", "name2")}
+	facts := []*MiningFacts{stringMethod("Wrapper[T0]", "name"), stringMethod("Wrapper[T0]", "name2")}
 	if got := MineGroups(facts); len(got) != 0 {
 		t.Fatalf("one generic owner must not form a group, got %v", got)
 	}
 }
 
 func TestMineOutputIndependentOfInputOrder(t *testing.T) {
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		stringMethod("Dog", "bark"),
 		stringMethod("Cat", "meow"),
 		selfGetter("Dog", "chase", "Self"),
@@ -189,7 +189,7 @@ func TestMineOutputIndependentOfInputOrder(t *testing.T) {
 		traited(stringMethod("Cow", "speak")),
 	}
 	forward := MineGroups(facts)
-	reversed := append([]*FuncFacts{}, facts...)
+	reversed := append([]*MiningFacts{}, facts...)
 	for i, j := 0, len(reversed)-1; i < j; i, j = i+1, j-1 {
 		reversed[i], reversed[j] = reversed[j], reversed[i]
 	}

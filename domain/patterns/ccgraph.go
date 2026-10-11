@@ -2,25 +2,16 @@ package patterns
 
 import (
 	"fmt"
+	"math"
 	"runtime"
 	"sort"
 	"strings"
 	"sync"
 )
 
-// CCGraph-style clone detection (Zou et al., ASE 2020) with LSH scaling.
-//
-// The pipeline:
-//  1. Characteristic vectors (cheap 7-dim) → candidate pairs.
-//     CCGraph Stage 1: numerical PDG characteristics, cosine >= 0.9.
-//  2. Jaro-Winkler function-name similarity >= 0.5 → still candidate.
-//     CCGraph Stage 2: string similarity filter.
-//  3. LSH on 512-dim WL vectors → candidate clusters.
-//     Scaling layer (Gabel et al.): avoids O(n^2) pairwise WL checks.
-//  4. WL graph kernel similarity >= 0.9 → clones.
-//     CCGraph approximate matching. NO exact subgraph isomorphism.
-//
-// LSH is the optimization, CCGraph is the algorithm. Both are kept.
+// Cyclo's CCGraph-style adaptation combines characteristic/name admission,
+// WL verification. It returns connected groups, not
+// paper-level accepted pairs. See docs/pdg/ccgraph-profile.md.
 
 // Thresholds from the paper (Zou et al., ASE 2020).
 const (
@@ -30,20 +21,12 @@ const (
 	// ccMatchThreshold is the minimum WL kernel similarity (in
 	// thousandths, matching SimilarityMilli) for a clone pair.
 	ccMatchThreshold = 900
-	// ccLSHTables and ccLSHHashes tune the LSH candidate generation.
-	// More tables = higher recall; fewer hashes = higher recall.
-	ccLSHTables = 16
-	ccLSHHashes = 4
-	ccLSHSeed   = 42
 )
 
-// CCGraphClones finds clone groups using the CCGraph pipeline with LSH
-// scaling: characteristic-vector pre-filter, Jaro-Winkler name filter,
-// LSH candidate clustering, then WL kernel similarity. names maps
-// function ID to function name; when a name is missing, Stage 2 is
-// skipped for that pair. No AST data: the Stage 0 AST pre-filter is
-// skipped.
-func CCGraphClones(pdgs map[string]*Pdg, names map[string]string) [][]string {
+// CCGraphClones finds clone groups with characteristic/name admission and
+// WL verification of every admitted pair. Missing names skip the name filter.
+// No AST data: the AST admission bypass is disabled.
+func CCGraphClones(pdgs map[string]*MiningGraph, names map[string]string) [][]string {
 	return ccGraphGroups(pdgs, names, nil, false)
 }
 
@@ -51,27 +34,27 @@ func CCGraphClones(pdgs map[string]*Pdg, names map[string]string) [][]string {
 // enabled. astTypes maps function ID to its AST node-type multiset (see
 // AstNodeMultiset); nil or empty disables the pre-filter, matching
 // CCGraphClones exactly.
-func CCGraphClonesWithAST(pdgs map[string]*Pdg, names map[string]string, astTypes map[string]map[string]int) [][]string {
+func CCGraphClonesWithAST(pdgs map[string]*MiningGraph, names map[string]string, astTypes map[string]map[string]int) [][]string {
 	return ccGraphGroups(pdgs, names, astTypes, false)
 }
 
 // CCGraphClonesWithNeighborhoodWL is CCGraphClones with the neighborhood-augmented
-// WL kernel replacing the standard WL kernel in Stage 4. All paper-exact
+// WL kernel replacing the standard WL kernel in Stage 4. The adaptation
 // thresholds are unchanged; only the similarity kernel differs.
-func CCGraphClonesWithNeighborhoodWL(pdgs map[string]*Pdg, names map[string]string) [][]string {
+func CCGraphClonesWithNeighborhoodWL(pdgs map[string]*MiningGraph, names map[string]string) [][]string {
 	return ccGraphGroups(pdgs, names, nil, true)
 }
 
 // ccGraphGroups runs the shared CCGraph pipeline. The Stage 4 WL
-// similarity threshold is the paper-exact ccMatchThreshold.
+// similarity threshold is ccMatchThreshold.
 //
 // Stage 0 (AST pre-filter) runs before the paper stages when astTypes
 // is non-empty. It only ADDS candidate pairs with high AST similarity;
-// the paper stages (1, 2, 4) keep their exact thresholds and order.
+// the characteristic/name and WL stages retain their adaptation policies.
 //
 // When useNeighborhoodWL is true, Stage 4 uses the neighborhood WL kernel (SimilarityNeighborhoodWLMilli)
 // instead of the standard WL kernel (SimilarityMilli).
-func ccGraphGroups(pdgs map[string]*Pdg, names map[string]string, astTypes map[string]map[string]int, useNeighborhoodWL bool) [][]string {
+func ccGraphGroups(pdgs map[string]*MiningGraph, names map[string]string, astTypes map[string]map[string]int, useNeighborhoodWL bool) [][]string {
 	ids := ccSortableIDs(pdgs)
 	if len(ids) < 2 {
 		return nil
@@ -93,12 +76,9 @@ func ccGraphGroups(pdgs map[string]*Pdg, names map[string]string, astTypes map[s
 	if len(candidates.members()) == 0 {
 		return nil
 	}
-	// Stage 3: LSH-cluster the survivors' WL vectors.
-	// Stage 4: WL similarity within LSH clusters. The kernel is selected
-	// once here: standard WL or neighborhood-augmented WL, wrapped in a
-	// closure so the worker functions stay kernel-agnostic.
+	// Verify every admitted pair with the selected WL kernel. Light summaries
+	// retain histograms and node counts; no retrieval index is built.
 	wls := ccBuildWls(ids, candidates, pdgs, vecs)
-	clusters := ccLSHClusters(wls)
 	aligned := ccAlignedWLs(ids, wls)
 	sim := func(a, b int) bool { return similarityAtLeast(aligned[a], aligned[b], ccMatchThreshold) }
 	if useNeighborhoodWL {
@@ -112,9 +92,7 @@ func ccGraphGroups(pdgs map[string]*Pdg, names map[string]string, astTypes map[s
 	// candidate-set lookups in Stage 4.
 	idToIndex := ccIDIndex(ids)
 	parent := ccMakeParent(ids)
-	for _, cluster := range clusters {
-		ccUnionSimilar(cluster, candidates, idToIndex, sim, parent)
-	}
+	ccUnionSimilar(ids, candidates, idToIndex, sim, parent)
 	return groupsOfTwoOrMore(parent)
 }
 
@@ -129,7 +107,7 @@ func ccIDIndex(ids []string) map[string]int {
 }
 
 // ccSortableIDs returns function IDs with usable PDGs, sorted.
-func ccSortableIDs(pdgs map[string]*Pdg) []string {
+func ccSortableIDs(pdgs map[string]*MiningGraph) []string {
 	var ids []string
 	for id, pdg := range pdgs {
 		if pdg != nil && len(pdg.Nodes) > 0 {
@@ -144,15 +122,18 @@ func ccSortableIDs(pdgs map[string]*Pdg) []string {
 type ccPairJob struct{ a, b string }
 
 // ccPairFilters contains immutable pair inputs shared by striped workers.
+// Algorithm 1 admits a numerical match before trying the string fallback.
+// The paper prose and swapped threshold symbols are ambiguous; see docs/pdg/paper-audit.md.
 type ccPairFilters struct {
 	vecs   [][]float64
 	names  [][]rune
 	shapes []astShape
+	norms  []float64
 }
 
 func ccCandidatePairs(vecs [][]float64, names []string, shapes []astShape) *ccPairs {
 	out := newCCPairs(len(vecs))
-	filters := ccPairFilters{vecs, ccNameRunes(names), shapes}
+	filters := ccPairFilters{vecs: vecs, names: ccNameRunes(names), shapes: shapes, norms: vectorNorms(vecs)}
 	workers := min(runtime.NumCPU(), len(vecs))
 	var wg sync.WaitGroup
 	for w := 0; w < workers; w++ {
@@ -181,8 +162,12 @@ func (f ccPairFilters) accepts(i, j int, matcher nameMatcher) bool {
 	if f.shapes[i].bypass(f.shapes[j]) {
 		return true
 	}
-	if cosineSimilarity(f.vecs[i], f.vecs[j]) < charVecThreshold {
-		return false
+	// Unknown source features cannot establish a numerical rejection.
+	if len(f.vecs[i]) == 0 || len(f.vecs[j]) == 0 {
+		return true
+	}
+	if f.cosine(i, j) >= charVecThreshold {
+		return true
 	}
 	return matcher.similar(f.names[i], f.names[j])
 }
@@ -249,7 +234,7 @@ func ccNamesSimilar(a, b string) bool {
 // reused here instead of recomputed. Uses NewWlLight: the CCGraph
 // pipeline only needs histograms and node counts, so the refinement
 // history and graph adjacency are not retained.
-func ccBuildWls(ids []string, candidates *ccPairs, pdgs map[string]*Pdg, vecs [][]float64) map[string]*Wl {
+func ccBuildWls(ids []string, candidates *ccPairs, pdgs map[string]*MiningGraph, vecs [][]float64) map[string]*Wl {
 	seen := candidates.members()
 	out := make(map[string]*Wl, len(seen))
 	for _, i := range seen {
@@ -262,7 +247,7 @@ func ccBuildWls(ids []string, candidates *ccPairs, pdgs map[string]*Pdg, vecs []
 // ccBuildNeighborhoodWLs builds NeighborhoodWL instances for every function appearing in any
 // candidate pair. Only called when the neighborhood WL kernel is selected.
 // ids maps candidate-pair indices back to function IDs.
-func ccBuildNeighborhoodWLs(ids []string, candidates *ccPairs, pdgs map[string]*Pdg) map[string]*NeighborhoodWL {
+func ccBuildNeighborhoodWLs(ids []string, candidates *ccPairs, pdgs map[string]*MiningGraph) map[string]*NeighborhoodWL {
 	seen := candidates.members()
 	out := make(map[string]*NeighborhoodWL, len(seen))
 	for _, i := range seen {
@@ -272,18 +257,7 @@ func ccBuildNeighborhoodWLs(ids []string, candidates *ccPairs, pdgs map[string]*
 	return out
 }
 
-// ccLSHClusters vectorizes the survivors' WL instances and LSH-clusters
-// them into candidate groups.
-func ccLSHClusters(wls map[string]*Wl) [][]string {
-	vectors := make(map[string][]float64, len(wls))
-	for id, w := range wls {
-		vectors[id] = Vectorize(w)
-	}
-	lsh := NewLSH(lshDim, ccLSHTables, ccLSHHashes, ccLSHSeed)
-	return ClusterClones(vectors, lsh)
-}
-
-// ccUnionSimilar unions pairs within each LSH cluster that pass all
+// ccUnionSimilar unions admitted pairs that pass all
 // filters including WL similarity. The WL kernel checks are striped
 // across a worker pool; unions are applied sequentially afterwards.
 // Union order cannot affect the final groups (groupsOfTwoOrMore
@@ -302,7 +276,7 @@ func ccUnionSimilar(cluster []string, candidates *ccPairs, idToIndex map[string]
 		wg.Add(1)
 		go func(w int) {
 			defer wg.Done()
-			found <- ccSimilarStripes(cluster, candidates, indices, sim, w, workers)
+			ccSimilarStripes(cluster, candidates, indices, sim, w, workers, found)
 		}(w)
 	}
 	go func() {
@@ -316,13 +290,14 @@ func ccUnionSimilar(cluster []string, candidates *ccPairs, idToIndex map[string]
 	}
 }
 
-// ccSimilarStripes returns the cluster pairs (outer index striped by
+// ccSimilarStripes streams bounded batches of cluster pairs (outer index striped by
 // worker) passing the candidate-set and WL-similarity filters. The sim
 // closure is the Stage 4 kernel: standard WL or neighborhood-augmented WL,
 // selected by the caller. idToIndex maps function IDs to positions in the
 // sorted ids slice, for candidate-set lookups.
-func ccSimilarStripes(cluster []string, candidates *ccPairs, indices []int, sim func(a, b int) bool, worker, workers int) []ccPairJob {
-	var out []ccPairJob
+func ccSimilarStripes(cluster []string, candidates *ccPairs, indices []int, sim func(a, b int) bool, worker, workers int, found chan<- []ccPairJob) {
+	batch := ccPairBatch{pairs: make([]ccPairJob, 0, 64), found: found}
+	defer batch.flush()
 	for i := worker; i < len(cluster); i += workers {
 		for j := i + 1; j < len(cluster); j++ {
 			a, b := indices[i], indices[j]
@@ -332,10 +307,9 @@ func ccSimilarStripes(cluster []string, candidates *ccPairs, indices []int, sim 
 			if !sim(a, b) {
 				continue
 			}
-			out = append(out, ccPairJob{a: cluster[i], b: cluster[j]})
+			batch.add(ccPairJob{a: cluster[i], b: cluster[j]})
 		}
 	}
-	return out
 }
 
 // ccMakeParent initializes union-find parent pointers.
@@ -464,8 +438,8 @@ func commonRunePrefix(r1, r2 []rune, max int) int {
 }
 
 // buildFactMap indexes facts by ID for candidate construction.
-func buildFactMap(facts []*FuncFacts) map[string]*FuncFacts {
-	out := map[string]*FuncFacts{}
+func buildFactMap(facts []*MiningFacts) map[string]*MiningFacts {
+	out := map[string]*MiningFacts{}
 	for _, f := range facts {
 		out[f.ID] = f
 	}
@@ -474,7 +448,7 @@ func buildFactMap(facts []*FuncFacts) map[string]*FuncFacts {
 
 // CCGraphCloneCandidates converts CCGraph clone groups (function ID lists)
 // into pattern candidates for the report pipeline.
-func CCGraphCloneCandidates(groups [][]string, facts []*FuncFacts) []Candidate {
+func CCGraphCloneCandidates(groups [][]string, facts []*MiningFacts) []Candidate {
 	factByID := buildFactMap(facts)
 	var out []Candidate
 	for _, group := range groups {
@@ -487,7 +461,7 @@ func CCGraphCloneCandidates(groups [][]string, facts []*FuncFacts) []Candidate {
 
 // makeCCGraphCandidate builds one candidate from a clone group. Groups with
 // fewer than two resolvable sites are dropped.
-func makeCCGraphCandidate(group []string, factByID map[string]*FuncFacts) (Candidate, bool) {
+func makeCCGraphCandidate(group []string, factByID map[string]*MiningFacts) (Candidate, bool) {
 	var sites []Site
 	for _, id := range group {
 		f := factByID[id]
@@ -507,7 +481,7 @@ func makeCCGraphCandidate(group []string, factByID map[string]*FuncFacts) (Candi
 		Kind:             CCGraphClone,
 		ScoreMilli:       750,
 		Observation:      ccObservation(sites),
-		Inference:        "these functions have similar PDGs and similar names: they likely implement the same logic",
+		Inference:        "these functions have similar PDGs: they likely implement the same logic",
 		PossibleRefactor: "review the group; extract a shared helper if the logic is truly duplicated",
 		Sites:            sites,
 	}, true
@@ -525,8 +499,8 @@ func ccObservation(sites []Site) string {
 
 // ccGraphInputs builds the PDG, name, and AST-type maps CCGraphClones
 // needs from facts. Functions without a PDG are skipped.
-func ccGraphInputs(facts []*FuncFacts) (map[string]*Pdg, map[string]string, map[string]map[string]int) {
-	pdgs := make(map[string]*Pdg, len(facts))
+func ccGraphInputs(facts []*MiningFacts) (map[string]*MiningGraph, map[string]string, map[string]map[string]int) {
+	pdgs := make(map[string]*MiningGraph, len(facts))
 	names := make(map[string]string, len(facts))
 	astTypes := make(map[string]map[string]int, len(facts))
 	for _, f := range facts {
@@ -554,6 +528,38 @@ func ccAlignedNeighborhoodWLs(ids []string, wls map[string]*NeighborhoodWL) []*N
 	out := make([]*NeighborhoodWL, len(ids))
 	for i, id := range ids {
 		out[i] = wls[id]
+	}
+	return out
+}
+
+// Norms are invariant across pair comparisons. Keep the original division and
+// summation order, so caching does not alter threshold decisions.
+func vectorNorms(vecs [][]float64) []float64 {
+	norms := make([]float64, len(vecs))
+	for i, vec := range vecs {
+		norms[i] = math.Sqrt(dot(vec, vec))
+	}
+	return norms
+}
+
+func (f ccPairFilters) cosine(i, j int) float64 {
+	if f.norms[i] == 0 || f.norms[j] == 0 {
+		return 0
+	}
+	return dot(f.vecs[i], f.vecs[j]) / (f.norms[i] * f.norms[j])
+}
+
+// defaultCloneGroups keeps report routing separate from explicit pair profiles.
+func defaultCloneGroups(facts []*MiningFacts) [][]string {
+	pdgs, names, astTypes := ccGraphInputs(facts)
+	return CCGraphClonesWithAST(pdgs, names, astTypes)
+}
+
+// dot multiplies aligned characteristic-vector coordinates in their original order.
+func dot(a, b []float64) float64 {
+	var out float64
+	for i, value := range a {
+		out += value * b[i]
 	}
 	return out
 }

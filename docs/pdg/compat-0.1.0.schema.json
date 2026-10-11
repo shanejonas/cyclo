@@ -1,0 +1,1049 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Reusable PDG interchange draft",
+  "description": "Structural contract only. Semantic validation and a versioned extraction/matching profile are required separately.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "profile",
+    "producer",
+    "sources",
+    "function",
+    "symbols",
+    "definitions",
+    "memory_locations",
+    "nodes",
+    "edges",
+    "extraction_evidence"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0",
+      "description": "Version of this interchange contract, independent of extraction and matching profile versions."
+    },
+    "profile": {
+      "$ref": "#/$defs/profile",
+      "description": "Versioned policy defining graph granularity, extraction semantics, and required evidence."
+    },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "language",
+        "language_version",
+        "configuration"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/id",
+          "description": "Name of the represented entity; unavailable names require explicit evidence."
+        },
+        "version": {
+          "$ref": "#/$defs/id",
+          "description": "Version identifying the producer or policy, as determined by the containing record."
+        },
+        "language": {
+          "$ref": "#/$defs/id",
+          "description": "Source language identity; sharing a language-neutral schema does not imply equivalent extraction."
+        },
+        "language_version": {
+          "$ref": "#/$defs/fact",
+          "description": "Known language version or an explicit explanation of unavailable version evidence."
+        },
+        "configuration": {
+          "type": "object",
+          "description": "Frontend and analysis settings affecting extraction, including build flags and enabled language features where relevant."
+        }
+      },
+      "description": "Frontend identity and configuration used to extract this graph."
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "path",
+          "content_identity"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id",
+            "description": "Opaque identity in the containing record namespace; not a clone-matching label."
+          },
+          "path": {
+            "$ref": "#/$defs/id",
+            "description": "Source navigation path; not part of semantic node equality or base matching labels."
+          },
+          "content_identity": {
+            "$ref": "#/$defs/fact",
+            "$comment": "I don't think we need this content_identity bit, not sure what it is",
+            "description": "Identity of the exact source contents, for example an algorithm-qualified digest. Detects stale spans when a path changes contents; unknown identity carries a reason."
+          }
+        },
+        "description": "One element of the enclosing collection; its referenced definition or fields specify its semantics."
+      },
+      "description": "Source artifacts used for navigation and extraction provenance."
+    },
+    "function": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "qualified_name",
+        "source_span",
+        "inputs",
+        "outputs",
+        "interface_completeness",
+        "reference_count"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id",
+          "description": "Opaque identity in the containing record namespace; not a clone-matching label."
+        },
+        "name": {
+          "$ref": "#/$defs/fact",
+          "description": "Name of the represented entity; unavailable names require explicit evidence."
+        },
+        "qualified_name": {
+          "$ref": "#/$defs/fact",
+          "description": "Frontend-resolved function name including containing module or type where applicable."
+        },
+        "source_span": {
+          "$ref": "#/$defs/span",
+          "description": "Source navigation range expressed as half-open UTF-8 byte offsets."
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/parameter",
+            "description": "One element of the enclosing collection; its referenced definition or fields specify its semantics."
+          },
+          "description": "Ordered input interface, with explicit roles for parameters, receivers, and captures according to the profile."
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/parameter",
+            "description": "One element of the enclosing collection; its referenced definition or fields specify its semantics."
+          },
+          "description": "Ordered return or output interface according to the profile; an empty list alone does not establish completeness."
+        },
+        "interface_completeness": {
+          "$ref": "#/$defs/capability",
+          "description": "Evidence that interface extraction is complete, approximate, unavailable, or not applicable."
+        },
+        "reference_count": {
+          "$ref": "#/$defs/countFact",
+          "description": "Known nonnegative reference count under an explicit versioned counting policy, or unavailable evidence; unknown is not zero."
+        }
+      },
+      "description": "Identity, source boundary, interface, and counting evidence for the represented function."
+    },
+    "symbols": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "scope_id",
+          "role",
+          "type"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id",
+            "description": "Opaque identity in the containing record namespace; not a clone-matching label."
+          },
+          "name": {
+            "$ref": "#/$defs/fact",
+            "description": "Name of the represented entity; unavailable names require explicit evidence."
+          },
+          "scope_id": {
+            "$ref": "#/$defs/id",
+            "description": "Binding scope identity under the extraction profile; scope identifiers are not necessarily node IDs."
+          },
+          "role": {
+            "enum": [
+              "parameter",
+              "local",
+              "global",
+              "capture",
+              "receiver",
+              "output",
+              "other"
+            ],
+            "description": "Semantic role within the enclosing binding or interface record."
+          },
+          "type": {
+            "$ref": "#/$defs/fact",
+            "description": "Original type representation or unavailable type evidence; type equivalence is a separate profile decision."
+          },
+          "extensions": {
+            "$ref": "#/$defs/extensions",
+            "description": "Namespaced extension facts, excluded from base matching unless the matching profile explicitly includes them."
+          }
+        },
+        "description": "One element of the enclosing collection; its referenced definition or fields specify its semantics."
+      },
+      "description": "Bindings referenced by operations; these records are not graph nodes or individual definitions."
+    },
+    "definitions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "node_id"
+        ],
+        "anyOf": [
+          {
+            "required": [
+              "symbol_id"
+            ],
+            "description": "Structural requirement; semantic consistency requires profile validation."
+          },
+          {
+            "required": [
+              "location_id"
+            ],
+            "description": "Structural requirement; semantic consistency requires profile validation."
+          }
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id",
+            "description": "Opaque identity in the containing record namespace; not a clone-matching label."
+          },
+          "node_id": {
+            "$ref": "#/$defs/id",
+            "description": "Graph-local node ID associated with this record; references must be checked by semantic validation."
+          },
+          "symbol_id": {
+            "$ref": "#/$defs/id",
+            "description": "Reference to a binding in the document symbol table."
+          },
+          "location_id": {
+            "$ref": "#/$defs/id",
+            "description": "Reference to an abstract storage location in memory_locations."
+          }
+        },
+        "description": "One element of the enclosing collection; its referenced definition or fields specify its semantics."
+      },
+      "description": "Individual produced versions of symbols or memory locations; reassignment creates a distinct definition."
+    },
+    "memory_locations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "abstraction",
+          "description",
+          "evidence"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id",
+            "description": "Opaque identity in the containing record namespace; not a clone-matching label."
+          },
+          "abstraction": {
+            "$ref": "#/$defs/id",
+            "description": "Identifier of the memory-region abstraction used, such as field-sensitive or allocation-site modeling, as defined by the profile."
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable explanation of this record, its scope, or its limitations; not a base matching label."
+          },
+          "evidence": {
+            "$ref": "#/$defs/capability",
+            "description": "Extraction support or approximation evidence for this particular entity or dependency."
+          },
+          "extensions": {
+            "$ref": "#/$defs/extensions",
+            "description": "Namespaced extension facts, excluded from base matching unless the matching profile explicitly includes them."
+          }
+        },
+        "description": "One element of the enclosing collection; its referenced definition or fields specify its semantics."
+      },
+      "description": "Abstract storage locations under the declared memory and alias policy."
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/node",
+        "description": "One element of the enclosing collection; its referenced definition or fields specify its semantics."
+      },
+      "description": "Program operations and synthetic analysis entities. Collection order is not execution order."
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/edge",
+        "description": "One element of the enclosing collection; its referenced definition or fields specify its semantics."
+      },
+      "description": "Directed dependency occurrences; parallel edges are retained, and collection order has no semantic meaning."
+    },
+    "extraction_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capabilities",
+        "diagnostics",
+        "conformance"
+      ],
+      "properties": {
+        "capabilities": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/capability"
+          },
+          "required": [
+            "node_extraction",
+            "scalar_reaching_definitions",
+            "branch_merges",
+            "loop_carried_dependencies",
+            "control_dependencies",
+            "execution_dependencies",
+            "returns",
+            "calls",
+            "parameters",
+            "closures",
+            "macros",
+            "memory_aliases",
+            "exceptional_flow",
+            "concurrency",
+            "reference_counting"
+          ],
+          "description": "Named extraction capabilities. Every required capability needs an explicit status; additional names are permitted."
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/diagnostic",
+            "description": "One element of the enclosing collection; its referenced definition or fields specify its semantics."
+          },
+          "description": "Extraction or validation messages, including unsupported constructs and missing required evidence."
+        },
+        "conformance": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "profile",
+              "status",
+              "reasons"
+            ],
+            "properties": {
+              "profile": {
+                "$ref": "#/$defs/profile",
+                "description": "Versioned policy defining graph granularity, extraction semantics, and required evidence."
+              },
+              "status": {
+                "enum": [
+                  "conformant",
+                  "non_conformant",
+                  "not_evaluated"
+                ],
+                "description": "Explicit knowledge, support, or conformance state according to the containing record; must not be inferred from empty collections."
+              },
+              "reasons": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/id",
+                  "description": "One element of the enclosing collection; its referenced definition or fields specify its semantics."
+                },
+                "description": "Explanations of the conformance assessment; at least one is required for non-conformance."
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "const": "non_conformant",
+                      "description": "Explicit knowledge, support, or conformance state according to the containing record; must not be inferred from empty collections."
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "reasons": {
+                      "minItems": 1,
+                      "description": "Explanations of the conformance assessment; at least one is required for non-conformance."
+                    }
+                  }
+                },
+                "description": "Structural requirement; semantic consistency requires profile validation."
+              }
+            ],
+            "description": "One element of the enclosing collection; its referenced definition or fields specify its semantics."
+          },
+          "description": "Assessments against named versioned profiles; structural validity alone does not prove conformance."
+        }
+      },
+      "description": "Capability coverage, limitations, diagnostics, and explicit profile-conformance assessments."
+    },
+    "extensions": {
+      "$ref": "#/$defs/extensions",
+      "description": "Namespaced extension facts, excluded from base matching unless the matching profile explicitly includes them."
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Nonempty identifier or textual token; the enclosing field determines its namespace and semantics."
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id",
+          "description": "Opaque identity in the containing record namespace; not a clone-matching label."
+        },
+        "version": {
+          "$ref": "#/$defs/id",
+          "description": "Version identifying the producer or policy, as determined by the containing record."
+        }
+      },
+      "description": "Named and versioned semantic policy; schema compatibility alone does not establish profile compatibility."
+    },
+    "extensions": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-zA-Z][a-zA-Z0-9_.-]*:[a-zA-Z0-9_.-]+$"
+      },
+      "description": "Namespaced extension facts, excluded from base matching unless the matching profile explicitly includes them."
+    },
+    "fact": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "value"
+          ],
+          "properties": {
+            "status": {
+              "const": "known",
+              "description": "Explicit knowledge, support, or conformance state according to the containing record; must not be inferred from empty collections."
+            },
+            "value": {
+              "type": "string",
+              "description": "Known fact value. Empty strings and zero counts are known values, not substitutes for unknown evidence."
+            }
+          },
+          "description": "Alternative representation of the enclosing fact."
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "reason"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "unknown",
+                "unsupported",
+                "not_applicable"
+              ],
+              "description": "Explicit knowledge, support, or conformance state according to the containing record; must not be inferred from empty collections."
+            },
+            "reason": {
+              "$ref": "#/$defs/id",
+              "description": "Explanation of why a fact is unknown, unsupported, or not applicable."
+            }
+          },
+          "description": "Alternative representation of the enclosing fact."
+        }
+      ],
+      "description": "String-valued evidence distinguishing a known value from unknown, unsupported, or not-applicable facts."
+    },
+    "countFact": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "value",
+            "policy"
+          ],
+          "properties": {
+            "status": {
+              "const": "known",
+              "description": "Explicit knowledge, support, or conformance state according to the containing record; must not be inferred from empty collections."
+            },
+            "value": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Known fact value. Empty strings and zero counts are known values, not substitutes for unknown evidence."
+            },
+            "policy": {
+              "$ref": "#/$defs/profile",
+              "description": "Versioned interpretation or analysis policy governing the enclosing fact, edge, or transformation."
+            }
+          },
+          "description": "Alternative representation of the enclosing fact."
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "reason"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "unknown",
+                "unsupported",
+                "not_applicable"
+              ],
+              "description": "Explicit knowledge, support, or conformance state according to the containing record; must not be inferred from empty collections."
+            },
+            "reason": {
+              "$ref": "#/$defs/id",
+              "description": "Explanation of why a fact is unknown, unsupported, or not applicable."
+            }
+          },
+          "description": "Alternative representation of the enclosing fact."
+        }
+      ],
+      "description": "Known nonnegative reference count under an explicit versioned counting policy, or unavailable evidence; unknown is not zero."
+    },
+    "span": {
+      "description": "Half-open UTF-8 byte offsets into the identified source content.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "start",
+        "end"
+      ],
+      "properties": {
+        "source_id": {
+          "$ref": "#/$defs/id",
+          "description": "Reference to the source artifact whose byte offsets are used."
+        },
+        "start": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Inclusive zero-based UTF-8 byte offset; semantic validation checks bounds."
+        },
+        "end": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Exclusive zero-based UTF-8 byte offset; must be at least start and within source bounds."
+        }
+      }
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "description"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "supported",
+            "approximated",
+            "unsupported",
+            "unknown",
+            "not_applicable"
+          ],
+          "description": "Explicit knowledge, support, or conformance state according to the containing record; must not be inferred from empty collections."
+        },
+        "description": {
+          "$ref": "#/$defs/id",
+          "description": "Human-readable explanation of this record, its scope, or its limitations; not a base matching label."
+        },
+        "policy": {
+          "$ref": "#/$defs/profile",
+          "description": "Versioned interpretation or analysis policy governing the enclosing fact, edge, or transformation."
+        }
+      },
+      "description": "Support evidence with a required explanation of scope, limitations, and approximation behavior."
+    },
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "position",
+        "role",
+        "name",
+        "type",
+        "variadic"
+      ],
+      "properties": {
+        "position": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zero-based interface or operation position under the profile-defined ordering."
+        },
+        "role": {
+          "enum": [
+            "parameter",
+            "receiver",
+            "capture",
+            "return",
+            "output"
+          ],
+          "description": "Semantic role within the enclosing binding or interface record."
+        },
+        "symbol_id": {
+          "$ref": "#/$defs/id",
+          "description": "Reference to a binding in the document symbol table."
+        },
+        "name": {
+          "$ref": "#/$defs/fact",
+          "description": "Name of the represented entity; unavailable names require explicit evidence."
+        },
+        "type": {
+          "$ref": "#/$defs/fact",
+          "description": "Original type representation or unavailable type evidence; type equivalence is a separate profile decision."
+        },
+        "variadic": {
+          "$ref": "#/$defs/fact",
+          "description": "String-valued fact describing variadic status under a profile-defined vocabulary; unavailable evidence is explicit."
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions",
+          "description": "Namespaced extension facts, excluded from base matching unless the matching profile explicitly includes them."
+        }
+      },
+      "description": "Ordered function-interface element with name/type evidence, semantic role, and variadic evidence."
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "origin",
+        "description"
+      ],
+      "properties": {
+        "origin": {
+          "enum": [
+            "source",
+            "desugaring",
+            "macro_expansion",
+            "analysis",
+            "projection"
+          ],
+          "description": "How the entity arose: source extraction, desugaring, macro expansion, analysis, or graph projection."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable explanation of this record, its scope, or its limitations; not a base matching label."
+        },
+        "origin_node_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id",
+            "description": "One element of the enclosing collection; its referenced definition or fields specify its semantics."
+          },
+          "description": "Nodes from which this entity was derived; external graph reference context must be defined by a transformation profile."
+        },
+        "origin_spans": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/span",
+            "description": "One element of the enclosing collection; its referenced definition or fields specify its semantics."
+          },
+          "description": "Source ranges contributing to this entity, including expansion or transformation origins."
+        },
+        "policy": {
+          "$ref": "#/$defs/profile",
+          "description": "Versioned interpretation or analysis policy governing the enclosing fact, edge, or transformation."
+        }
+      },
+      "description": "Origin and transformation evidence used to trace this entity back to source or prior graphs."
+    },
+    "access": {
+      "type": "object",
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": [
+            "symbol_id"
+          ],
+          "description": "Structural requirement; semantic consistency requires profile validation."
+        },
+        {
+          "required": [
+            "location_id"
+          ],
+          "description": "Structural requirement; semantic consistency requires profile validation."
+        },
+        {
+          "required": [
+            "unresolved_reason"
+          ],
+          "description": "Structural requirement; semantic consistency requires profile validation."
+        }
+      ],
+      "properties": {
+        "symbol_id": {
+          "$ref": "#/$defs/id",
+          "description": "Reference to a binding in the document symbol table."
+        },
+        "location_id": {
+          "$ref": "#/$defs/id",
+          "description": "Reference to an abstract storage location in memory_locations."
+        },
+        "unresolved_reason": {
+          "$ref": "#/$defs/id",
+          "description": "Explanation of an access whose binding or memory location could not be resolved."
+        },
+        "operand_position": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zero-based input position at the consumer under the profile operand ordering; repeated operands remain distinct."
+        }
+      },
+      "description": "Read or write access to a symbol, abstract location, or explicitly unresolved target."
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "category",
+        "original_kind",
+        "synthetic",
+        "attributes",
+        "provenance",
+        "evidence"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id",
+          "description": "Opaque identity in the containing record namespace; not a clone-matching label."
+        },
+        "category": {
+          "enum": [
+            "declaration",
+            "read",
+            "assignment",
+            "computation",
+            "control",
+            "call",
+            "entry",
+            "formal_input",
+            "return",
+            "formal_output",
+            "exit",
+            "merge",
+            "memory_summary",
+            "other"
+          ],
+          "description": "Normalized semantic category: declarations bind symbols; reads consume values; assignments define values; computations apply operators; controls govern execution; calls invoke operations; interface and exit nodes model boundaries; merges and memory summaries may be synthetic. This is not automatically a CCGraph label."
+        },
+        "original_kind": {
+          "$ref": "#/$defs/fact",
+          "description": "Original frontend or language-specific syntax/analysis kind, retained separately from normalized categories."
+        },
+        "synthetic": {
+          "type": "boolean",
+          "description": "Whether analysis introduced this node rather than directly extracting a source-backed operation."
+        },
+        "source_span": {
+          "$ref": "#/$defs/span",
+          "description": "Source navigation range expressed as half-open UTF-8 byte offsets."
+        },
+        "provenance": {
+          "$ref": "#/$defs/provenance",
+          "description": "Origin and transformation evidence used to trace this entity back to source or prior graphs."
+        },
+        "evidence": {
+          "$ref": "#/$defs/capability",
+          "description": "Extraction support or approximation evidence for this particular entity or dependency."
+        },
+        "attributes": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "symbol_ids": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/id",
+                "description": "One element of the enclosing collection; its referenced definition or fields specify its semantics."
+              },
+              "description": "Bindings declared or otherwise identified by this operation according to its category."
+            },
+            "defines": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/id",
+                "description": "One element of the enclosing collection; its referenced definition or fields specify its semantics."
+              },
+              "description": "Definition IDs produced by this node; each must identify this node as its defining operation."
+            },
+            "reads": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/access",
+                "description": "One element of the enclosing collection; its referenced definition or fields specify its semantics."
+              },
+              "description": "Read accesses performed by this operation; reaching-definition relationships are represented by dependency edges."
+            },
+            "writes": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/access",
+                "description": "One element of the enclosing collection; its referenced definition or fields specify its semantics."
+              },
+              "description": "Write accesses performed by this operation under the declared storage abstraction."
+            },
+            "operator": {
+              "$ref": "#/$defs/fact",
+              "description": "Original operator representation, or explicit unavailable evidence; normalization requires a profile decision."
+            },
+            "literal": {
+              "$ref": "#/$defs/fact",
+              "description": "Original literal representation or unavailable evidence; preservation and matching treatment are profile-defined."
+            },
+            "construct": {
+              "$ref": "#/$defs/id",
+              "description": "Original or profile-defined control construct, such as a conditional or loop."
+            },
+            "write_form": {
+              "$ref": "#/$defs/id",
+              "description": "Profile-defined write form, such as initialization, reassignment, compound assignment, or destructuring."
+            },
+            "position": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Zero-based interface or operation position under the profile-defined ordering."
+            },
+            "exit_kind": {
+              "enum": [
+                "normal",
+                "exceptional",
+                "other"
+              ],
+              "description": "Whether the represented exit is normal, exceptional, or another explicitly explained form."
+            },
+            "callee": {
+              "$ref": "#/$defs/fact",
+              "description": "Resolved callee representation or explicit unavailable resolution evidence; does not itself prove call effects."
+            },
+            "call_form": {
+              "enum": [
+                "direct",
+                "indirect",
+                "unknown"
+              ],
+              "description": "Whether the call is direct, indirect, or unresolved; indirect calls may have multiple possible targets under an extension policy."
+            },
+            "outcomes": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/id",
+                "description": "One element of the enclosing collection; its referenced definition or fields specify its semantics."
+              },
+              "description": "Profile-defined control alternatives, such as true/false or case labels, used to interpret control dependencies."
+            },
+            "description": {
+              "$ref": "#/$defs/id",
+              "description": "Human-readable explanation of this record, its scope, or its limitations; not a base matching label."
+            },
+            "extensions": {
+              "$ref": "#/$defs/extensions",
+              "description": "Namespaced extension facts, excluded from base matching unless the matching profile explicitly includes them."
+            }
+          },
+          "description": "Operation facts selected by node category and extraction profile; missing optional attributes mean unrecorded, not false or zero."
+        },
+        "annotations": {
+          "$ref": "#/$defs/extensions",
+          "description": "Namespaced optional effects, ownership, type, call, or other facts; ignored by base matching unless explicitly included by its versioned profile."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "synthetic": {
+                "const": false,
+                "description": "Whether analysis introduced this node rather than directly extracting a source-backed operation."
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "source_span"
+            ]
+          },
+          "description": "Structural requirement; semantic consistency requires profile validation."
+        },
+        {
+          "if": {
+            "properties": {
+              "category": {
+                "const": "other",
+                "description": "Normalized semantic category: declarations bind symbols; reads consume values; assignments define values; computations apply operators; controls govern execution; calls invoke operations; interface and exit nodes model boundaries; merges and memory summaries may be synthetic. This is not automatically a CCGraph label."
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "required": [
+                  "description"
+                ],
+                "description": "Operation facts selected by node category and extraction profile; missing optional attributes mean unrecorded, not false or zero."
+              }
+            }
+          },
+          "description": "Structural requirement; semantic consistency requires profile validation."
+        }
+      ],
+      "description": "Program operation or analysis entity with graph-local navigation identity, original kind, semantic attributes, and extraction provenance."
+    },
+    "edge": {
+      "description": "Directed multigraph edge. Data: producer to consumer; control: controller to controlled operation; execution: prerequisite to constrained operation under a declared policy.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "source",
+        "target",
+        "kind",
+        "subkind",
+        "policy",
+        "evidence",
+        "provenance"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id",
+          "description": "Opaque identity in the containing record namespace; not a clone-matching label."
+        },
+        "source": {
+          "$ref": "#/$defs/id",
+          "description": "Graph-local source node ID of this directed dependency."
+        },
+        "target": {
+          "$ref": "#/$defs/id",
+          "description": "Graph-local target node ID of this directed dependency."
+        },
+        "kind": {
+          "enum": [
+            "data",
+            "control",
+            "execution"
+          ],
+          "description": "Dependency family: data flows producer to consumer; control flows controller to controlled operation; execution flows prerequisite to constrained operation under its policy, not simple source order."
+        },
+        "subkind": {
+          "$ref": "#/$defs/id",
+          "description": "Profile-defined dependency refinement, such as reaching_definition, flow, anti, or output; accepted meanings require semantic validation."
+        },
+        "policy": {
+          "$ref": "#/$defs/profile",
+          "description": "Versioned interpretation or analysis policy governing the enclosing fact, edge, or transformation."
+        },
+        "evidence": {
+          "$ref": "#/$defs/capability",
+          "description": "Extraction support or approximation evidence for this particular entity or dependency."
+        },
+        "provenance": {
+          "$ref": "#/$defs/provenance",
+          "description": "Origin and transformation evidence used to trace this entity back to source or prior graphs."
+        },
+        "operand_position": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zero-based input position at the consumer under the profile operand ordering; repeated operands remain distinct."
+        },
+        "symbol_id": {
+          "$ref": "#/$defs/id",
+          "description": "Reference to a binding in the document symbol table."
+        },
+        "definition_id": {
+          "$ref": "#/$defs/id",
+          "description": "Reference to the particular produced definition involved in this dependency."
+        },
+        "location_id": {
+          "$ref": "#/$defs/id",
+          "description": "Reference to an abstract storage location in memory_locations."
+        },
+        "outcome": {
+          "$ref": "#/$defs/id",
+          "description": "Control alternative associated with this dependency; must agree with the controlling node under the profile."
+        },
+        "loop_carried": {
+          "type": "boolean",
+          "description": "Whether this dependency crosses loop iterations. Omission means unrecorded, not false."
+        },
+        "annotations": {
+          "$ref": "#/$defs/extensions",
+          "description": "Namespaced optional effects, ownership, type, call, or other facts; ignored by base matching unless explicitly included by its versioned profile."
+        }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "severity",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/id",
+          "description": "Stable diagnostic identifier suitable for automated handling."
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warning",
+            "error"
+          ],
+          "description": "Diagnostic importance: informational, warning, or error."
+        },
+        "message": {
+          "$ref": "#/$defs/id",
+          "description": "Human-readable diagnostic explaining the issue and relevant limitations."
+        },
+        "source_span": {
+          "$ref": "#/$defs/span",
+          "description": "Source navigation range expressed as half-open UTF-8 byte offsets."
+        },
+        "node_id": {
+          "$ref": "#/$defs/id",
+          "description": "Graph-local node ID associated with this record; references must be checked by semantic validation."
+        },
+        "capability": {
+          "$ref": "#/$defs/id",
+          "description": "Name of the extraction capability associated with this diagnostic."
+        }
+      },
+      "description": "Extraction or validation messages, including unsupported constructs and missing required evidence."
+    }
+  }
+}

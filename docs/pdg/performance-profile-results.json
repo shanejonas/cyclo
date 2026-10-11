@@ -1,0 +1,2742 @@
+{
+  "inputs": [
+    {
+      "repo": "cobra",
+      "commit": "adbc8813901bba65827259daa8e22ff94ec1f30e",
+      "exit_code": 0,
+      "extraction_seconds": 0.6150248951744288,
+      "functions": 269,
+      "usable_graphs": 269,
+      "reports_identical": true,
+      "groups_identical": true,
+      "unique_usable_graphs": 269,
+      "corpus_sha256": "2a91fb5b9b13c7d65369385ace863038ea46c6f286fe1c89c08189477a627c18",
+      "same_report_content_ignoring_candidate_order": true
+    },
+    {
+      "repo": "gin",
+      "commit": "0f09c3a9b4626d9fe9979cf4d0521d6ae32ab646",
+      "exit_code": 0,
+      "extraction_seconds": 7.342123986920342,
+      "functions": 483,
+      "usable_graphs": 483,
+      "reports_identical": true,
+      "groups_identical": true,
+      "unique_usable_graphs": 483,
+      "corpus_sha256": "1cf81f340640463d8602fd9edcf455a54a46cf9407b327a643eea3d6de7aaf88",
+      "same_report_content_ignoring_candidate_order": true
+    },
+    {
+      "repo": "prometheus",
+      "commit": "2213c3c192574b8a339acd336ea6385974a7567b",
+      "exit_code": 0,
+      "extraction_seconds": 9.947302813874558,
+      "functions": 6173,
+      "usable_graphs": 6173,
+      "reports_identical": false,
+      "groups_identical": true,
+      "unique_usable_graphs": 6159,
+      "corpus_sha256": "8738d48831df4b58410afccb19618380f9e6b8d23bb4d8a5d766ff25cf9b3a10",
+      "same_report_content_ignoring_candidate_order": true
+    }
+  ],
+  "environment": {
+    "go": "go version go1.27.1 linux/amd64",
+    "platform": "Linux-7.2.5-3-omarchy-x86_64-with-glibc2.44",
+    "cpus": 24,
+    "date": "2026-10-11T02:09:23Z"
+  },
+  "medians": {
+    "cobra": {
+      "pipeline": {
+        "shared_labels": {
+          "milliseconds": 0.449,
+          "allocated_bytes": 38656,
+          "allocations": 185
+        },
+        "features": {
+          "milliseconds": 0.283,
+          "allocated_bytes": 110152,
+          "allocations": 279
+        },
+        "pair_filters": {
+          "milliseconds": 1.653,
+          "allocated_bytes": 118480,
+          "allocations": 468
+        },
+        "wl_features": {
+          "milliseconds": 9.326,
+          "allocated_bytes": 3236720,
+          "allocations": 81298
+        },
+        "vectorize": {
+          "milliseconds": 0.6,
+          "allocated_bytes": 1123672,
+          "allocations": 273
+        },
+        "lsh_planes": {
+          "milliseconds": 0.226,
+          "allocated_bytes": 270384,
+          "allocations": 99
+        },
+        "lsh_index": {
+          "milliseconds": 7.792,
+          "allocated_bytes": 228672,
+          "allocations": 1282
+        },
+        "lsh_components": {
+          "milliseconds": 0.631,
+          "allocated_bytes": 27896,
+          "allocations": 15
+        },
+        "verify": {
+          "milliseconds": 0.322,
+          "allocated_bytes": 137144,
+          "allocations": 390
+        }
+      },
+      "storage": {
+        "native_graphs": {
+          "Milliseconds": 19.501,
+          "AllocatedBytes": 11566808,
+          "Allocations": 92579,
+          "RetainedHeapBytes": 1755472
+        },
+        "mining_views": {
+          "Milliseconds": 0.526,
+          "AllocatedBytes": 956816,
+          "Allocations": 1307,
+          "RetainedHeapBytes": 913232
+        },
+        "canonicalization_all_rules": {
+          "Milliseconds": 16.641,
+          "AllocatedBytes": 36876552,
+          "Allocations": 48407,
+          "RetainedHeapBytes": 973376
+        },
+        "canonicalization_no_rules": {
+          "Milliseconds": 0.193,
+          "AllocatedBytes": 867888,
+          "Allocations": 804,
+          "RetainedHeapBytes": 867888
+        }
+      },
+      "wl_storage": {
+        "light": {
+          "milliseconds": 9.511,
+          "allocated_bytes": 3222304,
+          "allocations": 81294,
+          "retained_heap_bytes": 313104
+        },
+        "full": {
+          "milliseconds": 9.445,
+          "allocated_bytes": 3222304,
+          "allocations": 81294,
+          "retained_heap_bytes": 989048
+        }
+      },
+      "counts": {
+        "Functions": 269,
+        "PossiblePairs": 36046,
+        "Candidates": 19268,
+        "WLGraphs": 269,
+        "Clusters": 1,
+        "LargestCluster": 269,
+        "VerificationPairs": 19268,
+        "ClonePairs": 111
+      },
+      "extraction": {
+        "elapsed_ms": 97.411,
+        "allocated_bytes": 30251664,
+        "allocations": 253251,
+        "retained_heap_bytes": 3160200,
+        "peak_process_rss_kib": 34556
+      }
+    },
+    "gin": {
+      "pipeline": {
+        "shared_labels": {
+          "milliseconds": 0.694,
+          "allocated_bytes": 81480,
+          "allocations": 442
+        },
+        "features": {
+          "milliseconds": 0.498,
+          "allocated_bytes": 210088,
+          "allocations": 493
+        },
+        "pair_filters": {
+          "milliseconds": 1.81,
+          "allocated_bytes": 147160,
+          "allocations": 676
+        },
+        "wl_features": {
+          "milliseconds": 14.319,
+          "allocated_bytes": 4693496,
+          "allocations": 118290
+        },
+        "vectorize": {
+          "milliseconds": 0.86,
+          "allocated_bytes": 2027608,
+          "allocations": 487
+        },
+        "lsh_planes": {
+          "milliseconds": 0.204,
+          "allocated_bytes": 270384,
+          "allocations": 99
+        },
+        "lsh_index": {
+          "milliseconds": 13.935,
+          "allocated_bytes": 385792,
+          "allocations": 1573
+        },
+        "lsh_components": {
+          "milliseconds": 1.153,
+          "allocated_bytes": 59896,
+          "allocations": 16
+        },
+        "verify": {
+          "milliseconds": 0.578,
+          "allocated_bytes": 203624,
+          "allocations": 569
+        }
+      },
+      "storage": {
+        "native_graphs": {
+          "Milliseconds": 26.127,
+          "AllocatedBytes": 17403624,
+          "Allocations": 143913,
+          "RetainedHeapBytes": 2605696
+        },
+        "mining_views": {
+          "Milliseconds": 0.856,
+          "AllocatedBytes": 1430000,
+          "Allocations": 2339,
+          "RetainedHeapBytes": 1365920
+        },
+        "canonicalization_all_rules": {
+          "Milliseconds": 21.799,
+          "AllocatedBytes": 54669376,
+          "Allocations": 78887,
+          "RetainedHeapBytes": 1401584
+        },
+        "canonicalization_no_rules": {
+          "Milliseconds": 0.311,
+          "AllocatedBytes": 1294592,
+          "Allocations": 1441,
+          "RetainedHeapBytes": 1294592
+        }
+      },
+      "wl_storage": {
+        "light": {
+          "milliseconds": 14.05,
+          "allocated_bytes": 4666936,
+          "allocations": 118286,
+          "retained_heap_bytes": 491424
+        },
+        "full": {
+          "milliseconds": 12.918,
+          "allocated_bytes": 4666936,
+          "allocations": 118286,
+          "retained_heap_bytes": 1482592
+        }
+      },
+      "counts": {
+        "Functions": 483,
+        "PossiblePairs": 116403,
+        "Candidates": 60273,
+        "WLGraphs": 483,
+        "Clusters": 1,
+        "LargestCluster": 483,
+        "VerificationPairs": 60273,
+        "ClonePairs": 520
+      },
+      "extraction": {
+        "elapsed_ms": 162.815,
+        "allocated_bytes": 64058032,
+        "allocations": 515714,
+        "retained_heap_bytes": 8723272,
+        "peak_process_rss_kib": 57576
+      }
+    },
+    "prometheus": {
+      "pipeline": {
+        "shared_labels": {
+          "milliseconds": 18.636,
+          "allocated_bytes": 626432,
+          "allocations": 2296
+        },
+        "features": {
+          "milliseconds": 12.365,
+          "allocated_bytes": 2835208,
+          "allocations": 6169
+        },
+        "pair_filters": {
+          "milliseconds": 347.595,
+          "allocated_bytes": 5352624,
+          "allocations": 6292
+        },
+        "wl_features": {
+          "milliseconds": 312.013,
+          "allocated_bytes": 124686576,
+          "allocations": 3084888
+        },
+        "vectorize": {
+          "milliseconds": 5.735,
+          "allocated_bytes": 25620848,
+          "allocations": 6177
+        },
+        "lsh_planes": {
+          "milliseconds": 0.148,
+          "allocated_bytes": 270384,
+          "allocations": 99
+        },
+        "lsh_index": {
+          "milliseconds": 120.976,
+          "allocated_bytes": 4519040,
+          "allocations": 2471
+        },
+        "lsh_components": {
+          "milliseconds": 14.426,
+          "allocated_bytes": 674576,
+          "allocations": 36
+        },
+        "verify": {
+          "milliseconds": 24.525,
+          "allocated_bytes": 2930472,
+          "allocations": 5741
+        }
+      },
+      "storage": {
+        "native_graphs": {
+          "Milliseconds": 556.347,
+          "AllocatedBytes": 426936208,
+          "Allocations": 2984841,
+          "RetainedHeapBytes": 56063472
+        },
+        "mining_views": {
+          "Milliseconds": 16.695,
+          "AllocatedBytes": 37415008,
+          "Allocations": 29644,
+          "RetainedHeapBytes": 35671792
+        },
+        "canonicalization_all_rules": {
+          "Milliseconds": 570.921,
+          "AllocatedBytes": 1535464120,
+          "Allocations": 1260781,
+          "RetainedHeapBytes": 37233944
+        },
+        "canonicalization_no_rules": {
+          "Milliseconds": 6.885,
+          "AllocatedBytes": 34386312.0,
+          "Allocations": 18241.5,
+          "RetainedHeapBytes": 34386320.0
+        }
+      },
+      "wl_storage": {
+        "light": {
+          "milliseconds": 382.316,
+          "allocated_bytes": 124338696,
+          "allocations": 3084861,
+          "retained_heap_bytes": 10252688
+        },
+        "full": {
+          "milliseconds": 385.239,
+          "allocated_bytes": 124365280,
+          "allocations": 3084866,
+          "retained_heap_bytes": 36897208
+        }
+      },
+      "counts": {
+        "Functions": 6159,
+        "PossiblePairs": 18963561,
+        "Candidates": 10435875,
+        "WLGraphs": 6159,
+        "Clusters": 1,
+        "LargestCluster": 6159,
+        "VerificationPairs": 10435875,
+        "ClonePairs": 34560
+      },
+      "extraction": {
+        "elapsed_ms": 1573.884,
+        "allocated_bytes": 1108638672,
+        "allocations": 8804564,
+        "retained_heap_bytes": 86525768,
+        "peak_process_rss_kib": 618044
+      }
+    }
+  },
+  "raw_stage_runs": [
+    {
+      "repo": "cobra",
+      "kind": "pipeline",
+      "run": 1,
+      "result": {
+        "stages": [
+          {
+            "name": "shared_labels",
+            "milliseconds": 0.449,
+            "allocated_bytes": 38656,
+            "allocations": 185
+          },
+          {
+            "name": "features",
+            "milliseconds": 0.283,
+            "allocated_bytes": 110152,
+            "allocations": 279
+          },
+          {
+            "name": "pair_filters",
+            "milliseconds": 1.714,
+            "allocated_bytes": 118480,
+            "allocations": 468
+          },
+          {
+            "name": "wl_features",
+            "milliseconds": 9.885,
+            "allocated_bytes": 3236720,
+            "allocations": 81298
+          },
+          {
+            "name": "vectorize",
+            "milliseconds": 0.69,
+            "allocated_bytes": 1123800,
+            "allocations": 275
+          },
+          {
+            "name": "lsh_planes",
+            "milliseconds": 0.428,
+            "allocated_bytes": 270384,
+            "allocations": 99
+          },
+          {
+            "name": "lsh_index",
+            "milliseconds": 5.231,
+            "allocated_bytes": 228672,
+            "allocations": 1282
+          },
+          {
+            "name": "lsh_components",
+            "milliseconds": 0.417,
+            "allocated_bytes": 27896,
+            "allocations": 15
+          },
+          {
+            "name": "verify",
+            "milliseconds": 0.333,
+            "allocated_bytes": 137032,
+            "allocations": 390
+          }
+        ],
+        "Functions": 269,
+        "PossiblePairs": 36046,
+        "Candidates": 19268,
+        "WLGraphs": 269,
+        "Clusters": 1,
+        "LargestCluster": 269,
+        "VerificationPairs": 19268,
+        "ClonePairs": 111,
+        "GroupDigest": "52d9ac34954007e5baed07088dd1c0cb34783b986578a4d779e32b4fffad96d4"
+      },
+      "log": "cobra-pipeline-1.txt"
+    },
+    {
+      "repo": "cobra",
+      "kind": "pipeline",
+      "run": 2,
+      "result": {
+        "stages": [
+          {
+            "name": "shared_labels",
+            "milliseconds": 0.429,
+            "allocated_bytes": 38656,
+            "allocations": 185
+          },
+          {
+            "name": "features",
+            "milliseconds": 0.296,
+            "allocated_bytes": 110152,
+            "allocations": 279
+          },
+          {
+            "name": "pair_filters",
+            "milliseconds": 1.599,
+            "allocated_bytes": 118480,
+            "allocations": 468
+          },
+          {
+            "name": "wl_features",
+            "milliseconds": 9.326,
+            "allocated_bytes": 3236720,
+            "allocations": 81298
+          },
+          {
+            "name": "vectorize",
+            "milliseconds": 0.612,
+            "allocated_bytes": 1123784,
+            "allocations": 274
+          },
+          {
+            "name": "lsh_planes",
+            "milliseconds": 0.212,
+            "allocated_bytes": 270384,
+            "allocations": 99
+          },
+          {
+            "name": "lsh_index",
+            "milliseconds": 7.792,
+            "allocated_bytes": 228672,
+            "allocations": 1282
+          },
+          {
+            "name": "lsh_components",
+            "milliseconds": 0.632,
+            "allocated_bytes": 27896,
+            "allocations": 15
+          },
+          {
+            "name": "verify",
+            "milliseconds": 0.322,
+            "allocated_bytes": 137400,
+            "allocations": 390
+          }
+        ],
+        "Functions": 269,
+        "PossiblePairs": 36046,
+        "Candidates": 19268,
+        "WLGraphs": 269,
+        "Clusters": 1,
+        "LargestCluster": 269,
+        "VerificationPairs": 19268,
+        "ClonePairs": 111,
+        "GroupDigest": "52d9ac34954007e5baed07088dd1c0cb34783b986578a4d779e32b4fffad96d4"
+      },
+      "log": "cobra-pipeline-2.txt"
+    },
+    {
+      "repo": "cobra",
+      "kind": "pipeline",
+      "run": 3,
+      "result": {
+        "stages": [
+          {
+            "name": "shared_labels",
+            "milliseconds": 0.453,
+            "allocated_bytes": 38656,
+            "allocations": 185
+          },
+          {
+            "name": "features",
+            "milliseconds": 0.281,
+            "allocated_bytes": 110152,
+            "allocations": 279
+          },
+          {
+            "name": "pair_filters",
+            "milliseconds": 1.842,
+            "allocated_bytes": 118480,
+            "allocations": 468
+          },
+          {
+            "name": "wl_features",
+            "milliseconds": 9.988,
+            "allocated_bytes": 3236720,
+            "allocations": 81298
+          },
+          {
+            "name": "vectorize",
+            "milliseconds": 0.6,
+            "allocated_bytes": 1123672,
+            "allocations": 273
+          },
+          {
+            "name": "lsh_planes",
+            "milliseconds": 0.226,
+            "allocated_bytes": 270384,
+            "allocations": 99
+          },
+          {
+            "name": "lsh_index",
+            "milliseconds": 7.827,
+            "allocated_bytes": 228672,
+            "allocations": 1282
+          },
+          {
+            "name": "lsh_components",
+            "milliseconds": 0.657,
+            "allocated_bytes": 27896,
+            "allocations": 15
+          },
+          {
+            "name": "verify",
+            "milliseconds": 0.312,
+            "allocated_bytes": 137032,
+            "allocations": 390
+          }
+        ],
+        "Functions": 269,
+        "PossiblePairs": 36046,
+        "Candidates": 19268,
+        "WLGraphs": 269,
+        "Clusters": 1,
+        "LargestCluster": 269,
+        "VerificationPairs": 19268,
+        "ClonePairs": 111,
+        "GroupDigest": "52d9ac34954007e5baed07088dd1c0cb34783b986578a4d779e32b4fffad96d4"
+      },
+      "log": "cobra-pipeline-3.txt"
+    },
+    {
+      "repo": "cobra",
+      "kind": "pipeline",
+      "run": 4,
+      "result": {
+        "stages": [
+          {
+            "name": "shared_labels",
+            "milliseconds": 0.419,
+            "allocated_bytes": 38656,
+            "allocations": 185
+          },
+          {
+            "name": "features",
+            "milliseconds": 0.271,
+            "allocated_bytes": 110152,
+            "allocations": 279
+          },
+          {
+            "name": "pair_filters",
+            "milliseconds": 1.653,
+            "allocated_bytes": 107840,
+            "allocations": 456
+          },
+          {
+            "name": "wl_features",
+            "milliseconds": 8.729,
+            "allocated_bytes": 3236720,
+            "allocations": 81298
+          },
+          {
+            "name": "vectorize",
+            "milliseconds": 0.489,
+            "allocated_bytes": 1123672,
+            "allocations": 273
+          },
+          {
+            "name": "lsh_planes",
+            "milliseconds": 0.211,
+            "allocated_bytes": 270384,
+            "allocations": 99
+          },
+          {
+            "name": "lsh_index",
+            "milliseconds": 7.819,
+            "allocated_bytes": 228672,
+            "allocations": 1282
+          },
+          {
+            "name": "lsh_components",
+            "milliseconds": 0.621,
+            "allocated_bytes": 27896,
+            "allocations": 15
+          },
+          {
+            "name": "verify",
+            "milliseconds": 0.302,
+            "allocated_bytes": 137144,
+            "allocations": 391
+          }
+        ],
+        "Functions": 269,
+        "PossiblePairs": 36046,
+        "Candidates": 19268,
+        "WLGraphs": 269,
+        "Clusters": 1,
+        "LargestCluster": 269,
+        "VerificationPairs": 19268,
+        "ClonePairs": 111,
+        "GroupDigest": "52d9ac34954007e5baed07088dd1c0cb34783b986578a4d779e32b4fffad96d4"
+      },
+      "log": "cobra-pipeline-4.txt"
+    },
+    {
+      "repo": "cobra",
+      "kind": "pipeline",
+      "run": 5,
+      "result": {
+        "stages": [
+          {
+            "name": "shared_labels",
+            "milliseconds": 0.47,
+            "allocated_bytes": 38656,
+            "allocations": 185
+          },
+          {
+            "name": "features",
+            "milliseconds": 0.289,
+            "allocated_bytes": 110152,
+            "allocations": 279
+          },
+          {
+            "name": "pair_filters",
+            "milliseconds": 1.493,
+            "allocated_bytes": 107840,
+            "allocations": 456
+          },
+          {
+            "name": "wl_features",
+            "milliseconds": 9.276,
+            "allocated_bytes": 3236720,
+            "allocations": 81298
+          },
+          {
+            "name": "vectorize",
+            "milliseconds": 0.511,
+            "allocated_bytes": 1123672,
+            "allocations": 273
+          },
+          {
+            "name": "lsh_planes",
+            "milliseconds": 0.286,
+            "allocated_bytes": 270384,
+            "allocations": 99
+          },
+          {
+            "name": "lsh_index",
+            "milliseconds": 5.597,
+            "allocated_bytes": 228672,
+            "allocations": 1282
+          },
+          {
+            "name": "lsh_components",
+            "milliseconds": 0.631,
+            "allocated_bytes": 27896,
+            "allocations": 15
+          },
+          {
+            "name": "verify",
+            "milliseconds": 0.372,
+            "allocated_bytes": 137144,
+            "allocations": 391
+          }
+        ],
+        "Functions": 269,
+        "PossiblePairs": 36046,
+        "Candidates": 19268,
+        "WLGraphs": 269,
+        "Clusters": 1,
+        "LargestCluster": 269,
+        "VerificationPairs": 19268,
+        "ClonePairs": 111,
+        "GroupDigest": "52d9ac34954007e5baed07088dd1c0cb34783b986578a4d779e32b4fffad96d4"
+      },
+      "log": "cobra-pipeline-5.txt"
+    },
+    {
+      "repo": "cobra",
+      "kind": "storage",
+      "run": 1,
+      "result": {
+        "edge_bytes": 56,
+        "edges": 7863,
+        "functions": 269,
+        "loader_ms": 69.825,
+        "mining_edge_bytes": 40,
+        "mining_node_bytes": 112,
+        "node_bytes": 44,
+        "nodes": 5335,
+        "stages": [
+          {
+            "Name": "native_graphs",
+            "Milliseconds": 20.889,
+            "AllocatedBytes": 11566808,
+            "Allocations": 92575,
+            "RetainedHeapBytes": 1755472
+          },
+          {
+            "Name": "mining_views",
+            "Milliseconds": 0.736,
+            "AllocatedBytes": 956816,
+            "Allocations": 1307,
+            "RetainedHeapBytes": 913232
+          },
+          {
+            "Name": "canonicalization_all_rules",
+            "Milliseconds": 18.973,
+            "AllocatedBytes": 36876584,
+            "Allocations": 48407,
+            "RetainedHeapBytes": 973376
+          }
+        ]
+      },
+      "log": "cobra-storage-1.txt"
+    },
+    {
+      "repo": "cobra",
+      "kind": "wl-light",
+      "run": 1,
+      "result": {
+        "allocated_bytes": 3227736,
+        "allocations": 81301,
+        "functions": 269,
+        "milliseconds": 9.628,
+        "mode": "light",
+        "retained_heap_bytes": 323856
+      },
+      "log": "cobra-wl-light-1.txt"
+    },
+    {
+      "repo": "cobra",
+      "kind": "wl-full",
+      "run": 1,
+      "result": {
+        "allocated_bytes": 3227608,
+        "allocations": 81300,
+        "functions": 269,
+        "milliseconds": 9.476,
+        "mode": "full",
+        "retained_heap_bytes": 994368
+      },
+      "log": "cobra-wl-full-1.txt"
+    },
+    {
+      "repo": "cobra",
+      "kind": "storage",
+      "run": 2,
+      "result": {
+        "edge_bytes": 56,
+        "edges": 7863,
+        "functions": 269,
+        "loader_ms": 67.785,
+        "mining_edge_bytes": 40,
+        "mining_node_bytes": 112,
+        "node_bytes": 44,
+        "nodes": 5335,
+        "stages": [
+          {
+            "Name": "native_graphs",
+            "Milliseconds": 17.921,
+            "AllocatedBytes": 11568560,
+            "Allocations": 92597,
+            "RetainedHeapBytes": 1766120
+          },
+          {
+            "Name": "mining_views",
+            "Milliseconds": 0.526,
+            "AllocatedBytes": 956816,
+            "Allocations": 1307,
+            "RetainedHeapBytes": 913232
+          },
+          {
+            "Name": "canonicalization_all_rules",
+            "Milliseconds": 16.511,
+            "AllocatedBytes": 36876552,
+            "Allocations": 48407,
+            "RetainedHeapBytes": 973376
+          }
+        ]
+      },
+      "log": "cobra-storage-2.txt"
+    },
+    {
+      "repo": "cobra",
+      "kind": "wl-light",
+      "run": 2,
+      "result": {
+        "allocated_bytes": 3216952,
+        "allocations": 81287,
+        "functions": 269,
+        "milliseconds": 9.511,
+        "mode": "light",
+        "retained_heap_bytes": 307768
+      },
+      "log": "cobra-wl-light-2.txt"
+    },
+    {
+      "repo": "cobra",
+      "kind": "wl-full",
+      "run": 2,
+      "result": {
+        "allocated_bytes": 3222304,
+        "allocations": 81294,
+        "functions": 269,
+        "milliseconds": 8.585,
+        "mode": "full",
+        "retained_heap_bytes": 989048
+      },
+      "log": "cobra-wl-full-2.txt"
+    },
+    {
+      "repo": "cobra",
+      "kind": "storage",
+      "run": 3,
+      "result": {
+        "edge_bytes": 56,
+        "edges": 7863,
+        "functions": 269,
+        "loader_ms": 67.464,
+        "mining_edge_bytes": 40,
+        "mining_node_bytes": 112,
+        "node_bytes": 44,
+        "nodes": 5335,
+        "stages": [
+          {
+            "Name": "native_graphs",
+            "Milliseconds": 19.501,
+            "AllocatedBytes": 11562440,
+            "Allocations": 92579,
+            "RetainedHeapBytes": 1754600
+          },
+          {
+            "Name": "mining_views",
+            "Milliseconds": 0.458,
+            "AllocatedBytes": 956816,
+            "Allocations": 1307,
+            "RetainedHeapBytes": 913248
+          },
+          {
+            "Name": "canonicalization_all_rules",
+            "Milliseconds": 16.641,
+            "AllocatedBytes": 36876552,
+            "Allocations": 48407,
+            "RetainedHeapBytes": 973376
+          }
+        ]
+      },
+      "log": "cobra-storage-3.txt"
+    },
+    {
+      "repo": "cobra",
+      "kind": "wl-light",
+      "run": 3,
+      "result": {
+        "allocated_bytes": 3222304,
+        "allocations": 81294,
+        "functions": 269,
+        "milliseconds": 9.311,
+        "mode": "light",
+        "retained_heap_bytes": 313104
+      },
+      "log": "cobra-wl-light-3.txt"
+    },
+    {
+      "repo": "cobra",
+      "kind": "wl-full",
+      "run": 3,
+      "result": {
+        "allocated_bytes": 3222304,
+        "allocations": 81294,
+        "functions": 269,
+        "milliseconds": 9.445,
+        "mode": "full",
+        "retained_heap_bytes": 983728
+      },
+      "log": "cobra-wl-full-3.txt"
+    },
+    {
+      "repo": "gin",
+      "kind": "pipeline",
+      "run": 1,
+      "result": {
+        "stages": [
+          {
+            "name": "shared_labels",
+            "milliseconds": 0.75,
+            "allocated_bytes": 81480,
+            "allocations": 442
+          },
+          {
+            "name": "features",
+            "milliseconds": 0.499,
+            "allocated_bytes": 210088,
+            "allocations": 493
+          },
+          {
+            "name": "pair_filters",
+            "milliseconds": 2.06,
+            "allocated_bytes": 147160,
+            "allocations": 676
+          },
+          {
+            "name": "wl_features",
+            "milliseconds": 14.388,
+            "allocated_bytes": 4693480,
+            "allocations": 118290
+          },
+          {
+            "name": "vectorize",
+            "milliseconds": 0.86,
+            "allocated_bytes": 2027720,
+            "allocations": 488
+          },
+          {
+            "name": "lsh_planes",
+            "milliseconds": 0.355,
+            "allocated_bytes": 270384,
+            "allocations": 99
+          },
+          {
+            "name": "lsh_index",
+            "milliseconds": 14.029,
+            "allocated_bytes": 385792,
+            "allocations": 1573
+          },
+          {
+            "name": "lsh_components",
+            "milliseconds": 1.153,
+            "allocated_bytes": 59896,
+            "allocations": 16
+          },
+          {
+            "name": "verify",
+            "milliseconds": 0.583,
+            "allocated_bytes": 203256,
+            "allocations": 568
+          }
+        ],
+        "Functions": 483,
+        "PossiblePairs": 116403,
+        "Candidates": 60273,
+        "WLGraphs": 483,
+        "Clusters": 1,
+        "LargestCluster": 483,
+        "VerificationPairs": 60273,
+        "ClonePairs": 520,
+        "GroupDigest": "ec242e0c3770357be4dc872886f5fca2943c4751ee1084b796589c6177cde75a"
+      },
+      "log": "gin-pipeline-1.txt"
+    },
+    {
+      "repo": "gin",
+      "kind": "pipeline",
+      "run": 2,
+      "result": {
+        "stages": [
+          {
+            "name": "shared_labels",
+            "milliseconds": 0.679,
+            "allocated_bytes": 81480,
+            "allocations": 442
+          },
+          {
+            "name": "features",
+            "milliseconds": 0.455,
+            "allocated_bytes": 210088,
+            "allocations": 493
+          },
+          {
+            "name": "pair_filters",
+            "milliseconds": 2.183,
+            "allocated_bytes": 152480,
+            "allocations": 682
+          },
+          {
+            "name": "wl_features",
+            "milliseconds": 14.319,
+            "allocated_bytes": 4693480,
+            "allocations": 118290
+          },
+          {
+            "name": "vectorize",
+            "milliseconds": 0.981,
+            "allocated_bytes": 2027608,
+            "allocations": 487
+          },
+          {
+            "name": "lsh_planes",
+            "milliseconds": 0.175,
+            "allocated_bytes": 270384,
+            "allocations": 99
+          },
+          {
+            "name": "lsh_index",
+            "milliseconds": 10.078,
+            "allocated_bytes": 385792,
+            "allocations": 1573
+          },
+          {
+            "name": "lsh_components",
+            "milliseconds": 0.893,
+            "allocated_bytes": 59896,
+            "allocations": 16
+          },
+          {
+            "name": "verify",
+            "milliseconds": 0.555,
+            "allocated_bytes": 203736,
+            "allocations": 569
+          }
+        ],
+        "Functions": 483,
+        "PossiblePairs": 116403,
+        "Candidates": 60273,
+        "WLGraphs": 483,
+        "Clusters": 1,
+        "LargestCluster": 483,
+        "VerificationPairs": 60273,
+        "ClonePairs": 520,
+        "GroupDigest": "ec242e0c3770357be4dc872886f5fca2943c4751ee1084b796589c6177cde75a"
+      },
+      "log": "gin-pipeline-2.txt"
+    },
+    {
+      "repo": "gin",
+      "kind": "pipeline",
+      "run": 3,
+      "result": {
+        "stages": [
+          {
+            "name": "shared_labels",
+            "milliseconds": 0.694,
+            "allocated_bytes": 81480,
+            "allocations": 442
+          },
+          {
+            "name": "features",
+            "milliseconds": 0.464,
+            "allocated_bytes": 210088,
+            "allocations": 493
+          },
+          {
+            "name": "pair_filters",
+            "milliseconds": 1.81,
+            "allocated_bytes": 147160,
+            "allocations": 676
+          },
+          {
+            "name": "wl_features",
+            "milliseconds": 14.32,
+            "allocated_bytes": 4693496,
+            "allocations": 118290
+          },
+          {
+            "name": "vectorize",
+            "milliseconds": 0.913,
+            "allocated_bytes": 2027608,
+            "allocations": 487
+          },
+          {
+            "name": "lsh_planes",
+            "milliseconds": 0.255,
+            "allocated_bytes": 270384,
+            "allocations": 99
+          },
+          {
+            "name": "lsh_index",
+            "milliseconds": 13.935,
+            "allocated_bytes": 385792,
+            "allocations": 1573
+          },
+          {
+            "name": "lsh_components",
+            "milliseconds": 1.175,
+            "allocated_bytes": 59896,
+            "allocations": 16
+          },
+          {
+            "name": "verify",
+            "milliseconds": 0.578,
+            "allocated_bytes": 203624,
+            "allocations": 568
+          }
+        ],
+        "Functions": 483,
+        "PossiblePairs": 116403,
+        "Candidates": 60273,
+        "WLGraphs": 483,
+        "Clusters": 1,
+        "LargestCluster": 483,
+        "VerificationPairs": 60273,
+        "ClonePairs": 520,
+        "GroupDigest": "ec242e0c3770357be4dc872886f5fca2943c4751ee1084b796589c6177cde75a"
+      },
+      "log": "gin-pipeline-3.txt"
+    },
+    {
+      "repo": "gin",
+      "kind": "pipeline",
+      "run": 4,
+      "result": {
+        "stages": [
+          {
+            "name": "shared_labels",
+            "milliseconds": 0.685,
+            "allocated_bytes": 81496,
+            "allocations": 442
+          },
+          {
+            "name": "features",
+            "milliseconds": 0.544,
+            "allocated_bytes": 210088,
+            "allocations": 493
+          },
+          {
+            "name": "pair_filters",
+            "milliseconds": 1.8,
+            "allocated_bytes": 147160,
+            "allocations": 676
+          },
+          {
+            "name": "wl_features",
+            "milliseconds": 11.345,
+            "allocated_bytes": 4693496,
+            "allocations": 118290
+          },
+          {
+            "name": "vectorize",
+            "milliseconds": 0.734,
+            "allocated_bytes": 2027608,
+            "allocations": 487
+          },
+          {
+            "name": "lsh_planes",
+            "milliseconds": 0.204,
+            "allocated_bytes": 270384,
+            "allocations": 99
+          },
+          {
+            "name": "lsh_index",
+            "milliseconds": 13.948,
+            "allocated_bytes": 385792,
+            "allocations": 1573
+          },
+          {
+            "name": "lsh_components",
+            "milliseconds": 1.213,
+            "allocated_bytes": 59896,
+            "allocations": 16
+          },
+          {
+            "name": "verify",
+            "milliseconds": 0.665,
+            "allocated_bytes": 203368,
+            "allocations": 569
+          }
+        ],
+        "Functions": 483,
+        "PossiblePairs": 116403,
+        "Candidates": 60273,
+        "WLGraphs": 483,
+        "Clusters": 1,
+        "LargestCluster": 483,
+        "VerificationPairs": 60273,
+        "ClonePairs": 520,
+        "GroupDigest": "ec242e0c3770357be4dc872886f5fca2943c4751ee1084b796589c6177cde75a"
+      },
+      "log": "gin-pipeline-4.txt"
+    },
+    {
+      "repo": "gin",
+      "kind": "pipeline",
+      "run": 5,
+      "result": {
+        "stages": [
+          {
+            "name": "shared_labels",
+            "milliseconds": 0.714,
+            "allocated_bytes": 81480,
+            "allocations": 442
+          },
+          {
+            "name": "features",
+            "milliseconds": 0.498,
+            "allocated_bytes": 210088,
+            "allocations": 493
+          },
+          {
+            "name": "pair_filters",
+            "milliseconds": 1.686,
+            "allocated_bytes": 147160,
+            "allocations": 676
+          },
+          {
+            "name": "wl_features",
+            "milliseconds": 12.429,
+            "allocated_bytes": 4693496,
+            "allocations": 118290
+          },
+          {
+            "name": "vectorize",
+            "milliseconds": 0.814,
+            "allocated_bytes": 2027720,
+            "allocations": 488
+          },
+          {
+            "name": "lsh_planes",
+            "milliseconds": 0.155,
+            "allocated_bytes": 270384,
+            "allocations": 99
+          },
+          {
+            "name": "lsh_index",
+            "milliseconds": 9.739,
+            "allocated_bytes": 385792,
+            "allocations": 1573
+          },
+          {
+            "name": "lsh_components",
+            "milliseconds": 0.822,
+            "allocated_bytes": 59896,
+            "allocations": 16
+          },
+          {
+            "name": "verify",
+            "milliseconds": 0.518,
+            "allocated_bytes": 203736,
+            "allocations": 569
+          }
+        ],
+        "Functions": 483,
+        "PossiblePairs": 116403,
+        "Candidates": 60273,
+        "WLGraphs": 483,
+        "Clusters": 1,
+        "LargestCluster": 483,
+        "VerificationPairs": 60273,
+        "ClonePairs": 520,
+        "GroupDigest": "ec242e0c3770357be4dc872886f5fca2943c4751ee1084b796589c6177cde75a"
+      },
+      "log": "gin-pipeline-5.txt"
+    },
+    {
+      "repo": "gin",
+      "kind": "storage",
+      "run": 1,
+      "result": {
+        "edge_bytes": 56,
+        "edges": 11387,
+        "functions": 483,
+        "loader_ms": 133.742,
+        "mining_edge_bytes": 40,
+        "mining_node_bytes": 112,
+        "node_bytes": 44,
+        "nodes": 7906,
+        "stages": [
+          {
+            "Name": "native_graphs",
+            "Milliseconds": 27.169,
+            "AllocatedBytes": 17403624,
+            "Allocations": 143911,
+            "RetainedHeapBytes": 2620648
+          },
+          {
+            "Name": "mining_views",
+            "Milliseconds": 0.907,
+            "AllocatedBytes": 1430000,
+            "Allocations": 2339,
+            "RetainedHeapBytes": 1365920
+          },
+          {
+            "Name": "canonicalization_all_rules",
+            "Milliseconds": 20.946,
+            "AllocatedBytes": 54669392,
+            "Allocations": 78887,
+            "RetainedHeapBytes": 1401584
+          }
+        ]
+      },
+      "log": "gin-storage-1.txt"
+    },
+    {
+      "repo": "gin",
+      "kind": "wl-light",
+      "run": 1,
+      "result": {
+        "allocated_bytes": 4661616,
+        "allocations": 118280,
+        "functions": 483,
+        "milliseconds": 14.149,
+        "mode": "light",
+        "retained_heap_bytes": 486104
+      },
+      "log": "gin-wl-light-1.txt"
+    },
+    {
+      "repo": "gin",
+      "kind": "wl-full",
+      "run": 1,
+      "result": {
+        "allocated_bytes": 4666936,
+        "allocations": 118286,
+        "functions": 483,
+        "milliseconds": 12.918,
+        "mode": "full",
+        "retained_heap_bytes": 1482592
+      },
+      "log": "gin-wl-full-1.txt"
+    },
+    {
+      "repo": "gin",
+      "kind": "storage",
+      "run": 2,
+      "result": {
+        "edge_bytes": 56,
+        "edges": 11387,
+        "functions": 483,
+        "loader_ms": 125.988,
+        "mining_edge_bytes": 40,
+        "mining_node_bytes": 112,
+        "node_bytes": 44,
+        "nodes": 7906,
+        "stages": [
+          {
+            "Name": "native_graphs",
+            "Milliseconds": 26.127,
+            "AllocatedBytes": 17403224,
+            "Allocations": 143913,
+            "RetainedHeapBytes": 2603088
+          },
+          {
+            "Name": "mining_views",
+            "Milliseconds": 0.746,
+            "AllocatedBytes": 1430000,
+            "Allocations": 2339,
+            "RetainedHeapBytes": 1365936
+          },
+          {
+            "Name": "canonicalization_all_rules",
+            "Milliseconds": 23.545,
+            "AllocatedBytes": 54669376,
+            "Allocations": 78887,
+            "RetainedHeapBytes": 1406904
+          }
+        ]
+      },
+      "log": "gin-storage-2.txt"
+    },
+    {
+      "repo": "gin",
+      "kind": "wl-light",
+      "run": 2,
+      "result": {
+        "allocated_bytes": 4666936,
+        "allocations": 118286,
+        "functions": 483,
+        "milliseconds": 14.05,
+        "mode": "light",
+        "retained_heap_bytes": 491424
+      },
+      "log": "gin-wl-light-2.txt"
+    },
+    {
+      "repo": "gin",
+      "kind": "wl-full",
+      "run": 2,
+      "result": {
+        "allocated_bytes": 4666952,
+        "allocations": 118286,
+        "functions": 483,
+        "milliseconds": 10.005,
+        "mode": "full",
+        "retained_heap_bytes": 1482592
+      },
+      "log": "gin-wl-full-2.txt"
+    },
+    {
+      "repo": "gin",
+      "kind": "storage",
+      "run": 3,
+      "result": {
+        "edge_bytes": 56,
+        "edges": 11387,
+        "functions": 483,
+        "loader_ms": 128.188,
+        "mining_edge_bytes": 40,
+        "mining_node_bytes": 112,
+        "node_bytes": 44,
+        "nodes": 7906,
+        "stages": [
+          {
+            "Name": "native_graphs",
+            "Milliseconds": 25.755,
+            "AllocatedBytes": 17404888,
+            "Allocations": 143928,
+            "RetainedHeapBytes": 2605696
+          },
+          {
+            "Name": "mining_views",
+            "Milliseconds": 0.856,
+            "AllocatedBytes": 1430000,
+            "Allocations": 2339,
+            "RetainedHeapBytes": 1365920
+          },
+          {
+            "Name": "canonicalization_all_rules",
+            "Milliseconds": 21.799,
+            "AllocatedBytes": 54669328,
+            "Allocations": 78887,
+            "RetainedHeapBytes": 1401584
+          }
+        ]
+      },
+      "log": "gin-storage-3.txt"
+    },
+    {
+      "repo": "gin",
+      "kind": "wl-light",
+      "run": 3,
+      "result": {
+        "allocated_bytes": 4666936,
+        "allocations": 118286,
+        "functions": 483,
+        "milliseconds": 10.555,
+        "mode": "light",
+        "retained_heap_bytes": 491424
+      },
+      "log": "gin-wl-light-3.txt"
+    },
+    {
+      "repo": "gin",
+      "kind": "wl-full",
+      "run": 3,
+      "result": {
+        "allocated_bytes": 4661600,
+        "allocations": 118280,
+        "functions": 483,
+        "milliseconds": 14.121,
+        "mode": "full",
+        "retained_heap_bytes": 1471952
+      },
+      "log": "gin-wl-full-3.txt"
+    },
+    {
+      "repo": "prometheus",
+      "kind": "pipeline",
+      "run": 1,
+      "result": {
+        "stages": [
+          {
+            "name": "shared_labels",
+            "milliseconds": 19.095,
+            "allocated_bytes": 626432,
+            "allocations": 2296
+          },
+          {
+            "name": "features",
+            "milliseconds": 12.365,
+            "allocated_bytes": 2835208,
+            "allocations": 6169
+          },
+          {
+            "name": "pair_filters",
+            "milliseconds": 311.248,
+            "allocated_bytes": 5347304,
+            "allocations": 6286
+          },
+          {
+            "name": "wl_features",
+            "milliseconds": 321.977,
+            "allocated_bytes": 124686576,
+            "allocations": 3084888
+          },
+          {
+            "name": "vectorize",
+            "milliseconds": 5.611,
+            "allocated_bytes": 25620848,
+            "allocations": 6177
+          },
+          {
+            "name": "lsh_planes",
+            "milliseconds": 0.148,
+            "allocated_bytes": 270384,
+            "allocations": 99
+          },
+          {
+            "name": "lsh_index",
+            "milliseconds": 125.019,
+            "allocated_bytes": 4519040,
+            "allocations": 2471
+          },
+          {
+            "name": "lsh_components",
+            "milliseconds": 13.584,
+            "allocated_bytes": 674576,
+            "allocations": 36
+          },
+          {
+            "name": "verify",
+            "milliseconds": 24.005,
+            "allocated_bytes": 2930472,
+            "allocations": 5741
+          }
+        ],
+        "Functions": 6159,
+        "PossiblePairs": 18963561,
+        "Candidates": 10435875,
+        "WLGraphs": 6159,
+        "Clusters": 1,
+        "LargestCluster": 6159,
+        "VerificationPairs": 10435875,
+        "ClonePairs": 34560,
+        "GroupDigest": "f73421d408f9fff8584de36db29a62bd959da5a2a43efba1ce87e6c959e2a0bc"
+      },
+      "log": "prometheus-pipeline-1.txt"
+    },
+    {
+      "repo": "prometheus",
+      "kind": "pipeline",
+      "run": 2,
+      "result": {
+        "stages": [
+          {
+            "name": "shared_labels",
+            "milliseconds": 23.495,
+            "allocated_bytes": 626416,
+            "allocations": 2295
+          },
+          {
+            "name": "features",
+            "milliseconds": 17.78,
+            "allocated_bytes": 2835208,
+            "allocations": 6169
+          },
+          {
+            "name": "pair_filters",
+            "milliseconds": 418.857,
+            "allocated_bytes": 5384544,
+            "allocations": 6328
+          },
+          {
+            "name": "wl_features",
+            "milliseconds": 297.751,
+            "allocated_bytes": 124686688,
+            "allocations": 3084890
+          },
+          {
+            "name": "vectorize",
+            "milliseconds": 6.005,
+            "allocated_bytes": 25620848,
+            "allocations": 6177
+          },
+          {
+            "name": "lsh_planes",
+            "milliseconds": 0.142,
+            "allocated_bytes": 270384,
+            "allocations": 99
+          },
+          {
+            "name": "lsh_index",
+            "milliseconds": 120.976,
+            "allocated_bytes": 4519040,
+            "allocations": 2471
+          },
+          {
+            "name": "lsh_components",
+            "milliseconds": 14.426,
+            "allocated_bytes": 674576,
+            "allocations": 36
+          },
+          {
+            "name": "verify",
+            "milliseconds": 24.525,
+            "allocated_bytes": 2930472,
+            "allocations": 5741
+          }
+        ],
+        "Functions": 6159,
+        "PossiblePairs": 18963561,
+        "Candidates": 10435875,
+        "WLGraphs": 6159,
+        "Clusters": 1,
+        "LargestCluster": 6159,
+        "VerificationPairs": 10435875,
+        "ClonePairs": 34560,
+        "GroupDigest": "f73421d408f9fff8584de36db29a62bd959da5a2a43efba1ce87e6c959e2a0bc"
+      },
+      "log": "prometheus-pipeline-2.txt"
+    },
+    {
+      "repo": "prometheus",
+      "kind": "pipeline",
+      "run": 3,
+      "result": {
+        "stages": [
+          {
+            "name": "shared_labels",
+            "milliseconds": 17.447,
+            "allocated_bytes": 626448,
+            "allocations": 2296
+          },
+          {
+            "name": "features",
+            "milliseconds": 14.857,
+            "allocated_bytes": 2835208,
+            "allocations": 6169
+          },
+          {
+            "name": "pair_filters",
+            "milliseconds": 347.96,
+            "allocated_bytes": 5347304,
+            "allocations": 6286
+          },
+          {
+            "name": "wl_features",
+            "milliseconds": 312.013,
+            "allocated_bytes": 124686608,
+            "allocations": 3084889
+          },
+          {
+            "name": "vectorize",
+            "milliseconds": 6.019,
+            "allocated_bytes": 25620848,
+            "allocations": 6177
+          },
+          {
+            "name": "lsh_planes",
+            "milliseconds": 0.141,
+            "allocated_bytes": 270384,
+            "allocations": 99
+          },
+          {
+            "name": "lsh_index",
+            "milliseconds": 119.724,
+            "allocated_bytes": 4519040,
+            "allocations": 2471
+          },
+          {
+            "name": "lsh_components",
+            "milliseconds": 13.859,
+            "allocated_bytes": 674576,
+            "allocations": 36
+          },
+          {
+            "name": "verify",
+            "milliseconds": 26.184,
+            "allocated_bytes": 2930472,
+            "allocations": 5741
+          }
+        ],
+        "Functions": 6159,
+        "PossiblePairs": 18963561,
+        "Candidates": 10435875,
+        "WLGraphs": 6159,
+        "Clusters": 1,
+        "LargestCluster": 6159,
+        "VerificationPairs": 10435875,
+        "ClonePairs": 34560,
+        "GroupDigest": "f73421d408f9fff8584de36db29a62bd959da5a2a43efba1ce87e6c959e2a0bc"
+      },
+      "log": "prometheus-pipeline-3.txt"
+    },
+    {
+      "repo": "prometheus",
+      "kind": "pipeline",
+      "run": 4,
+      "result": {
+        "stages": [
+          {
+            "name": "shared_labels",
+            "milliseconds": 18.582,
+            "allocated_bytes": 626432,
+            "allocations": 2296
+          },
+          {
+            "name": "features",
+            "milliseconds": 11.232,
+            "allocated_bytes": 2835208,
+            "allocations": 6169
+          },
+          {
+            "name": "pair_filters",
+            "milliseconds": 304.076,
+            "allocated_bytes": 5352624,
+            "allocations": 6292
+          },
+          {
+            "name": "wl_features",
+            "milliseconds": 305.307,
+            "allocated_bytes": 124649632,
+            "allocations": 3084884
+          },
+          {
+            "name": "vectorize",
+            "milliseconds": 5.735,
+            "allocated_bytes": 25620848,
+            "allocations": 6177
+          },
+          {
+            "name": "lsh_planes",
+            "milliseconds": 0.151,
+            "allocated_bytes": 270384,
+            "allocations": 99
+          },
+          {
+            "name": "lsh_index",
+            "milliseconds": 119.124,
+            "allocated_bytes": 4519040,
+            "allocations": 2471
+          },
+          {
+            "name": "lsh_components",
+            "milliseconds": 14.526,
+            "allocated_bytes": 674576,
+            "allocations": 36
+          },
+          {
+            "name": "verify",
+            "milliseconds": 25.852,
+            "allocated_bytes": 2930952,
+            "allocations": 5742
+          }
+        ],
+        "Functions": 6159,
+        "PossiblePairs": 18963561,
+        "Candidates": 10435875,
+        "WLGraphs": 6159,
+        "Clusters": 1,
+        "LargestCluster": 6159,
+        "VerificationPairs": 10435875,
+        "ClonePairs": 34560,
+        "GroupDigest": "f73421d408f9fff8584de36db29a62bd959da5a2a43efba1ce87e6c959e2a0bc"
+      },
+      "log": "prometheus-pipeline-4.txt"
+    },
+    {
+      "repo": "prometheus",
+      "kind": "pipeline",
+      "run": 5,
+      "result": {
+        "stages": [
+          {
+            "name": "shared_labels",
+            "milliseconds": 18.636,
+            "allocated_bytes": 626416,
+            "allocations": 2295
+          },
+          {
+            "name": "features",
+            "milliseconds": 12.143,
+            "allocated_bytes": 2835208,
+            "allocations": 6169
+          },
+          {
+            "name": "pair_filters",
+            "milliseconds": 347.595,
+            "allocated_bytes": 5368584,
+            "allocations": 6310
+          },
+          {
+            "name": "wl_features",
+            "milliseconds": 316.432,
+            "allocated_bytes": 124686560,
+            "allocations": 3084888
+          },
+          {
+            "name": "vectorize",
+            "milliseconds": 5.417,
+            "allocated_bytes": 25620848,
+            "allocations": 6177
+          },
+          {
+            "name": "lsh_planes",
+            "milliseconds": 0.196,
+            "allocated_bytes": 270384,
+            "allocations": 99
+          },
+          {
+            "name": "lsh_index",
+            "milliseconds": 121.515,
+            "allocated_bytes": 4519040,
+            "allocations": 2471
+          },
+          {
+            "name": "lsh_components",
+            "milliseconds": 15.666,
+            "allocated_bytes": 674576,
+            "allocations": 36
+          },
+          {
+            "name": "verify",
+            "milliseconds": 23.499,
+            "allocated_bytes": 2930472,
+            "allocations": 5741
+          }
+        ],
+        "Functions": 6159,
+        "PossiblePairs": 18963561,
+        "Candidates": 10435875,
+        "WLGraphs": 6159,
+        "Clusters": 1,
+        "LargestCluster": 6159,
+        "VerificationPairs": 10435875,
+        "ClonePairs": 34560,
+        "GroupDigest": "f73421d408f9fff8584de36db29a62bd959da5a2a43efba1ce87e6c959e2a0bc"
+      },
+      "log": "prometheus-pipeline-5.txt"
+    },
+    {
+      "repo": "prometheus",
+      "kind": "storage",
+      "run": 1,
+      "result": {
+        "edge_bytes": 56,
+        "edges": 323127,
+        "functions": 6173,
+        "loader_ms": 834.165,
+        "mining_edge_bytes": 40,
+        "mining_node_bytes": 112,
+        "node_bytes": 44,
+        "nodes": 210050,
+        "stages": [
+          {
+            "Name": "native_graphs",
+            "Milliseconds": 556.347,
+            "AllocatedBytes": 426936208,
+            "Allocations": 2984841,
+            "RetainedHeapBytes": 56063472
+          },
+          {
+            "Name": "mining_views",
+            "Milliseconds": 16.695,
+            "AllocatedBytes": 37415008,
+            "Allocations": 29644,
+            "RetainedHeapBytes": 35671792
+          },
+          {
+            "Name": "canonicalization_all_rules",
+            "Milliseconds": 587.87,
+            "AllocatedBytes": 1535354640,
+            "Allocations": 1260781,
+            "RetainedHeapBytes": 37233944
+          }
+        ]
+      },
+      "log": "prometheus-storage-1.txt"
+    },
+    {
+      "repo": "prometheus",
+      "kind": "wl-light",
+      "run": 1,
+      "result": {
+        "allocated_bytes": 124338696,
+        "allocations": 3084862,
+        "functions": 6159,
+        "milliseconds": 290.842,
+        "mode": "light",
+        "retained_heap_bytes": 10252688
+      },
+      "log": "prometheus-wl-light-1.txt"
+    },
+    {
+      "repo": "prometheus",
+      "kind": "wl-full",
+      "run": 1,
+      "result": {
+        "allocated_bytes": 124375624,
+        "allocations": 3084866,
+        "functions": 6159,
+        "milliseconds": 386.544,
+        "mode": "full",
+        "retained_heap_bytes": 36891904
+      },
+      "log": "prometheus-wl-full-1.txt"
+    },
+    {
+      "repo": "prometheus",
+      "kind": "storage",
+      "run": 2,
+      "result": {
+        "edge_bytes": 56,
+        "edges": 323127,
+        "functions": 6173,
+        "loader_ms": 841.974,
+        "mining_edge_bytes": 40,
+        "mining_node_bytes": 112,
+        "node_bytes": 44,
+        "nodes": 210050,
+        "stages": [
+          {
+            "Name": "native_graphs",
+            "Milliseconds": 561.656,
+            "AllocatedBytes": 426636464,
+            "Allocations": 2984831,
+            "RetainedHeapBytes": 56062296
+          },
+          {
+            "Name": "mining_views",
+            "Milliseconds": 19.278,
+            "AllocatedBytes": 37415024,
+            "Allocations": 29644,
+            "RetainedHeapBytes": 35671792
+          },
+          {
+            "Name": "canonicalization_all_rules",
+            "Milliseconds": 570.921,
+            "AllocatedBytes": 1535469440,
+            "Allocations": 1260786,
+            "RetainedHeapBytes": 37233944
+          }
+        ]
+      },
+      "log": "prometheus-storage-2.txt"
+    },
+    {
+      "repo": "prometheus",
+      "kind": "wl-light",
+      "run": 2,
+      "result": {
+        "allocated_bytes": 124333360,
+        "allocations": 3084856,
+        "functions": 6159,
+        "milliseconds": 388.409,
+        "mode": "light",
+        "retained_heap_bytes": 10247368
+      },
+      "log": "prometheus-wl-light-2.txt"
+    },
+    {
+      "repo": "prometheus",
+      "kind": "wl-full",
+      "run": 2,
+      "result": {
+        "allocated_bytes": 124307056,
+        "allocations": 3084864,
+        "functions": 6159,
+        "milliseconds": 333.81,
+        "mode": "full",
+        "retained_heap_bytes": 36897208
+      },
+      "log": "prometheus-wl-full-2.txt"
+    },
+    {
+      "repo": "prometheus",
+      "kind": "storage",
+      "run": 3,
+      "result": {
+        "edge_bytes": 56,
+        "edges": 323127,
+        "functions": 6173,
+        "loader_ms": 848.195,
+        "mining_edge_bytes": 40,
+        "mining_node_bytes": 112,
+        "node_bytes": 44,
+        "nodes": 210050,
+        "stages": [
+          {
+            "Name": "native_graphs",
+            "Milliseconds": 543.308,
+            "AllocatedBytes": 427215640,
+            "Allocations": 2984880,
+            "RetainedHeapBytes": 56069632
+          },
+          {
+            "Name": "mining_views",
+            "Milliseconds": 15.578,
+            "AllocatedBytes": 37415008,
+            "Allocations": 29644,
+            "RetainedHeapBytes": 35671792
+          },
+          {
+            "Name": "canonicalization_all_rules",
+            "Milliseconds": 565.203,
+            "AllocatedBytes": 1535464120,
+            "Allocations": 1260780,
+            "RetainedHeapBytes": 37228624
+          }
+        ]
+      },
+      "log": "prometheus-storage-3.txt"
+    },
+    {
+      "repo": "prometheus",
+      "kind": "wl-light",
+      "run": 3,
+      "result": {
+        "allocated_bytes": 124370384,
+        "allocations": 3084861,
+        "functions": 6159,
+        "milliseconds": 382.316,
+        "mode": "light",
+        "retained_heap_bytes": 10252688
+      },
+      "log": "prometheus-wl-light-3.txt"
+    },
+    {
+      "repo": "prometheus",
+      "kind": "wl-full",
+      "run": 3,
+      "result": {
+        "allocated_bytes": 124365280,
+        "allocations": 3084892,
+        "functions": 6159,
+        "milliseconds": 385.239,
+        "mode": "full",
+        "retained_heap_bytes": 36918504
+      },
+      "log": "prometheus-wl-full-3.txt"
+    },
+    {
+      "repo": "prometheus",
+      "kind": "profile-filtered",
+      "run": 1,
+      "result": null,
+      "log": "prometheus-profile-filtered-1.txt"
+    },
+    {
+      "repo": "prometheus",
+      "kind": "profile-exhaustive",
+      "run": 1,
+      "result": null,
+      "log": "prometheus-profile-exhaustive-1.txt"
+    },
+    {
+      "repo": "prometheus",
+      "kind": "profile-native",
+      "run": 1,
+      "result": {
+        "edge_bytes": 56,
+        "edges": 323127,
+        "functions": 6173,
+        "loader_ms": 832.516,
+        "mining_edge_bytes": 40,
+        "mining_node_bytes": 112,
+        "node_bytes": 44,
+        "nodes": 210050,
+        "stages": [
+          {
+            "Name": "native_graphs",
+            "Milliseconds": 532.504,
+            "AllocatedBytes": 426770520,
+            "Allocations": 2984843,
+            "RetainedHeapBytes": 56039392
+          },
+          {
+            "Name": "mining_views",
+            "Milliseconds": 16.264,
+            "AllocatedBytes": 37414992,
+            "Allocations": 29643,
+            "RetainedHeapBytes": 35668328
+          },
+          {
+            "Name": "canonicalization_all_rules",
+            "Milliseconds": 562.869,
+            "AllocatedBytes": 1535349368,
+            "Allocations": 1260776,
+            "RetainedHeapBytes": 37228640
+          }
+        ]
+      },
+      "log": "prometheus-profile-native-1.txt"
+    }
+  ],
+  "expanded_storage_runs": [
+    {
+      "repo": "cobra",
+      "kind": "storage-expanded",
+      "run": 1,
+      "profiled": false,
+      "result": {
+        "edge_bytes": 56,
+        "edges": 7863,
+        "functions": 269,
+        "loader_ms": 89.753,
+        "mining_edge_bytes": 40,
+        "mining_node_bytes": 112,
+        "node_bytes": 44,
+        "nodes": 5335,
+        "stages": [
+          {
+            "Name": "native_graphs",
+            "Milliseconds": 26.26,
+            "AllocatedBytes": 11562304,
+            "Allocations": 92581,
+            "RetainedHeapBytes": 1754800
+          },
+          {
+            "Name": "mining_views",
+            "Milliseconds": 0.612,
+            "AllocatedBytes": 956816,
+            "Allocations": 1307,
+            "RetainedHeapBytes": 913216
+          },
+          {
+            "Name": "canonicalization_no_rules",
+            "Milliseconds": 0.246,
+            "AllocatedBytes": 867888,
+            "Allocations": 804,
+            "RetainedHeapBytes": 867888
+          },
+          {
+            "Name": "canonicalization_all_rules",
+            "Milliseconds": 26.122,
+            "AllocatedBytes": 36876568,
+            "Allocations": 48407,
+            "RetainedHeapBytes": 973376
+          }
+        ]
+      }
+    },
+    {
+      "repo": "cobra",
+      "kind": "storage-expanded",
+      "run": 2,
+      "profiled": false,
+      "result": {
+        "edge_bytes": 56,
+        "edges": 7863,
+        "functions": 269,
+        "loader_ms": 81.294,
+        "mining_edge_bytes": 40,
+        "mining_node_bytes": 112,
+        "node_bytes": 44,
+        "nodes": 5335,
+        "stages": [
+          {
+            "Name": "native_graphs",
+            "Milliseconds": 25.087,
+            "AllocatedBytes": 11562472,
+            "Allocations": 92580,
+            "RetainedHeapBytes": 1750656
+          },
+          {
+            "Name": "mining_views",
+            "Milliseconds": 1.006,
+            "AllocatedBytes": 956832,
+            "Allocations": 1308,
+            "RetainedHeapBytes": 913232
+          },
+          {
+            "Name": "canonicalization_no_rules",
+            "Milliseconds": 0.193,
+            "AllocatedBytes": 867888,
+            "Allocations": 804,
+            "RetainedHeapBytes": 878528
+          },
+          {
+            "Name": "canonicalization_all_rules",
+            "Milliseconds": 19.555,
+            "AllocatedBytes": 36876584,
+            "Allocations": 48407,
+            "RetainedHeapBytes": 973376
+          }
+        ]
+      }
+    },
+    {
+      "repo": "cobra",
+      "kind": "storage-expanded",
+      "run": 3,
+      "profiled": false,
+      "result": {
+        "edge_bytes": 56,
+        "edges": 7863,
+        "functions": 269,
+        "loader_ms": 72.566,
+        "mining_edge_bytes": 40,
+        "mining_node_bytes": 112,
+        "node_bytes": 44,
+        "nodes": 5335,
+        "stages": [
+          {
+            "Name": "native_graphs",
+            "Milliseconds": 13.707,
+            "AllocatedBytes": 11562224,
+            "Allocations": 92576,
+            "RetainedHeapBytes": 1754544
+          },
+          {
+            "Name": "mining_views",
+            "Milliseconds": 0.379,
+            "AllocatedBytes": 956816,
+            "Allocations": 1307,
+            "RetainedHeapBytes": 913232
+          },
+          {
+            "Name": "canonicalization_no_rules",
+            "Milliseconds": 0.124,
+            "AllocatedBytes": 867888,
+            "Allocations": 804,
+            "RetainedHeapBytes": 867888
+          },
+          {
+            "Name": "canonicalization_all_rules",
+            "Milliseconds": 14.783,
+            "AllocatedBytes": 36876600,
+            "Allocations": 48407,
+            "RetainedHeapBytes": 973376
+          }
+        ]
+      }
+    },
+    {
+      "repo": "gin",
+      "kind": "storage-expanded",
+      "run": 1,
+      "profiled": false,
+      "result": {
+        "edge_bytes": 56,
+        "edges": 11387,
+        "functions": 483,
+        "loader_ms": 137.204,
+        "mining_edge_bytes": 40,
+        "mining_node_bytes": 112,
+        "node_bytes": 44,
+        "nodes": 7906,
+        "stages": [
+          {
+            "Name": "native_graphs",
+            "Milliseconds": 33.553,
+            "AllocatedBytes": 17402584,
+            "Allocations": 143904,
+            "RetainedHeapBytes": 2604064
+          },
+          {
+            "Name": "mining_views",
+            "Milliseconds": 1.054,
+            "AllocatedBytes": 1430000,
+            "Allocations": 2339,
+            "RetainedHeapBytes": 1365936
+          },
+          {
+            "Name": "canonicalization_no_rules",
+            "Milliseconds": 0.332,
+            "AllocatedBytes": 1294592,
+            "Allocations": 1441,
+            "RetainedHeapBytes": 1294592
+          },
+          {
+            "Name": "canonicalization_all_rules",
+            "Milliseconds": 23.654,
+            "AllocatedBytes": 54669344,
+            "Allocations": 78887,
+            "RetainedHeapBytes": 1422864
+          }
+        ]
+      }
+    },
+    {
+      "repo": "gin",
+      "kind": "storage-expanded",
+      "run": 2,
+      "profiled": false,
+      "result": {
+        "edge_bytes": 56,
+        "edges": 11387,
+        "functions": 483,
+        "loader_ms": 120.798,
+        "mining_edge_bytes": 40,
+        "mining_node_bytes": 112,
+        "node_bytes": 44,
+        "nodes": 7906,
+        "stages": [
+          {
+            "Name": "native_graphs",
+            "Milliseconds": 35.369,
+            "AllocatedBytes": 17414392,
+            "Allocations": 143927,
+            "RetainedHeapBytes": 2614240
+          },
+          {
+            "Name": "mining_views",
+            "Milliseconds": 0.776,
+            "AllocatedBytes": 1430000,
+            "Allocations": 2339,
+            "RetainedHeapBytes": 1365936
+          },
+          {
+            "Name": "canonicalization_no_rules",
+            "Milliseconds": 0.311,
+            "AllocatedBytes": 1294592,
+            "Allocations": 1441,
+            "RetainedHeapBytes": 1294592
+          },
+          {
+            "Name": "canonicalization_all_rules",
+            "Milliseconds": 25.169,
+            "AllocatedBytes": 54669360,
+            "Allocations": 78887,
+            "RetainedHeapBytes": 1401584
+          }
+        ]
+      }
+    },
+    {
+      "repo": "gin",
+      "kind": "storage-expanded",
+      "run": 3,
+      "profiled": false,
+      "result": {
+        "edge_bytes": 56,
+        "edges": 11387,
+        "functions": 483,
+        "loader_ms": 132,
+        "mining_edge_bytes": 40,
+        "mining_node_bytes": 112,
+        "node_bytes": 44,
+        "nodes": 7906,
+        "stages": [
+          {
+            "Name": "native_graphs",
+            "Milliseconds": 29.244,
+            "AllocatedBytes": 17402808,
+            "Allocations": 143906,
+            "RetainedHeapBytes": 2602768
+          },
+          {
+            "Name": "mining_views",
+            "Milliseconds": 0.782,
+            "AllocatedBytes": 1430000,
+            "Allocations": 2339,
+            "RetainedHeapBytes": 1365936
+          },
+          {
+            "Name": "canonicalization_no_rules",
+            "Milliseconds": 0.294,
+            "AllocatedBytes": 1294592,
+            "Allocations": 1441,
+            "RetainedHeapBytes": 1294592
+          },
+          {
+            "Name": "canonicalization_all_rules",
+            "Milliseconds": 23.205,
+            "AllocatedBytes": 54669376,
+            "Allocations": 78887,
+            "RetainedHeapBytes": 1401584
+          }
+        ]
+      }
+    },
+    {
+      "repo": "prometheus",
+      "kind": "storage-expanded",
+      "run": 1,
+      "profiled": false,
+      "result": {
+        "edge_bytes": 56,
+        "edges": 323127,
+        "functions": 6173,
+        "loader_ms": 813.787,
+        "mining_edge_bytes": 40,
+        "mining_node_bytes": 112,
+        "node_bytes": 44,
+        "nodes": 210050,
+        "stages": [
+          {
+            "Name": "native_graphs",
+            "Milliseconds": 503.008,
+            "AllocatedBytes": 427073904,
+            "Allocations": 2984863,
+            "RetainedHeapBytes": 56061920
+          },
+          {
+            "Name": "mining_views",
+            "Milliseconds": 14.808,
+            "AllocatedBytes": 37415008,
+            "Allocations": 29644,
+            "RetainedHeapBytes": 35671792
+          },
+          {
+            "Name": "canonicalization_no_rules",
+            "Milliseconds": 6.727,
+            "AllocatedBytes": 34386304,
+            "Allocations": 18241,
+            "RetainedHeapBytes": 34386320
+          },
+          {
+            "Name": "canonicalization_all_rules",
+            "Milliseconds": 549.969,
+            "AllocatedBytes": 1535349304,
+            "Allocations": 1260775,
+            "RetainedHeapBytes": 37228624
+          }
+        ]
+      }
+    },
+    {
+      "repo": "prometheus",
+      "kind": "storage-expanded",
+      "run": 2,
+      "profiled": false,
+      "result": {
+        "edge_bytes": 56,
+        "edges": 323127,
+        "functions": 6173,
+        "loader_ms": 807.106,
+        "mining_edge_bytes": 40,
+        "mining_node_bytes": 112,
+        "node_bytes": 44,
+        "nodes": 210050,
+        "stages": [
+          {
+            "Name": "native_graphs",
+            "Milliseconds": 518.124,
+            "AllocatedBytes": 426938000,
+            "Allocations": 2984851,
+            "RetainedHeapBytes": 56064776
+          },
+          {
+            "Name": "mining_views",
+            "Milliseconds": 14.934,
+            "AllocatedBytes": 37415008,
+            "Allocations": 29644,
+            "RetainedHeapBytes": 35671792
+          },
+          {
+            "Name": "canonicalization_no_rules",
+            "Milliseconds": 7.043,
+            "AllocatedBytes": 34386320,
+            "Allocations": 18242,
+            "RetainedHeapBytes": 34386320
+          },
+          {
+            "Name": "canonicalization_all_rules",
+            "Milliseconds": 563.068,
+            "AllocatedBytes": 1535464136,
+            "Allocations": 1260780,
+            "RetainedHeapBytes": 37228624
+          }
+        ]
+      }
+    },
+    {
+      "repo": "prometheus",
+      "kind": "storage-expanded",
+      "run": 3,
+      "profiled": true,
+      "result": {
+        "edge_bytes": 56,
+        "edges": 323127,
+        "functions": 6173,
+        "loader_ms": 845.058,
+        "mining_edge_bytes": 40,
+        "mining_node_bytes": 112,
+        "node_bytes": 44,
+        "nodes": 210050,
+        "stages": [
+          {
+            "Name": "native_graphs",
+            "Milliseconds": 518.841,
+            "AllocatedBytes": 429310928,
+            "Allocations": 2987154,
+            "RetainedHeapBytes": 56076728
+          },
+          {
+            "Name": "mining_views",
+            "Milliseconds": 15.59,
+            "AllocatedBytes": 37415008,
+            "Allocations": 29644,
+            "RetainedHeapBytes": 35668344
+          },
+          {
+            "Name": "canonicalization_no_rules",
+            "Milliseconds": 5.675,
+            "AllocatedBytes": 34386304,
+            "Allocations": 18241,
+            "RetainedHeapBytes": 34386304
+          },
+          {
+            "Name": "canonicalization_all_rules",
+            "Milliseconds": 593.112,
+            "AllocatedBytes": 1535349352,
+            "Allocations": 1260775,
+            "RetainedHeapBytes": 37228624
+          }
+        ]
+      }
+    }
+  ],
+  "profiles": {
+    "filtered-cpu-top.txt": "File: matching.test\nBuild ID: 7673db71c33af2736976964c7817d346daee76f1\nType: cpu\nTime: 2026-10-10 22:31:09 EDT\nDuration: 3.32s, Total samples = 28.25s (850.93%)\nShowing nodes accounting for 27.02s, 95.65% of 28.25s total\nDropped 143 nodes (cum <= 0.14s)\nShowing top 25 nodes out of 51\n      flat  flat%   sum%        cum   cum%\n    13.06s 46.23% 46.23%     14.36s 50.83%  github.com/shanejonas/cyclo/domain/patterns.jaroFindMatches\n     3.82s 13.52% 59.75%      3.82s 13.52%  github.com/shanejonas/cyclo/domain/patterns.jaroTranspositions (inline)\n     1.54s  5.45% 65.20%      1.54s  5.45%  github.com/shanejonas/cyclo/domain/patterns.astShape.bypass\n     1.29s  4.57% 69.77%      1.29s  4.57%  github.com/shanejonas/cyclo/domain/patterns.jaroBounds (inline)\n     1.26s  4.46% 74.23%      1.26s  4.46%  github.com/shanejonas/cyclo/domain/patterns.dot (inline)\n     1.10s  3.89% 78.12%     19.33s 68.42%  github.com/shanejonas/cyclo/domain/patterns.jaroRunes\n     1.07s  3.79% 81.91%     23.74s 84.04%  github.com/shanejonas/cyclo/domain/patterns.ccPairFilters.accepts\n     0.49s  1.73% 83.65%     20.31s 71.89%  github.com/shanejonas/cyclo/domain/patterns.nameMatcher.similar\n     0.41s  1.45% 85.10%      0.94s  3.33%  github.com/shanejonas/cyclo/domain/patterns.similarityAtLeast\n     0.35s  1.24% 86.34%      0.35s  1.24%  github.com/shanejonas/cyclo/domain/patterns.intersection\n     0.31s  1.10% 87.43%      0.31s  1.10%  github.com/shanejonas/cyclo/domain/patterns.(*ccPairs).add (inline)\n     0.28s  0.99% 88.42%      0.28s  0.99%  runtime.memclrNoHeapPointers\n     0.26s  0.92% 89.35%      0.26s  0.92%  github.com/shanejonas/cyclo/domain/patterns.appendNeighbours (inline)\n     0.25s  0.88% 90.23%      0.25s  0.88%  github.com/shanejonas/cyclo/domain/patterns.(*ccPairs).has (inline)\n     0.25s  0.88% 91.12%      0.25s  0.88%  github.com/shanejonas/cyclo/domain/patterns.fnv1a (inline)\n     0.19s  0.67% 91.79%      0.19s  0.67%  github.com/shanejonas/cyclo/domain/patterns.commonRunePrefix (inline)\n     0.18s  0.64% 92.42%     24.23s 85.77%  github.com/shanejonas/cyclo/domain/patterns.ccPairFilters.stripes\n     0.18s  0.64% 93.06%      1.48s  5.24%  github.com/shanejonas/cyclo/domain/patterns.ccSimilarStripes\n     0.15s  0.53% 93.59%      0.15s  0.53%  github.com/shanejonas/cyclo/domain/patterns.(*ccPairs).members\n     0.15s  0.53% 94.12%      0.37s  1.31%  runtime.scanObject\n     0.14s   0.5% 94.62%      0.40s  1.42%  github.com/shanejonas/cyclo/domain/patterns.(*Graph).eccentricityWith\n     0.12s  0.42% 95.04%      0.17s   0.6%  runtime.tryDeferToSpanScan\n     0.11s  0.39% 95.43%      1.05s  3.72%  github.com/shanejonas/cyclo/domain/patterns.ccGraphGroups.func1\n     0.06s  0.21% 95.65%      0.82s  2.90%  github.com/shanejonas/cyclo/domain/patterns.ccPairFilters.cosine (inline)\n         0     0% 95.65%      0.44s  1.56%  github.com/shanejonas/cyclo/domain/patterns.(*Graph).refine\n",
+    "filtered-alloc_space-top.txt": "File: matching.test\nBuild ID: 7673db71c33af2736976964c7817d346daee76f1\nType: alloc_space\nTime: 2026-10-10 22:31:09 EDT\nShowing nodes accounting for 623.77MB, 97.55% of 639.43MB total\nDropped 47 nodes (cum <= 3.20MB)\nShowing top 25 nodes out of 30\n      flat  flat%   sum%        cum   cum%\n  163.03MB 25.50% 25.50%   223.53MB 34.96%  github.com/shanejonas/cyclo/domain/patterns.digest\n  118.78MB 18.58% 44.07%   125.28MB 19.59%  github.com/shanejonas/cyclo/domain/patterns.histogram\n   93.19MB 14.57% 58.65%    93.19MB 14.57%  github.com/shanejonas/cyclo/domain/patterns.adjacency\n   86.34MB 13.50% 72.15%    86.34MB 13.50%  github.com/shanejonas/cyclo/domain/patterns.Vectorize (inline)\n   63.50MB  9.93% 82.08%       67MB 10.48%  internal/reflectlite.Swapper\n   18.25MB  2.85% 84.93%    18.25MB  2.85%  github.com/shanejonas/cyclo/domain/patterns.newCCPairs (inline)\n   16.52MB  2.58% 87.52%   240.05MB 37.54%  github.com/shanejonas/cyclo/domain/patterns.(*Graph).refine\n   14.16MB  2.22% 89.73%    14.16MB  2.22%  github.com/shanejonas/cyclo/domain/patterns.(*LSH).Add\n    8.02MB  1.25% 90.99%   101.20MB 15.83%  github.com/shanejonas/cyclo/domain/patterns.buildProfileGraph\n    7.02MB  1.10% 92.08%     7.02MB  1.10%  github.com/shanejonas/cyclo/domain/patterns.(*ccPairBatch).add\n    5.50MB  0.86% 92.94%     5.50MB  0.86%  github.com/shanejonas/cyclo/domain/patterns.denseASTShape (inline)\n       5MB  0.78% 93.73%        5MB  0.78%  github.com/shanejonas/cyclo/domain/patterns.diameter\n       5MB  0.78% 94.51%   483.54MB 75.62%  github.com/shanejonas/cyclo/domain/patterns.NewWlLight\n    4.15MB  0.65% 95.16%     4.15MB  0.65%  github.com/shanejonas/cyclo/domain/patterns.groupsOfTwoOrMore\n    3.50MB  0.55% 95.70%   128.78MB 20.14%  github.com/shanejonas/cyclo/domain/patterns.histograms\n    3.50MB  0.55% 96.25%   243.55MB 38.09%  github.com/shanejonas/cyclo/domain/patterns.(*Graph).refineRoundsDiameter\n    3.50MB  0.55% 96.80%     3.50MB  0.55%  internal/reflectlite.unsafe_New\n    1.57MB  0.25% 97.04%   105.17MB 16.45%  github.com/shanejonas/cyclo/domain/patterns.ccLSHClusters\n    1.04MB  0.16% 97.21%    16.26MB  2.54%  github.com/shanejonas/cyclo/domain/patterns.ClusterClones\n    1.03MB  0.16% 97.37%   484.56MB 75.78%  github.com/shanejonas/cyclo/domain/patterns.ccBuildWls\n    0.60MB 0.094% 97.46%     6.11MB  0.95%  github.com/shanejonas/cyclo/domain/patterns.ccASTShapes\n    0.58MB  0.09% 97.55%   625.08MB 97.76%  github.com/shanejonas/cyclo/domain/patterns.ccGraphGroups\n         0     0% 97.55%   625.08MB 97.76%  github.com/shanejonas/cyclo/domain/patterns.CCGraphClonesWithAST (inline)\n         0     0% 97.55%   627.41MB 98.12%  github.com/shanejonas/cyclo/domain/patterns.TestProfileMatchingRoute\n         0     0% 97.55%    20.83MB  3.26%  github.com/shanejonas/cyclo/domain/patterns.ccCandidatePairs\n",
+    "filtered-alloc_objects-top.txt": "File: matching.test\nBuild ID: 7673db71c33af2736976964c7817d346daee76f1\nType: alloc_objects\nTime: 2026-10-10 22:31:09 EDT\nShowing nodes accounting for 12066622, 98.81% of 12211362 total\nDropped 60 nodes (cum <= 61056)\n      flat  flat%   sum%        cum   cum%\n   7147464 58.53% 58.53%    9129988 74.77%  github.com/shanejonas/cyclo/domain/patterns.digest\n   2048063 16.77% 75.30%    2277442 18.65%  internal/reflectlite.Swapper\n   1964326 16.09% 91.39%    1964326 16.09%  github.com/shanejonas/cyclo/domain/patterns.adjacency\n    391744  3.21% 94.60%     686662  5.62%  github.com/shanejonas/cyclo/domain/patterns.histogram\n    229379  1.88% 96.48%     229379  1.88%  internal/reflectlite.unsafe_New\n     65608  0.54% 97.01%      65608  0.54%  github.com/shanejonas/cyclo/domain/patterns.groupsOfTwoOrMore\n     60985   0.5% 97.51%    9190973 75.27%  github.com/shanejonas/cyclo/domain/patterns.(*Graph).refine\n     54616  0.45% 97.96%    9245589 75.71%  github.com/shanejonas/cyclo/domain/patterns.(*Graph).refineRoundsDiameter\n     39325  0.32% 98.28%     725987  5.95%  github.com/shanejonas/cyclo/domain/patterns.histograms\n     37759  0.31% 98.59%    2002085 16.40%  github.com/shanejonas/cyclo/domain/patterns.buildProfileGraph\n     27311  0.22% 98.81%   12023030 98.46%  github.com/shanejonas/cyclo/domain/patterns.NewWlLight\n        39 0.00032% 98.81%   12023069 98.46%  github.com/shanejonas/cyclo/domain/patterns.ccBuildWls\n         3 2.5e-05% 98.81%   12160100 99.58%  github.com/shanejonas/cyclo/domain/patterns.ccGraphGroups\n         0     0% 98.81%   12160100 99.58%  github.com/shanejonas/cyclo/domain/patterns.CCGraphClonesWithAST (inline)\n         0     0% 98.81%   12162288 99.60%  github.com/shanejonas/cyclo/domain/patterns.TestProfileMatchingRoute\n         0     0% 98.81%    2277442 18.65%  sort.Slice\n         0     0% 98.81%   12162288 99.60%  testing.tRunner\n",
+    "filtered-inuse_space-top.txt": "File: matching.test\nBuild ID: 7673db71c33af2736976964c7817d346daee76f1\nType: inuse_space\nTime: 2026-10-10 22:31:09 EDT\nShowing nodes accounting for -551.52kB, 34.96% of 1577.52kB total\n      flat  flat%   sum%        cum   cum%\n-1064.52kB 67.48% 67.48% -1064.52kB 67.48%  github.com/shanejonas/cyclo/domain/patterns.ccGraphInputs (inline)\n     513kB 32.52% 34.96%      513kB 32.52%  runtime.mallocgc\n         0     0% 34.96% -1064.52kB 67.48%  github.com/shanejonas/cyclo/domain/patterns.TestProfileMatchingRoute\n         0     0% 34.96%      513kB 32.52%  runtime.allocm\n         0     0% 34.96%      513kB 32.52%  runtime.mcall\n         0     0% 34.96%      513kB 32.52%  runtime.newm\n         0     0% 34.96%      513kB 32.52%  runtime.newobject\n         0     0% 34.96%      513kB 32.52%  runtime.park_m\n         0     0% 34.96%      513kB 32.52%  runtime.resetspinning\n         0     0% 34.96%      513kB 32.52%  runtime.schedule\n         0     0% 34.96%      513kB 32.52%  runtime.startm\n         0     0% 34.96%      513kB 32.52%  runtime.wakep\n         0     0% 34.96% -1064.52kB 67.48%  testing.tRunner\n",
+    "exhaustive-cpu-top.txt": "File: exhaustive.test\nBuild ID: 691782d1122baad4b58dc4f6148a674326d21317\nType: cpu\nTime: 2026-10-10 22:31:13 EDT\nDuration: 3.30s, Total samples = 7.51s (227.44%)\nShowing nodes accounting for 6.38s, 84.95% of 7.51s total\nDropped 107 nodes (cum <= 0.04s)\nShowing top 25 nodes out of 86\n      flat  flat%   sum%        cum   cum%\n     1.39s 18.51% 18.51%      2.90s 38.62%  github.com/shanejonas/cyclo/domain/patterns.similarityAtLeast\n     1.15s 15.31% 33.82%      1.15s 15.31%  github.com/shanejonas/cyclo/domain/patterns.intersection\n     0.88s 11.72% 45.54%      0.88s 11.72%  github.com/shanejonas/cyclo/domain/patterns.appendNeighbours (inline)\n     0.49s  6.52% 52.06%      0.49s  6.52%  github.com/shanejonas/cyclo/domain/patterns.fnv1a (inline)\n     0.30s  3.99% 56.06%      0.30s  3.99%  github.com/shanejonas/cyclo/domain/patterns.levels (inline)\n     0.30s  3.99% 60.05%      0.49s  6.52%  runtime.tryDeferToSpanScan\n     0.29s  3.86% 63.91%      1.17s 15.58%  github.com/shanejonas/cyclo/domain/patterns.(*Graph).eccentricityWith\n     0.28s  3.73% 67.64%      0.79s 10.52%  runtime.scanObject\n     0.24s  3.20% 70.84%      3.14s 41.81%  github.com/shanejonas/cyclo/domain/patterns.ccAllMatchStripes\n     0.14s  1.86% 72.70%      0.14s  1.86%  runtime.spanClass.sizeclass (inline)\n     0.13s  1.73% 74.43%      0.13s  1.73%  internal/runtime/maps.memHashAES\n     0.13s  1.73% 76.17%      0.27s  3.60%  sort.insertionSort_func\n     0.13s  1.73% 77.90%      0.21s  2.80%  sort.partition_func\n     0.06s   0.8% 78.70%      0.06s   0.8%  github.com/shanejonas/cyclo/domain/patterns.maxNodes (inline)\n     0.06s   0.8% 79.49%      0.09s  1.20%  runtime.typePointers.next\n     0.05s  0.67% 80.16%      0.11s  1.46%  internal/reflectlite.typedmemmove\n     0.05s  0.67% 80.83%      0.05s  0.67%  runtime.findObject\n     0.04s  0.53% 81.36%      0.04s  0.53%  github.com/shanejonas/cyclo/domain/patterns.digest.func1\n     0.04s  0.53% 81.89%      0.04s  0.53%  internal/runtime/maps.(*groupReference).key\n     0.04s  0.53% 82.42%      0.04s  0.53%  internal/runtime/maps.ctrlGroup.matchH2\n     0.04s  0.53% 82.96%      0.33s  4.39%  runtime.mallocgc\n     0.04s  0.53% 83.49%      0.09s  1.20%  runtime.mallocgcSmallScanNoHeaderSC3\n     0.04s  0.53% 84.02%      0.04s  0.53%  runtime.typePointers.nextFast (inline)\n     0.04s  0.53% 84.55%      0.60s  7.99%  sort.Slice\n     0.03s   0.4% 84.95%      0.19s  2.53%  github.com/shanejonas/cyclo/domain/patterns.adjacency\n",
+    "exhaustive-alloc_space-top.txt": "File: exhaustive.test\nBuild ID: 691782d1122baad4b58dc4f6148a674326d21317\nType: alloc_space\nTime: 2026-10-10 22:31:13 EDT\nShowing nodes accounting for 1229.17MB, 98.89% of 1242.99MB total\nDropped 20 nodes (cum <= 6.21MB)\n      flat  flat%   sum%        cum   cum%\n  364.54MB 29.33% 29.33%   492.04MB 39.59%  github.com/shanejonas/cyclo/domain/patterns.digest\n  341.32MB 27.46% 56.79%   357.32MB 28.75%  github.com/shanejonas/cyclo/domain/patterns.histogram\n  256.37MB 20.63% 77.41%   256.37MB 20.63%  github.com/shanejonas/cyclo/domain/patterns.adjacency\n     142MB 11.42% 88.84%   143.50MB 11.55%  internal/reflectlite.Swapper\n   45.60MB  3.67% 92.51%   537.64MB 43.25%  github.com/shanejonas/cyclo/domain/patterns.(*Graph).refine\n   18.02MB  1.45% 93.96%   274.39MB 22.08%  github.com/shanejonas/cyclo/domain/patterns.buildProfileGraph\n   14.03MB  1.13% 95.08%    14.03MB  1.13%  github.com/shanejonas/cyclo/domain/patterns.(*ccPairBatch).add (inline)\n   10.51MB  0.85% 95.93%    10.51MB  0.85%  github.com/shanejonas/cyclo/domain/patterns.diameter\n   10.50MB  0.84% 96.77%   548.14MB 44.10%  github.com/shanejonas/cyclo/domain/patterns.(*Graph).refineRoundsDiameter\n      10MB   0.8% 97.58%  1205.87MB 97.01%  github.com/shanejonas/cyclo/domain/patterns.NewWlLight\n    8.24MB  0.66% 98.24%     8.24MB  0.66%  github.com/shanejonas/cyclo/domain/patterns.groupsOfTwoOrMore\n    5.50MB  0.44% 98.68%   362.82MB 29.19%  github.com/shanejonas/cyclo/domain/patterns.histograms\n       2MB  0.16% 98.85%    16.04MB  1.29%  github.com/shanejonas/cyclo/domain/patterns.ccAllMatchStripes\n    0.53MB 0.042% 98.89%  1222.99MB 98.39%  github.com/shanejonas/cyclo/domain/patterns.ccGraphGroups\n         0     0% 98.89%  1222.99MB 98.39%  github.com/shanejonas/cyclo/domain/patterns.CCGraphClonesWithAST (inline)\n         0     0% 98.89%  1225.88MB 98.62%  github.com/shanejonas/cyclo/domain/patterns.TestProfileMatchingRoute\n         0     0% 98.89%    16.04MB  1.29%  github.com/shanejonas/cyclo/domain/patterns.ccGraphGroups.func1\n         0     0% 98.89%   143.50MB 11.55%  sort.Slice\n         0     0% 98.89%  1225.88MB 98.62%  testing.tRunner\n",
+    "exhaustive-alloc_objects-top.txt": "File: exhaustive.test\nBuild ID: 691782d1122baad4b58dc4f6148a674326d21317\nType: alloc_objects\nTime: 2026-10-10 22:31:13 EDT\nShowing nodes accounting for 28036238, 99.49% of 28179864 total\nDropped 24 nodes (cum <= 140899)\n      flat  flat%   sum%        cum   cum%\n  16249577 57.66% 57.66%   20427623 72.49%  github.com/shanejonas/cyclo/domain/patterns.digest\n   5275080 18.72% 76.38%    5275080 18.72%  github.com/shanejonas/cyclo/domain/patterns.adjacency\n   4494817 15.95% 92.33%    4593122 16.30%  internal/reflectlite.Swapper\n   1255290  4.45% 96.79%    1670366  5.93%  github.com/shanejonas/cyclo/domain/patterns.histogram\n    213002  0.76% 97.54%   20804726 73.83%  github.com/shanejonas/cyclo/domain/patterns.(*Graph).refineRoundsDiameter\n    168049   0.6% 98.14%     168049   0.6%  github.com/shanejonas/cyclo/domain/patterns.groupsOfTwoOrMore\n    164101  0.58% 98.72%   20591724 73.07%  github.com/shanejonas/cyclo/domain/patterns.(*Graph).refine\n     99426  0.35% 99.08%    5374506 19.07%  github.com/shanejonas/cyclo/domain/patterns.buildProfileGraph\n     62264  0.22% 99.30%    1732630  6.15%  github.com/shanejonas/cyclo/domain/patterns.histograms\n     54623  0.19% 99.49%   28004066 99.38%  github.com/shanejonas/cyclo/domain/patterns.NewWlLight\n         9 3.2e-05% 99.49%   28172484   100%  github.com/shanejonas/cyclo/domain/patterns.ccGraphGroups\n         0     0% 99.49%   28172484   100%  github.com/shanejonas/cyclo/domain/patterns.CCGraphClonesWithAST (inline)\n         0     0% 99.49%   28172499   100%  github.com/shanejonas/cyclo/domain/patterns.TestProfileMatchingRoute\n         0     0% 99.49%    4593122 16.30%  sort.Slice\n         0     0% 99.49%   28172499   100%  testing.tRunner\n",
+    "exhaustive-inuse_space-top.txt": "File: exhaustive.test\nBuild ID: 691782d1122baad4b58dc4f6148a674326d21317\nType: inuse_space\nTime: 2026-10-10 22:31:13 EDT\nShowing nodes accounting for 0, 0% of 0 total\n      flat  flat%   sum%        cum   cum%\n",
+    "cli-filtered-cpu-top.txt": "File: cli-filtered.test\nBuild ID: de7eda2768a8b0cdd57fdf2a0b4f477e62b839ed\nType: cpu\nTime: 2026-10-10 22:32:39 EDT\nDuration: 4.27s, Total samples = 12.09s (283.36%)\nShowing nodes accounting for 8.49s, 70.22% of 12.09s total\nDropped 687 nodes (cum <= 0.06s)\nShowing top 25 nodes out of 191\n      flat  flat%   sum%        cum   cum%\n     3.11s 25.72% 25.72%      3.49s 28.87%  github.com/shanejonas/cyclo/domain/patterns.jaroFindMatches\n     0.77s  6.37% 32.09%      0.77s  6.37%  github.com/shanejonas/cyclo/domain/patterns.jaroTranspositions (inline)\n     0.38s  3.14% 35.24%      0.38s  3.14%  github.com/shanejonas/cyclo/domain/patterns.astShape.bypass\n     0.38s  3.14% 38.38%      0.38s  3.14%  github.com/shanejonas/cyclo/domain/patterns.jaroBounds (inline)\n     0.33s  2.73% 41.11%      0.33s  2.73%  github.com/shanejonas/cyclo/domain/patterns.dot (inline)\n     0.33s  2.73% 43.84%      0.72s  5.96%  runtime.tryDeferToSpanScan\n     0.30s  2.48% 46.32%      0.30s  2.48%  github.com/shanejonas/cyclo/domain/patterns.intersection\n     0.29s  2.40% 48.72%      0.29s  2.40%  internal/runtime/gc/scan.scanSpanPackedAVX512\n     0.29s  2.40% 51.12%      0.29s  2.40%  internal/runtime/maps.memHashAES\n     0.28s  2.32% 53.43%      5.54s 45.82%  github.com/shanejonas/cyclo/domain/patterns.ccPairFilters.accepts\n     0.23s  1.90% 55.33%      0.23s  1.90%  runtime.spanClass.sizeclass (inline)\n     0.21s  1.74% 57.07%      4.47s 36.97%  github.com/shanejonas/cyclo/domain/patterns.jaroRunes\n     0.21s  1.74% 58.81%      0.21s  1.74%  internal/runtime/maps.ctrlGroup.matchH2 (inline)\n     0.18s  1.49% 60.30%      0.18s  1.49%  github.com/shanejonas/cyclo/domain/patterns.fnv1a\n     0.16s  1.32% 61.62%      0.57s  4.71%  runtime.mapaccess2_faststr\n     0.15s  1.24% 62.86%      0.33s  2.73%  runtime.scanObjectsSmall\n     0.14s  1.16% 64.02%      0.19s  1.57%  runtime.findObject\n     0.12s  0.99% 65.01%      0.30s  2.48%  github.com/shanejonas/cyclo/domain/patterns.similarityAtLeast\n     0.11s  0.91% 65.92%      4.66s 38.54%  github.com/shanejonas/cyclo/domain/patterns.nameMatcher.similar\n     0.11s  0.91% 66.83%      0.62s  5.13%  runtime.scanObject\n     0.09s  0.74% 67.58%      1.89s 15.63%  runtime.gcDrain\n     0.08s  0.66% 68.24%      0.08s  0.66%  github.com/shanejonas/cyclo/domain/patterns.(*ccPairs).has\n     0.08s  0.66% 68.90%      0.08s  0.66%  github.com/shanejonas/cyclo/domain/patterns.appendNeighbours\n     0.08s  0.66% 69.56%      0.50s  4.14%  go/ast.Walk\n     0.08s  0.66% 70.22%      0.31s  2.56%  go/ast.inspector.Visit\n",
+    "cli-filtered-alloc_space-top.txt": "File: cli-filtered.test\nBuild ID: de7eda2768a8b0cdd57fdf2a0b4f477e62b839ed\nType: alloc_space\nTime: 2026-10-10 22:32:39 EDT\nShowing nodes accounting for 1.28GB, 62.36% of 2.05GB total\nDropped 507 nodes (cum <= 0.01GB)\nShowing top 25 nodes out of 271\n      flat  flat%   sum%        cum   cum%\n    0.16GB  7.96%  7.96%     0.17GB  8.13%  github.com/shanejonas/cyclo/domain/patterns.classes\n    0.15GB  7.21% 15.18%     0.15GB  7.36%  github.com/shanejonas/cyclo/adapters/gopatterns.(*irBuilder).appendNode\n    0.10GB  4.85% 20.03%     0.13GB  6.19%  github.com/shanejonas/cyclo/domain/patterns.digest\n    0.09GB  4.50% 24.54%     0.10GB  4.74%  github.com/shanejonas/cyclo/domain/patterns.histogram\n    0.08GB  3.79% 28.32%     0.08GB  3.79%  go/types.(*Checker).recordTypeAndValue\n    0.06GB  2.93% 31.25%     0.24GB 11.80%  golang.org/x/tools/internal/gcimporter.UImportData\n    0.06GB  2.90% 34.15%     0.06GB  2.90%  golang.org/x/tools/go/gcexportdata.readAll\n    0.05GB  2.62% 36.77%     0.05GB  2.62%  github.com/shanejonas/cyclo/domain/patterns.adjacency\n    0.05GB  2.62% 39.39%     0.05GB  2.62%  go/types.newVar (inline)\n    0.05GB  2.50% 41.89%     0.05GB  2.50%  github.com/shanejonas/cyclo/domain/patterns.(*matching).pairs\n    0.05GB  2.42% 44.31%     0.07GB  3.20%  github.com/shanejonas/cyclo/domain/pdg.(*attributeBuilder).pack\n    0.04GB  1.97% 46.28%     0.04GB  2.03%  github.com/shanejonas/cyclo/adapters/gopatterns.(*irBuilder).miningEdge\n    0.04GB  1.87% 48.14%     0.04GB  1.87%  github.com/shanejonas/cyclo/domain/patterns.clonePdg\n    0.04GB  1.83% 49.98%     0.04GB  1.90%  internal/reflectlite.Swapper\n    0.04GB  1.74% 51.72%     0.04GB  1.81%  github.com/shanejonas/cyclo/domain/patterns.MiningView\n    0.03GB  1.41% 53.12%     0.03GB  1.41%  slices.Grow[go.shape.[]uint8,go.shape.uint8]\n    0.03GB  1.27% 54.39%     0.03GB  1.27%  github.com/shanejonas/cyclo/domain/patterns.Vectorize\n    0.02GB  1.15% 55.54%     0.46GB 22.21%  github.com/shanejonas/cyclo/adapters/gopatterns.Extract\n    0.02GB  1.12% 56.66%     0.02GB  1.12%  github.com/shanejonas/cyclo/domain/patterns.blockPairs\n    0.02GB  1.12% 57.78%     0.02GB  1.21%  github.com/shanejonas/cyclo/domain/patterns.childrenOf\n    0.02GB  1.07% 58.85%     0.02GB  1.07%  go/types.(*Checker).recordUse\n    0.02GB  0.93% 59.78%     0.02GB  0.93%  github.com/shanejonas/cyclo/domain/patterns.newReturnTraversal\n    0.02GB   0.9% 60.69%     0.15GB  7.09%  github.com/shanejonas/cyclo/domain/patterns.(*Graph).refine\n    0.02GB  0.86% 61.55%     0.02GB  0.86%  github.com/shanejonas/cyclo/domain/patterns.projectionAdjacency\n    0.02GB  0.81% 62.36%     0.02GB  0.81%  github.com/shanejonas/cyclo/domain/patterns.dependenceAdjacency\n",
+    "cli-filtered-alloc_objects-top.txt": "File: cli-filtered.test\nBuild ID: de7eda2768a8b0cdd57fdf2a0b4f477e62b839ed\nType: alloc_objects\nTime: 2026-10-10 22:32:39 EDT\nShowing nodes accounting for 15022038, 69.24% of 21694625 total\nDropped 529 nodes (cum <= 108473)\nShowing top 25 nodes out of 249\n      flat  flat%   sum%        cum   cum%\n   4550777 20.98% 20.98%    5468306 25.21%  github.com/shanejonas/cyclo/domain/patterns.digest\n   2474709 11.41% 32.38%    2589400 11.94%  github.com/shanejonas/cyclo/domain/patterns.classes\n   1201526  5.54% 37.92%    1299830  5.99%  internal/reflectlite.Swapper\n   1186859  5.47% 43.39%    1186859  5.47%  github.com/shanejonas/cyclo/domain/patterns.adjacency\n    925688  4.27% 47.66%    1013070  4.67%  github.com/shanejonas/cyclo/domain/patterns.childrenOf\n    600746  2.77% 50.43%     600746  2.77%  go/types.newVar (inline)\n    447756  2.06% 52.49%     447756  2.06%  github.com/shanejonas/cyclo/domain/patterns.newReturnTraversal\n    352034  1.62% 54.12%     352034  1.62%  github.com/shanejonas/cyclo/domain/patterns.dependenceAdjacency\n    331921  1.53% 55.65%     462996  2.13%  github.com/shanejonas/cyclo/domain/patterns.histogram\n    294913  1.36% 57.00%     294913  1.36%  go/parser.(*parser).parseIdent\n    248970  1.15% 58.15%     248970  1.15%  github.com/shanejonas/cyclo/domain/patterns.projectionAdjacency\n    219546  1.01% 59.16%     219546  1.01%  golang.org/x/tools/internal/pkgbits.(*PkgDecoder).TempDecoderRaw\n    196608  0.91% 60.07%     196608  0.91%  go/types.NewPointer (inline)\n    196608  0.91% 60.98%    1656693  7.64%  golang.org/x/tools/internal/gcimporter.(*reader).params\n    182804  0.84% 61.82%     182868  0.84%  fmt.Sprintf\n    180227  0.83% 62.65%     180227  0.83%  go/types.NewSignatureType\n    180223  0.83% 63.48%     180223  0.83%  go/types.NewScope\n    172034  0.79% 64.27%     172034  0.79%  github.com/shanejonas/cyclo/adapters/gopatterns.executionPredecessors\n    163842  0.76% 65.03%     169303  0.78%  go/types.NewPackage\n    163117  0.75% 65.78%     163117  0.75%  github.com/shanejonas/cyclo/domain/patterns.(*matching).pairs\n    159744  0.74% 66.52%    2287669 10.54%  golang.org/x/tools/internal/gcimporter.(*pkgReader).objIdx\n    152917   0.7% 67.22%     152917   0.7%  go/scanner.(*Scanner).scanIdentifier\n    149564  0.69% 67.91%     149564  0.69%  github.com/shanejonas/cyclo/domain/patterns.intersectKeys\n    147456  0.68% 68.59%     147456  0.68%  unicode/utf8.AppendRune\n    141449  0.65% 69.24%     141449  0.65%  github.com/shanejonas/cyclo/domain/patterns.FuncID\n",
+    "cli-exhaustive-cpu-top.txt": "File: cli-exhaustive.test\nBuild ID: ff2baf6492bc9a38d56899a37d18b0a4dc9c0175\nType: cpu\nTime: 2026-10-10 22:32:44 EDT\nDuration: 3.61s, Total samples = 6.35s (175.93%)\nShowing nodes accounting for 3.55s, 55.91% of 6.35s total\nDropped 515 nodes (cum <= 0.03s)\nShowing top 25 nodes out of 323\n      flat  flat%   sum%        cum   cum%\n     0.52s  8.19%  8.19%      0.90s 14.17%  runtime.tryDeferToSpanScan\n     0.26s  4.09% 12.28%      0.26s  4.09%  internal/runtime/maps.memHashAES\n     0.26s  4.09% 16.38%      0.26s  4.09%  runtime.spanClass.sizeclass (inline)\n     0.24s  3.78% 20.16%      0.81s 12.76%  runtime.scanObject\n     0.23s  3.62% 23.78%      0.25s  3.94%  internal/runtime/gc/scan.scanSpanPackedAVX512\n     0.21s  3.31% 27.09%      0.21s  3.31%  github.com/shanejonas/cyclo/domain/patterns.intersection\n     0.18s  2.83% 29.92%      0.18s  2.83%  github.com/shanejonas/cyclo/domain/patterns.appendNeighbours\n     0.17s  2.68% 32.60%      0.48s  7.56%  runtime.mapaccess2_faststr\n     0.16s  2.52% 35.12%      0.16s  2.52%  github.com/shanejonas/cyclo/domain/patterns.fnv1a\n     0.16s  2.52% 37.64%      0.16s  2.52%  internal/runtime/maps.ctrlGroup.matchH2 (inline)\n     0.14s  2.20% 39.84%      0.14s  2.20%  runtime.memmove\n     0.13s  2.05% 41.89%      0.29s  4.57%  github.com/shanejonas/cyclo/domain/patterns.similarityAtLeast\n     0.13s  2.05% 43.94%      1.18s 18.58%  runtime.scanSpan\n     0.10s  1.57% 45.51%      0.32s  5.04%  runtime.scanObjectsSmall\n     0.08s  1.26% 46.77%      0.16s  2.52%  runtime.findObject\n     0.07s  1.10% 47.87%      0.23s  3.62%  go/ast.inspector.Visit\n     0.07s  1.10% 48.98%      0.07s  1.10%  runtime.spanOf (inline)\n     0.06s  0.94% 49.92%      0.35s  5.51%  github.com/shanejonas/cyclo/domain/patterns.ccAllMatchStripes\n     0.06s  0.94% 50.87%      0.09s  1.42%  github.com/shanejonas/cyclo/domain/quality.prefixKind\n     0.06s  0.94% 51.81%      0.43s  6.77%  go/ast.Walk\n     0.06s  0.94% 52.76%      2.08s 32.76%  runtime.gcDrain\n     0.05s  0.79% 53.54%      0.05s  0.79%  github.com/shanejonas/cyclo/domain/patterns.disjunctiveRuleFromCounts\n     0.05s  0.79% 54.33%      0.05s  0.79%  github.com/shanejonas/cyclo/domain/patterns.levels (inline)\n     0.05s  0.79% 55.12%      0.08s  1.26%  internal/runtime/maps.(*Iter).Next\n     0.05s  0.79% 55.91%      0.05s  0.79%  internal/runtime/maps.(*groupReference).key (inline)\n",
+    "cli-exhaustive-alloc_space-top.txt": "File: cli-exhaustive.test\nBuild ID: ff2baf6492bc9a38d56899a37d18b0a4dc9c0175\nType: alloc_space\nTime: 2026-10-10 22:32:44 EDT\nShowing nodes accounting for 1.25GB, 63.13% of 1.98GB total\nDropped 492 nodes (cum <= 0.01GB)\nShowing top 25 nodes out of 271\n      flat  flat%   sum%        cum   cum%\n    0.16GB  7.99%  7.99%     0.16GB  8.21%  github.com/shanejonas/cyclo/adapters/gopatterns.(*irBuilder).appendNode\n    0.15GB  7.46% 15.45%     0.15GB  7.63%  github.com/shanejonas/cyclo/domain/patterns.classes\n    0.12GB  6.01% 21.46%     0.15GB  7.57%  github.com/shanejonas/cyclo/domain/patterns.digest\n    0.09GB  4.79% 26.25%     0.10GB  4.91%  github.com/shanejonas/cyclo/domain/patterns.histogram\n    0.07GB  3.29% 29.54%     0.07GB  3.29%  go/types.(*Checker).recordTypeAndValue\n    0.06GB  3.07% 32.61%     0.24GB 12.14%  golang.org/x/tools/internal/gcimporter.UImportData\n    0.06GB  3.00% 35.62%     0.06GB  3.00%  golang.org/x/tools/go/gcexportdata.readAll\n    0.05GB  2.76% 38.38%     0.05GB  2.76%  go/types.newVar (inline)\n    0.05GB  2.49% 40.87%     0.05GB  2.49%  github.com/shanejonas/cyclo/domain/patterns.(*matching).pairs\n    0.04GB  2.17% 43.04%     0.04GB  2.17%  github.com/shanejonas/cyclo/domain/patterns.adjacency\n    0.04GB  1.95% 44.99%     0.04GB  2.12%  internal/reflectlite.Swapper\n    0.04GB  1.93% 46.92%     0.05GB  2.53%  github.com/shanejonas/cyclo/domain/pdg.(*attributeBuilder).pack\n    0.04GB  1.90% 48.82%     0.04GB  1.90%  github.com/shanejonas/cyclo/domain/patterns.clonePdg\n    0.04GB  1.82% 50.64%     0.04GB  1.93%  github.com/shanejonas/cyclo/adapters/gopatterns.(*irBuilder).miningEdge\n    0.03GB  1.47% 52.11%     0.03GB  1.47%  github.com/shanejonas/cyclo/domain/patterns.MiningView\n    0.03GB  1.45% 53.56%     0.03GB  1.45%  slices.Grow[go.shape.[]uint8,go.shape.uint8]\n    0.03GB  1.41% 54.97%     0.03GB  1.41%  go/types.(*Checker).recordUse\n    0.03GB  1.36% 56.32%     0.03GB  1.53%  github.com/shanejonas/cyclo/domain/patterns.childrenOf\n    0.02GB  1.22% 57.54%     0.02GB  1.22%  github.com/shanejonas/cyclo/domain/patterns.blockPairs\n    0.02GB  1.11% 58.65%     0.44GB 22.25%  github.com/shanejonas/cyclo/adapters/gopatterns.Extract\n    0.02GB  1.01% 59.66%     0.02GB  1.01%  github.com/shanejonas/cyclo/domain/patterns.projectionAdjacency\n    0.02GB  1.01% 60.68%     0.02GB  1.01%  golang.org/x/tools/internal/gcimporter.(*pkgReader).objDictIdx\n    0.02GB  0.89% 61.57%     0.02GB  0.89%  github.com/shanejonas/cyclo/domain/patterns.newReturnTraversal\n    0.02GB  0.79% 62.35%     0.02GB  0.79%  github.com/shanejonas/cyclo/domain/patterns.dependenceAdjacency\n    0.02GB  0.78% 63.13%     0.02GB  0.78%  github.com/shanejonas/cyclo/domain/pdg.compactSlice[go.shape.599db6e8d2558b52b7176f34aa08be0c227995a73af7fe0a1dc5ee1c8f7fc0b3] (inline)\n",
+    "cli-exhaustive-alloc_objects-top.txt": "File: cli-exhaustive.test\nBuild ID: ff2baf6492bc9a38d56899a37d18b0a4dc9c0175\nType: alloc_objects\nTime: 2026-10-10 22:32:44 EDT\nShowing nodes accounting for 16384518, 71.82% of 22812926 total\nDropped 520 nodes (cum <= 114064)\nShowing top 25 nodes out of 243\n      flat  flat%   sum%        cum   cum%\n   5554423 24.35% 24.35%    6586642 28.87%  github.com/shanejonas/cyclo/domain/patterns.digest\n   2321180 10.17% 34.52%    2435870 10.68%  github.com/shanejonas/cyclo/domain/patterns.classes\n   1267060  5.55% 40.08%    1496438  6.56%  internal/reflectlite.Swapper\n   1077113  4.72% 44.80%    1262801  5.54%  github.com/shanejonas/cyclo/domain/patterns.childrenOf\n    907286  3.98% 48.78%     907286  3.98%  github.com/shanejonas/cyclo/domain/patterns.adjacency\n    611664  2.68% 51.46%     611664  2.68%  go/types.newVar (inline)\n    420368  1.84% 53.30%     518673  2.27%  github.com/shanejonas/cyclo/domain/patterns.histogram\n    409649  1.80% 55.09%     409649  1.80%  github.com/shanejonas/cyclo/domain/patterns.dependenceAdjacency\n    409600  1.80% 56.89%     409728  1.80%  go/parser.(*parser).parseIdent\n    373784  1.64% 58.53%     373784  1.64%  github.com/shanejonas/cyclo/domain/patterns.newReturnTraversal\n    327678  1.44% 59.97%     327678  1.44%  go/types.NewTuple (inline)\n    319492  1.40% 61.37%     319492  1.40%  unicode/utf8.AppendRune\n    268624  1.18% 62.54%     268624  1.18%  github.com/shanejonas/cyclo/domain/patterns.newTarjan\n    258046  1.13% 63.67%     258046  1.13%  fmt.Sprintf\n    229378  1.01% 64.68%     229378  1.01%  internal/reflectlite.unsafe_New\n    216827  0.95% 65.63%     216827  0.95%  github.com/shanejonas/cyclo/domain/patterns.projectionAdjacency\n    196608  0.86% 66.49%    1612834  7.07%  golang.org/x/tools/internal/gcimporter.(*reader).params\n    170409  0.75% 67.24%     170409  0.75%  golang.org/x/tools/internal/pkgbits.(*PkgDecoder).TempDecoderRaw\n    165529  0.73% 67.96%     165529  0.73%  github.com/shanejonas/cyclo/domain/patterns.intersectKeys\n    152917  0.67% 68.63%     152917  0.67%  go/scanner.(*Scanner).scanIdentifier\n    152915  0.67% 69.31%     152915  0.67%  go/types.NewFunc (inline)\n    149290  0.65% 69.96%     149290  0.65%  golang.org/x/tools/internal/gcimporter.(*pkgReader).objDictIdx\n    144945  0.64% 70.59%    1407746  6.17%  github.com/shanejonas/cyclo/domain/patterns.(*dfs).from\n    141998  0.62% 71.22%     141998  0.62%  go/ast.NewScope\n    137735   0.6% 71.82%     388955  1.70%  github.com/shanejonas/cyclo/adapters/gopatterns.(*irBuilder).appendNode\n",
+    "native-clean-cpu-top.txt": "File: storage.test\nBuild ID: 39a4fb272646e113fdef0cfc59db6386c92f01d9\nType: cpu\nTime: 2026-10-10 22:32:38 EDT\nDuration: 517.30ms, Total samples = 910ms (175.91%)\nShowing nodes accounting for 670ms, 73.63% of 910ms total\nShowing top 25 nodes out of 219\n      flat  flat%   sum%        cum   cum%\n      70ms  7.69%  7.69%       70ms  7.69%  internal/runtime/gc/scan.scanSpanPackedAVX512\n      70ms  7.69% 15.38%      140ms 15.38%  runtime.tryDeferToSpanScan\n      50ms  5.49% 20.88%       50ms  5.49%  internal/runtime/maps.ctrlGroup.matchH2 (inline)\n      40ms  4.40% 25.27%      110ms 12.09%  runtime.mapaccess2_faststr\n      30ms  3.30% 28.57%       30ms  3.30%  internal/runtime/maps.memHashAES\n      30ms  3.30% 31.87%       30ms  3.30%  memeqbody\n      30ms  3.30% 35.16%       60ms  6.59%  runtime.mapaccess2\n      30ms  3.30% 38.46%       30ms  3.30%  runtime.memclrNoHeapPointers\n      30ms  3.30% 41.76%       90ms  9.89%  runtime.scanObjectsSmall\n      30ms  3.30% 45.05%      280ms 30.77%  runtime.scanSpan\n      30ms  3.30% 48.35%       30ms  3.30%  runtime.spanClass.sizeclass (inline)\n      20ms  2.20% 50.55%      110ms 12.09%  github.com/shanejonas/cyclo/adapters/gopatterns.(*irBuilder).appendNode\n      20ms  2.20% 52.75%       40ms  4.40%  github.com/shanejonas/cyclo/domain/quality.ClassifyCallee\n      20ms  2.20% 54.95%       20ms  2.20%  github.com/shanejonas/cyclo/domain/quality.prefixKind (inline)\n      20ms  2.20% 57.14%       20ms  2.20%  internal/runtime/maps.memHash64AES\n      20ms  2.20% 59.34%       20ms  2.20%  runtime.(*mspan).init\n      20ms  2.20% 61.54%       20ms  2.20%  runtime.extractHeapBitsSmall\n      20ms  2.20% 63.74%      370ms 40.66%  runtime.gcDrain\n      20ms  2.20% 65.93%       20ms  2.20%  runtime.memmove\n      20ms  2.20% 68.13%       20ms  2.20%  runtime.unlock2\n      10ms  1.10% 69.23%       20ms  2.20%  github.com/shanejonas/cyclo/adapters/gopatterns.(*builder).matchLabel\n      10ms  1.10% 70.33%      120ms 13.19%  github.com/shanejonas/cyclo/adapters/gopatterns.(*builder).matchingNode\n      10ms  1.10% 71.43%       30ms  3.30%  github.com/shanejonas/cyclo/adapters/gopatterns.(*irBuilder).call\n      10ms  1.10% 72.53%       10ms  1.10%  github.com/shanejonas/cyclo/adapters/gopatterns.(*irBuilder).capabilities\n      10ms  1.10% 73.63%       10ms  1.10%  github.com/shanejonas/cyclo/adapters/gopatterns.(*irBuilder).executionControls.func1\n",
+    "native-clean-alloc_space-top.txt": "File: storage.test\nBuild ID: 39a4fb272646e113fdef0cfc59db6386c92f01d9\nType: alloc_space\nTime: 2026-10-10 22:32:38 EDT\nShowing nodes accounting for 371.26MB, 93.18% of 398.42MB total\nDropped 50 nodes (cum <= 1.99MB)\nShowing top 25 nodes out of 122\n      flat  flat%   sum%        cum   cum%\n  156.69MB 39.33% 39.33%   161.19MB 40.46%  github.com/shanejonas/cyclo/adapters/gopatterns.(*irBuilder).appendNode\n   44.40MB 11.15% 50.47%    46.88MB 11.77%  github.com/shanejonas/cyclo/adapters/gopatterns.(*irBuilder).miningEdge\n   40.19MB 10.09% 60.56%    51.20MB 12.85%  github.com/shanejonas/cyclo/domain/pdg.(*attributeBuilder).pack\n   15.42MB  3.87% 64.43%    15.42MB  3.87%  github.com/shanejonas/cyclo/domain/pdg.compactSlice[go.shape.599db6e8d2558b52b7176f34aa08be0c227995a73af7fe0a1dc5ee1c8f7fc0b3] (inline)\n   14.84MB  3.72% 68.16%   393.77MB 98.83%  github.com/shanejonas/cyclo/adapters/gopatterns.memoryGraphs\n   13.50MB  3.39% 71.55%       17MB  4.27%  go/types.(*typeWriter).typ\n    8.31MB  2.09% 73.63%     8.83MB  2.22%  github.com/shanejonas/cyclo/adapters/gopatterns.(*irBuilder).executionEdge\n    7.25MB  1.82% 75.45%     9.75MB  2.45%  github.com/shanejonas/cyclo/domain/pdg.(*Builder).Text (inline)\n    7.01MB  1.76% 77.21%    27.07MB  6.79%  github.com/shanejonas/cyclo/adapters/gopatterns.(*irBuilder).symbol\n       7MB  1.76% 78.97%        7MB  1.76%  golang.org/x/tools/go/cfg.(*builder).newBlock (inline)\n    6.66MB  1.67% 80.64%     6.66MB  1.67%  github.com/shanejonas/cyclo/domain/pdg.compactSlice[go.shape.a792d3f54274aab7e85289d8b9298843195a15676ca836f5a5c5572d78117abd] (inline)\n    6.51MB  1.63% 82.27%     6.51MB  1.63%  github.com/shanejonas/cyclo/domain/pdg.(*attributeBuilder).references\n    5.06MB  1.27% 83.55%     5.06MB  1.27%  github.com/shanejonas/cyclo/domain/pdg.compactSlice[go.shape.c8c0daa2185fa1edaa1e592610a608572a97cd380645f3b43d9e78f40bbab025] (inline)\n    4.50MB  1.13% 84.68%     7.02MB  1.76%  github.com/shanejonas/cyclo/adapters/gopatterns.newIRBuilder\n    4.50MB  1.13% 85.80%     4.50MB  1.13%  fmt.Sprintf\n       4MB  1.00% 86.81%     5.50MB  1.38%  github.com/shanejonas/cyclo/adapters/gopatterns.newExecutionDominators\n       4MB  1.00% 87.81%       23MB  5.77%  go/types.TypeString\n    3.50MB  0.88% 88.69%     4.50MB  1.13%  github.com/shanejonas/cyclo/domain/pdg.(*attributeBuilder).accessList\n    3.50MB  0.88% 89.57%     3.50MB  0.88%  github.com/shanejonas/cyclo/domain/patterns.FuncID\n    2.89MB  0.73% 90.30%     2.89MB  0.73%  github.com/shanejonas/cyclo/domain/pdg.(*Builder).MatchLabel (inline)\n    2.50MB  0.63% 90.92%     2.50MB  0.63%  bytes.(*Buffer).grow\n    2.50MB  0.63% 91.55%     2.50MB  0.63%  internal/stringslite.Clone (inline)\n    2.50MB  0.63% 92.18%     2.50MB  0.63%  golang.org/x/tools/go/cfg.(*builder).add (inline)\n       2MB   0.5% 92.68%    27.33MB  6.86%  github.com/shanejonas/cyclo/adapters/gopatterns.(*irBuilder).execution\n       2MB   0.5% 93.18%        2MB   0.5%  github.com/shanejonas/cyclo/adapters/gopatterns.(*irBuilder).definition\n",
+    "native-clean-alloc_objects-top.txt": "File: storage.test\nBuild ID: 39a4fb272646e113fdef0cfc59db6386c92f01d9\nType: alloc_objects\nTime: 2026-10-10 22:32:38 EDT\nShowing nodes accounting for 1629587, 91.88% of 1773693 total\nDropped 51 nodes (cum <= 8868)\nShowing top 25 nodes out of 121\n      flat  flat%   sum%        cum   cum%\n    262143 14.78% 14.78%     262143 14.78%  fmt.Sprintf\n    157106  8.86% 23.64%     419249 23.64%  github.com/shanejonas/cyclo/adapters/gopatterns.(*irBuilder).appendNode\n     90113  5.08% 28.72%      90113  5.08%  golang.org/x/tools/go/cfg.(*builder).add (inline)\n     87384  4.93% 33.64%     272090 15.34%  go/types.TypeString\n     84963  4.79% 38.43%      84963  4.79%  internal/stringslite.Clone (inline)\n     83265  4.69% 43.13%      83265  4.69%  github.com/shanejonas/cyclo/domain/pdg.(*attributeBuilder).references\n     79430  4.48% 47.61%     112219  6.33%  github.com/shanejonas/cyclo/adapters/gopatterns.(*irBuilder).miningEdge\n     75913  4.28% 51.89%      75913  4.28%  github.com/shanejonas/cyclo/domain/patterns.FuncID\n     70144  3.95% 55.84%      70144  3.95%  github.com/shanejonas/cyclo/adapters/gopatterns.(*irBuilder).definition\n     68067  3.84% 59.68%     149987  8.46%  go/types.(*typeWriter).typ\n     65536  3.69% 63.37%      65536  3.69%  github.com/shanejonas/cyclo/adapters/gopatterns.(*irBuilder).executionAnchors\n     65536  3.69% 67.07%      65536  3.69%  github.com/shanejonas/cyclo/adapters/gopatterns.definedIdents\n     62006  3.50% 70.56%      62006  3.50%  golang.org/x/tools/go/cfg.(*builder).newBlock (inline)\n     61440  3.46% 74.03%     110266  6.22%  github.com/shanejonas/cyclo/adapters/gopatterns.(*irBuilder).read\n     40960  2.31% 76.34%      40960  2.31%  bytes.(*Buffer).grow\n     40960  2.31% 78.65%      40960  2.31%  go/types.packagePrefix (inline)\n     32768  1.85% 80.49%      55123  3.11%  github.com/shanejonas/cyclo/adapters/gopatterns.(*irBuilder).memoryRead\n     32768  1.85% 82.34%      32768  1.85%  internal/strconv.FormatInt\n     31655  1.78% 84.13%     291424 16.43%  github.com/shanejonas/cyclo/adapters/gopatterns.(*irBuilder).symbol\n     28546  1.61% 85.74%     144760  8.16%  github.com/shanejonas/cyclo/domain/pdg.(*attributeBuilder).pack\n     24576  1.39% 87.12%      24576  1.39%  github.com/shanejonas/cyclo/domain/pdg.accessKey (inline)\n     23467  1.32% 88.45%      28474  1.61%  github.com/shanejonas/cyclo/adapters/gopatterns.newExecutionDominators\n     21846  1.23% 89.68%      21846  1.23%  go/types.newTypeWriter (inline)\n     20480  1.15% 90.83%      20480  1.15%  github.com/shanejonas/cyclo/domain/patterns.SigClass\n     18515  1.04% 91.88%     266046 15.00%  github.com/shanejonas/cyclo/adapters/gopatterns.(*irBuilder).execution\n"
+  },
+  "profile_logs": {
+    "prometheus-profile-filtered-1.txt": "=== RUN   TestProfileMatchingRoute\n    matching_profile_test.go:57: profile passes=4 groups=494\n--- PASS: TestProfileMatchingRoute (3.69s)\nPASS\n",
+    "prometheus-profile-exhaustive-1.txt": "=== RUN   TestProfileMatchingRoute\n    matching_profile_test.go:57: profile passes=10 groups=494\n--- PASS: TestProfileMatchingRoute (3.58s)\nPASS\n",
+    "prometheus-profile-native-1.txt": "=== RUN   TestMeasureGraphStorage\n    storage_measure_test.go:91: {\"edge_bytes\":56,\"edges\":323127,\"functions\":6173,\"loader_ms\":832.516,\"mining_edge_bytes\":40,\"mining_node_bytes\":112,\"node_bytes\":44,\"nodes\":210050,\"stages\":[{\"Name\":\"native_graphs\",\"Milliseconds\":532.504,\"AllocatedBytes\":426770520,\"Allocations\":2984843,\"RetainedHeapBytes\":56039392},{\"Name\":\"mining_views\",\"Milliseconds\":16.264,\"AllocatedBytes\":37414992,\"Allocations\":29643,\"RetainedHeapBytes\":35668328},{\"Name\":\"canonicalization_all_rules\",\"Milliseconds\":562.869,\"AllocatedBytes\":1535349368,\"Allocations\":1260776,\"RetainedHeapBytes\":37228640}]}\n--- PASS: TestMeasureGraphStorage (2.22s)\nPASS\n"
+  },
+  "binaries_sha256": {
+    "matching.test": "f112ca0ce136d7a9f7ef6a04c4449c337f4457e5965e67188799e5124dcee731",
+    "exhaustive.test": "cc21d81914f16e1660b804809db5585d64348749dd14f8694a1f45c95408b056",
+    "storage.test": "651261762b9fd650b8e0dd9df2c78eb4cc9868a4547f2235d349b3052b985be9",
+    "cli-filtered.test": "81d828485c7586054de70a22d56aef3f32e278c36659245840516c911e6184db",
+    "cli-exhaustive.test": "354ef8a85e2bd1c3ca8d55075630039837c92ff6c82979b09b4079fc5df939db"
+  },
+  "extraction_runs": [
+    {
+      "repo": "cobra",
+      "run": 1,
+      "result": {
+        "allocated_bytes": 30251664,
+        "allocations": 253243,
+        "edges": 7863,
+        "elapsed_ms": 97.411,
+        "functions": 269,
+        "go_version": "go1.27.1",
+        "mode": "api-new",
+        "nodes": 5335,
+        "peak_process_rss_kib": 34452,
+        "retained_heap_bytes": 3162696,
+        "root": "/tmp/cyclo-bench-cobra"
+      }
+    },
+    {
+      "repo": "cobra",
+      "run": 2,
+      "result": {
+        "allocated_bytes": 30238056,
+        "allocations": 253252,
+        "edges": 7863,
+        "elapsed_ms": 96.086,
+        "functions": 269,
+        "go_version": "go1.27.1",
+        "mode": "api-new",
+        "nodes": 5335,
+        "peak_process_rss_kib": 36712,
+        "retained_heap_bytes": 3144264,
+        "root": "/tmp/cyclo-bench-cobra"
+      }
+    },
+    {
+      "repo": "cobra",
+      "run": 3,
+      "result": {
+        "allocated_bytes": 30377216,
+        "allocations": 253251,
+        "edges": 7863,
+        "elapsed_ms": 111.121,
+        "functions": 269,
+        "go_version": "go1.27.1",
+        "mode": "api-new",
+        "nodes": 5335,
+        "peak_process_rss_kib": 34556,
+        "retained_heap_bytes": 3160200,
+        "root": "/tmp/cyclo-bench-cobra"
+      }
+    },
+    {
+      "repo": "gin",
+      "run": 1,
+      "result": {
+        "allocated_bytes": 63989104,
+        "allocations": 515662,
+        "edges": 11387,
+        "elapsed_ms": 174.733,
+        "functions": 483,
+        "go_version": "go1.27.1",
+        "mode": "api-new",
+        "nodes": 7906,
+        "peak_process_rss_kib": 56096,
+        "retained_heap_bytes": 4518880,
+        "root": "/tmp/cyclo-bench-gin"
+      }
+    },
+    {
+      "repo": "gin",
+      "run": 2,
+      "result": {
+        "allocated_bytes": 64059000,
+        "allocations": 515746,
+        "edges": 11387,
+        "elapsed_ms": 160.067,
+        "functions": 483,
+        "go_version": "go1.27.1",
+        "mode": "api-new",
+        "nodes": 7906,
+        "peak_process_rss_kib": 60144,
+        "retained_heap_bytes": 8723272,
+        "root": "/tmp/cyclo-bench-gin"
+      }
+    },
+    {
+      "repo": "gin",
+      "run": 3,
+      "result": {
+        "allocated_bytes": 64058032,
+        "allocations": 515714,
+        "edges": 11387,
+        "elapsed_ms": 162.815,
+        "functions": 483,
+        "go_version": "go1.27.1",
+        "mode": "api-new",
+        "nodes": 7906,
+        "peak_process_rss_kib": 57576,
+        "retained_heap_bytes": 8730008,
+        "root": "/tmp/cyclo-bench-gin"
+      }
+    },
+    {
+      "repo": "prometheus",
+      "run": 1,
+      "result": {
+        "allocated_bytes": 1108638672,
+        "allocations": 8804564,
+        "edges": 323127,
+        "elapsed_ms": 1573.884,
+        "functions": 6173,
+        "go_version": "go1.27.1",
+        "mode": "api-new",
+        "nodes": 210050,
+        "peak_process_rss_kib": 577380,
+        "retained_heap_bytes": 86525768,
+        "root": "/tmp/cyclo-bench-prometheus"
+      }
+    },
+    {
+      "repo": "prometheus",
+      "run": 2,
+      "result": {
+        "allocated_bytes": 1109548408,
+        "allocations": 8804832,
+        "edges": 323127,
+        "elapsed_ms": 1654.061,
+        "functions": 6173,
+        "go_version": "go1.27.1",
+        "mode": "api-new",
+        "nodes": 210050,
+        "peak_process_rss_kib": 618044,
+        "retained_heap_bytes": 130605368,
+        "root": "/tmp/cyclo-bench-prometheus"
+      }
+    },
+    {
+      "repo": "prometheus",
+      "run": 3,
+      "result": {
+        "allocated_bytes": 1108269848,
+        "allocations": 8804452,
+        "edges": 323127,
+        "elapsed_ms": 1549.391,
+        "functions": 6173,
+        "go_version": "go1.27.1",
+        "mode": "api-new",
+        "nodes": 210050,
+        "peak_process_rss_kib": 621276,
+        "retained_heap_bytes": 86523440,
+        "root": "/tmp/cyclo-bench-prometheus"
+      }
+    }
+  ],
+  "method": {
+    "pipeline_samples": 5,
+    "storage_samples": 3,
+    "expanded_no_rule_clone_samples": {
+      "cobra": 3,
+      "gin": 3,
+      "prometheus": 2
+    },
+    "wl_storage_samples_per_mode": 3,
+    "extraction_samples": 3,
+    "cpu_profile_matching_duration_seconds": 3,
+    "cpu_profile_matching_passes": {
+      "filtered": 4,
+      "exhaustive": 10
+    },
+    "profile_allocations": "Sampled after-minus-before profiles; totals span all profile passes, not one invocation. Native CPU profile excludes forced snapshot GCs.",
+    "timing": "Fresh processes, warm dependency/compiler caches, sequential runs. CPU/allocation profiling runs are excluded from timing medians."
+  }
+}

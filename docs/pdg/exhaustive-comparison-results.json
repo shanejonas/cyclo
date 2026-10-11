@@ -1,0 +1,262 @@
+{
+  "corpus": {
+    "repository": "moby/moby",
+    "commit_prefix": "9fabd6d",
+    "functions": 7601,
+    "usable_graphs": 7592,
+    "reference_pairs": 32603,
+    "filtered_pairs": 32184,
+    "group_count": 484
+  },
+  "method": "Five fresh process runs per route, alternating route order. API and complete CLI timings are separate runs. Exhaustive route uses a temporary Go overlay and safe WL upper bounds. Production default is unchanged.",
+  "full_reports_byte_identical": true,
+  "results": {
+    "filtered": {
+      "median": {
+        "wall_seconds": 4.788114909082651,
+        "peak_rss_kib": 519784,
+        "matching_milliseconds": 1131.165,
+        "matching_allocated_bytes": 185839168,
+        "matching_allocations": 3269249
+      },
+      "runs": [
+        {
+          "run": 1,
+          "matching": {
+            "group_count": 484,
+            "group_digest": "00ccc16ae97a2883a6d090ecfde434045fe46e9ae788f00d1e73b187a2b6f110",
+            "method": "filtered",
+            "retained_result_heap_bytes": 96712,
+            "stages": [
+              {
+                "name": "complete_ccgraph",
+                "milliseconds": 1131.165,
+                "allocated_bytes": 185839168,
+                "allocations": 3269249
+              }
+            ]
+          },
+          "full_report": {
+            "wall_seconds": 4.603002569871023,
+            "peak_rss_kib": 510928,
+            "exit_code": 0
+          }
+        },
+        {
+          "run": 2,
+          "matching": {
+            "group_count": 484,
+            "group_digest": "00ccc16ae97a2883a6d090ecfde434045fe46e9ae788f00d1e73b187a2b6f110",
+            "method": "filtered",
+            "retained_result_heap_bytes": 90256,
+            "stages": [
+              {
+                "name": "complete_ccgraph",
+                "milliseconds": 1077.692,
+                "allocated_bytes": 185832712,
+                "allocations": 3269233
+              }
+            ]
+          },
+          "full_report": {
+            "wall_seconds": 5.125213854946196,
+            "peak_rss_kib": 515084,
+            "exit_code": 0
+          }
+        },
+        {
+          "run": 3,
+          "matching": {
+            "group_count": 484,
+            "group_digest": "00ccc16ae97a2883a6d090ecfde434045fe46e9ae788f00d1e73b187a2b6f110",
+            "method": "filtered",
+            "retained_result_heap_bytes": 85624,
+            "stages": [
+              {
+                "name": "complete_ccgraph",
+                "milliseconds": 1030.884,
+                "allocated_bytes": 185828064,
+                "allocations": 3269233
+              }
+            ]
+          },
+          "full_report": {
+            "wall_seconds": 5.174674066947773,
+            "peak_rss_kib": 519784,
+            "exit_code": 0
+          }
+        },
+        {
+          "run": 4,
+          "matching": {
+            "group_count": 484,
+            "group_digest": "00ccc16ae97a2883a6d090ecfde434045fe46e9ae788f00d1e73b187a2b6f110",
+            "method": "filtered",
+            "retained_result_heap_bytes": 117096,
+            "stages": [
+              {
+                "name": "complete_ccgraph",
+                "milliseconds": 1301,
+                "allocated_bytes": 185859552,
+                "allocations": 3269265
+              }
+            ]
+          },
+          "full_report": {
+            "wall_seconds": 4.788114909082651,
+            "peak_rss_kib": 521884,
+            "exit_code": 0
+          }
+        },
+        {
+          "run": 5,
+          "matching": {
+            "group_count": 484,
+            "group_digest": "00ccc16ae97a2883a6d090ecfde434045fe46e9ae788f00d1e73b187a2b6f110",
+            "method": "filtered",
+            "retained_result_heap_bytes": 117880,
+            "stages": [
+              {
+                "name": "complete_ccgraph",
+                "milliseconds": 1167.043,
+                "allocated_bytes": 185860320,
+                "allocations": 3269272
+              }
+            ]
+          },
+          "full_report": {
+            "wall_seconds": 4.376959680113941,
+            "peak_rss_kib": 523556,
+            "exit_code": 0
+          }
+        }
+      ]
+    },
+    "exhaustive": {
+      "median": {
+        "wall_seconds": 3.8882804338354617,
+        "peak_rss_kib": 525328,
+        "matching_milliseconds": 373.196,
+        "matching_allocated_bytes": 134014320,
+        "matching_allocations": 3243500
+      },
+      "runs": [
+        {
+          "run": 1,
+          "matching": {
+            "group_count": 484,
+            "group_digest": "00ccc16ae97a2883a6d090ecfde434045fe46e9ae788f00d1e73b187a2b6f110",
+            "method": "exhaustive",
+            "reference_pairs": 32603,
+            "retained_result_heap_bytes": 78928,
+            "stages": [
+              {
+                "name": "complete_ccgraph",
+                "milliseconds": 360.899,
+                "allocated_bytes": 134008536,
+                "allocations": 3243490
+              }
+            ]
+          },
+          "full_report": {
+            "wall_seconds": 3.9114988970104605,
+            "peak_rss_kib": 510364,
+            "exit_code": 0
+          }
+        },
+        {
+          "run": 2,
+          "matching": {
+            "group_count": 484,
+            "group_digest": "00ccc16ae97a2883a6d090ecfde434045fe46e9ae788f00d1e73b187a2b6f110",
+            "method": "exhaustive",
+            "reference_pairs": 32603,
+            "retained_result_heap_bytes": 84808,
+            "stages": [
+              {
+                "name": "complete_ccgraph",
+                "milliseconds": 472.217,
+                "allocated_bytes": 134014400,
+                "allocations": 3243501
+              }
+            ]
+          },
+          "full_report": {
+            "wall_seconds": 4.508121381979436,
+            "peak_rss_kib": 534924,
+            "exit_code": 0
+          }
+        },
+        {
+          "run": 3,
+          "matching": {
+            "group_count": 484,
+            "group_digest": "00ccc16ae97a2883a6d090ecfde434045fe46e9ae788f00d1e73b187a2b6f110",
+            "method": "exhaustive",
+            "reference_pairs": 32603,
+            "retained_result_heap_bytes": 84696,
+            "stages": [
+              {
+                "name": "complete_ccgraph",
+                "milliseconds": 332.143,
+                "allocated_bytes": 134014320,
+                "allocations": 3243500
+              }
+            ]
+          },
+          "full_report": {
+            "wall_seconds": 3.5782784100156277,
+            "peak_rss_kib": 513536,
+            "exit_code": 0
+          }
+        },
+        {
+          "run": 4,
+          "matching": {
+            "group_count": 484,
+            "group_digest": "00ccc16ae97a2883a6d090ecfde434045fe46e9ae788f00d1e73b187a2b6f110",
+            "method": "exhaustive",
+            "reference_pairs": 32603,
+            "retained_result_heap_bytes": 79376,
+            "stages": [
+              {
+                "name": "complete_ccgraph",
+                "milliseconds": 447.174,
+                "allocated_bytes": 134008984,
+                "allocations": 3243494
+              }
+            ]
+          },
+          "full_report": {
+            "wall_seconds": 3.8882804338354617,
+            "peak_rss_kib": 525328,
+            "exit_code": 0
+          }
+        },
+        {
+          "run": 5,
+          "matching": {
+            "group_count": 484,
+            "group_digest": "00ccc16ae97a2883a6d090ecfde434045fe46e9ae788f00d1e73b187a2b6f110",
+            "method": "exhaustive",
+            "reference_pairs": 32603,
+            "retained_result_heap_bytes": 100768,
+            "stages": [
+              {
+                "name": "complete_ccgraph",
+                "milliseconds": 373.196,
+                "allocated_bytes": 134025088,
+                "allocations": 3243513
+              }
+            ]
+          },
+          "full_report": {
+            "wall_seconds": 3.829806520836428,
+            "peak_rss_kib": 543700,
+            "exit_code": 0
+          }
+        }
+      ]
+    }
+  }
+}

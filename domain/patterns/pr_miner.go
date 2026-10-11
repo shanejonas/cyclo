@@ -343,8 +343,8 @@ func addTriples(calls []int, counts map[[3]int]int) {
 }
 
 // MinedRuleCandidates converts violations to pattern candidates.
-func MinedRuleCandidates(violations []RuleViolation, facts []*FuncFacts) []Candidate {
-	factByID := map[string]*FuncFacts{}
+func MinedRuleCandidates(violations []RuleViolation, facts []*MiningFacts) []Candidate {
+	factByID := map[string]*MiningFacts{}
 	for _, f := range facts {
 		factByID[f.ID] = f
 	}
@@ -378,9 +378,9 @@ func MinedRuleCandidates(violations []RuleViolation, facts []*FuncFacts) []Candi
 	return out
 }
 
-// BuildCallSets constructs CallSets from FuncFacts by extracting called
+// BuildCallSets constructs CallSets from MiningFacts by extracting called
 // function names from PDG Call nodes.
-func BuildCallSets(facts []*FuncFacts) []CallSet {
+func BuildCallSets(facts []*MiningFacts) []CallSet {
 	var out []CallSet
 	for _, f := range facts {
 		if calls := extractCalls(f); len(calls) > 0 {
@@ -391,7 +391,7 @@ func BuildCallSets(facts []*FuncFacts) []CallSet {
 }
 
 // extractCalls returns the set of callee IDs from a function's PDG.
-func extractCalls(f *FuncFacts) map[string]bool {
+func extractCalls(f *MiningFacts) map[string]bool {
 	calls := map[string]bool{}
 	if f.Pdg == nil {
 		return calls

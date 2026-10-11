@@ -6,7 +6,7 @@ import (
 )
 
 func TestGuardCandidatesProposeInversion(t *testing.T) {
-	facts := []*FuncFacts{{
+	facts := []*MiningFacts{{
 		ID:           "p.complete",
 		Name:         "complete",
 		Path:         "completions.go",
@@ -41,7 +41,7 @@ func TestGuardCandidatesProposeInversion(t *testing.T) {
 }
 
 func TestGuardCandidatesNoneWithoutHits(t *testing.T) {
-	facts := []*FuncFacts{{
+	facts := []*MiningFacts{{
 		ID:   "p.clean",
 		Name: "clean",
 		Path: "clean.go",
@@ -53,7 +53,7 @@ func TestGuardCandidatesNoneWithoutHits(t *testing.T) {
 }
 
 func TestRunIncludesGuardClauses(t *testing.T) {
-	facts := []*FuncFacts{{
+	facts := []*MiningFacts{{
 		ID:           "p.complete",
 		Name:         "complete",
 		Path:         "completions.go",
@@ -61,7 +61,7 @@ func TestRunIncludesGuardClauses(t *testing.T) {
 		EndLine:      700,
 		GuardClauses: []GuardClauseHit{{Line: 673, BodyStmts: 3}},
 	}}
-	report := Run(facts, Options{})
+	report := RunMining(facts, Options{})
 	found := false
 	for _, c := range report.Candidates {
 		if c.Kind == GuardClause {

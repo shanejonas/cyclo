@@ -125,7 +125,7 @@ func primitiveConcept(name string) string {
 
 // primitiveOccurrence is one function using a concept as a raw primitive.
 type primitiveOccurrence struct {
-	fact    *FuncFacts
+	fact    *MiningFacts
 	param   string
 	concept string
 	typ     string
@@ -134,13 +134,13 @@ type primitiveOccurrence struct {
 // primitiveObsessionCandidates finds domain concepts used as raw string/int
 // params in at least minPrimitiveFuncs functions. Each concept proposes one
 // named type.
-func primitiveObsessionCandidates(facts []*FuncFacts) []Candidate {
+func primitiveObsessionCandidates(facts []*MiningFacts) []Candidate {
 	byConcept := groupOccurrences(facts)
 	return buildCandidates(byConcept)
 }
 
 // groupOccurrences groups concept occurrences by (concept, type).
-func groupOccurrences(facts []*FuncFacts) map[string][]primitiveOccurrence {
+func groupOccurrences(facts []*MiningFacts) map[string][]primitiveOccurrence {
 	byConcept := make(map[string][]primitiveOccurrence)
 	for _, f := range facts {
 		if f == nil {
@@ -154,7 +154,7 @@ func groupOccurrences(facts []*FuncFacts) map[string][]primitiveOccurrence {
 }
 
 // factOccurrences returns one occurrence per (concept, type) in a function.
-func factOccurrences(f *FuncFacts) map[string]primitiveOccurrence {
+func factOccurrences(f *MiningFacts) map[string]primitiveOccurrence {
 	out := make(map[string]primitiveOccurrence)
 	for _, p := range f.Params {
 		if occ, ok := paramOccurrence(f, p); ok {
@@ -169,7 +169,7 @@ func factOccurrences(f *FuncFacts) map[string]primitiveOccurrence {
 
 // paramOccurrence builds the occurrence for a param, or false if the param
 // isn't a primitive with a domain concept.
-func paramOccurrence(f *FuncFacts, p ParamInfo) (primitiveOccurrence, bool) {
+func paramOccurrence(f *MiningFacts, p ParamInfo) (primitiveOccurrence, bool) {
 	var zero primitiveOccurrence
 	if p.Type != "string" && p.Type != "int" {
 		return zero, false
