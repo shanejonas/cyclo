@@ -5,9 +5,9 @@ import (
 	"testing"
 )
 
-// voFact builds a FuncFacts with the given primitive params.
-func voFact(id, path string, line int, params ...ParamInfo) *FuncFacts {
-	return &FuncFacts{
+// voFact builds a MiningFacts with the given primitive params.
+func voFact(id, path string, line int, params ...ParamInfo) *MiningFacts {
+	return &MiningFacts{
 		ID:     id,
 		Name:   id,
 		Path:   path,
@@ -17,7 +17,7 @@ func voFact(id, path string, line int, params ...ParamInfo) *FuncFacts {
 }
 
 func TestValueObjectClumpFound(t *testing.T) {
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		voFact("a.Transfer", "a.go", 1,
 			ParamInfo{"fromID", "string"}, ParamInfo{"toID", "string"},
 			ParamInfo{"amount", "int"}, ParamInfo{"currency", "string"}),
@@ -51,7 +51,7 @@ func TestValueObjectClumpFound(t *testing.T) {
 }
 
 func TestValueObjectNeedsThreeFuncs(t *testing.T) {
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		voFact("a.F", "a.go", 1,
 			ParamInfo{"amount", "int"}, ParamInfo{"currency", "string"}),
 		voFact("b.G", "b.go", 10,
@@ -63,7 +63,7 @@ func TestValueObjectNeedsThreeFuncs(t *testing.T) {
 }
 
 func TestValueObjectNeedsTwoParams(t *testing.T) {
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		voFact("a.F", "a.go", 1, ParamInfo{"amount", "int"}),
 		voFact("b.G", "b.go", 10, ParamInfo{"amount", "int"}),
 		voFact("c.H", "c.go", 20, ParamInfo{"amount", "int"}),
@@ -76,7 +76,7 @@ func TestValueObjectNeedsTwoParams(t *testing.T) {
 func TestValueObjectIgnoresNonPrimitive(t *testing.T) {
 	// Params without primitive types are never recorded by the extractor,
 	// so facts with empty Params are skipped.
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		voFact("a.F", "a.go", 1),
 		voFact("b.G", "b.go", 10),
 		voFact("c.H", "c.go", 20),
@@ -87,7 +87,7 @@ func TestValueObjectIgnoresNonPrimitive(t *testing.T) {
 }
 
 func TestValueObjectMaximalOnly(t *testing.T) {
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		voFact("a.F", "a.go", 1,
 			ParamInfo{"amount", "int"}, ParamInfo{"currency", "string"}, ParamInfo{"region", "string"}),
 		voFact("b.G", "b.go", 10,
@@ -112,7 +112,7 @@ func TestValueObjectEmpty(t *testing.T) {
 
 func TestValueObjectSkipsGenericNames(t *testing.T) {
 	// (x, y) are placeholders, not a domain concept.
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		voFact("a.F", "a.go", 1, ParamInfo{"x", "string"}, ParamInfo{"y", "string"}),
 		voFact("b.G", "b.go", 10, ParamInfo{"x", "string"}, ParamInfo{"y", "string"}),
 		voFact("c.H", "c.go", 20, ParamInfo{"x", "string"}, ParamInfo{"y", "string"}),
@@ -123,7 +123,7 @@ func TestValueObjectSkipsGenericNames(t *testing.T) {
 }
 
 func TestValueObjectSkipsSingleLetters(t *testing.T) {
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		voFact("a.F", "a.go", 1, ParamInfo{"a", "int"}, ParamInfo{"b", "int"}),
 		voFact("b.G", "b.go", 10, ParamInfo{"a", "int"}, ParamInfo{"b", "int"}),
 		voFact("c.H", "c.go", 20, ParamInfo{"a", "int"}, ParamInfo{"b", "int"}),
@@ -134,7 +134,7 @@ func TestValueObjectSkipsSingleLetters(t *testing.T) {
 }
 
 func TestValueObjectSkipsPlaceholders(t *testing.T) {
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		voFact("a.F", "a.go", 1, ParamInfo{"foo", "string"}, ParamInfo{"bar", "string"}),
 		voFact("b.G", "b.go", 10, ParamInfo{"foo", "string"}, ParamInfo{"bar", "string"}),
 		voFact("c.H", "c.go", 20, ParamInfo{"foo", "string"}, ParamInfo{"bar", "string"}),
@@ -145,7 +145,7 @@ func TestValueObjectSkipsPlaceholders(t *testing.T) {
 }
 
 func TestValueObjectKeepsMeaningfulNames(t *testing.T) {
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		voFact("a.F", "a.go", 1, ParamInfo{"start", "int"}, ParamInfo{"end", "int"}),
 		voFact("b.G", "b.go", 10, ParamInfo{"start", "int"}, ParamInfo{"end", "int"}),
 		voFact("c.H", "c.go", 20, ParamInfo{"start", "int"}, ParamInfo{"end", "int"}),
@@ -157,7 +157,7 @@ func TestValueObjectKeepsMeaningfulNames(t *testing.T) {
 
 func TestValueObjectKeepsMixedGroup(t *testing.T) {
 	// One meaningful name saves the clump.
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		voFact("a.F", "a.go", 1, ParamInfo{"x", "int"}, ParamInfo{"offset", "int"}),
 		voFact("b.G", "b.go", 10, ParamInfo{"x", "int"}, ParamInfo{"offset", "int"}),
 		voFact("c.H", "c.go", 20, ParamInfo{"x", "int"}, ParamInfo{"offset", "int"}),

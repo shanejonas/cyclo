@@ -1,3 +1,5 @@
+QUALITY_TMP_DIR ?= /tmp
+
 .PHONY: check complexity cognitive cyclo-check fmt lint quality-baseline quality-gate test test-race
 
 check:
@@ -23,16 +25,16 @@ cyclo-check:
 # when it reports findings, which is expected; only exit 2 (analysis
 # failure) fails the run.
 quality-gate:
-	go build -buildvcs=false -o /tmp/cyclo-check-bin .
-	/tmp/cyclo-check-bin check --format json . > /tmp/cyclo-facts.json || test $$? -eq 1
-	go run ./application/qualitygate --baseline quality-baseline.json --facts /tmp/cyclo-facts.json
+	go build -buildvcs=false -o "$(QUALITY_TMP_DIR)/cyclo-check-bin" .
+	"$(QUALITY_TMP_DIR)/cyclo-check-bin" check --format json . > "$(QUALITY_TMP_DIR)/cyclo-facts.json" || test $$? -eq 1
+	go run ./application/qualitygate --baseline quality-baseline.json --facts "$(QUALITY_TMP_DIR)/cyclo-facts.json"
 
 # Regenerate the checked-in baseline after a change legitimately moves the
 # numbers (usually down).
 quality-baseline:
-	go build -buildvcs=false -o /tmp/cyclo-check-bin .
-	/tmp/cyclo-check-bin check --format json . > /tmp/cyclo-facts.json || test $$? -eq 1
-	go run ./application/qualitygate --write quality-baseline.json --facts /tmp/cyclo-facts.json
+	go build -buildvcs=false -o "$(QUALITY_TMP_DIR)/cyclo-check-bin" .
+	"$(QUALITY_TMP_DIR)/cyclo-check-bin" check --format json . > "$(QUALITY_TMP_DIR)/cyclo-facts.json" || test $$? -eq 1
+	go run ./application/qualitygate --write quality-baseline.json --facts "$(QUALITY_TMP_DIR)/cyclo-facts.json"
 
 fmt:
 	go fmt ./...

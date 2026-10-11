@@ -23,7 +23,7 @@ type DiffResult struct {
 // Returns Semantic=false if the dependence structure is identical
 // (cosmetic change: moved code, renamed variables, reformatting).
 // Returns Semantic=true if dependences were added, removed, or rewired.
-func SemanticDiff(oldPdg, newPdg *Pdg) DiffResult {
+func SemanticDiff(oldPdg, newPdg *MiningGraph) DiffResult {
 	if oldPdg == nil || newPdg == nil {
 		return DiffResult{Semantic: true, Reason: "missing PDG"}
 	}
@@ -44,7 +44,7 @@ func SemanticDiff(oldPdg, newPdg *Pdg) DiffResult {
 // pdgStructureHash computes a canonical hash of the PDG structure,
 // ignoring line numbers and variable names.
 // Two PDGs with the same hash are semantically equivalent.
-func pdgStructureHash(pdg *Pdg) string {
+func pdgStructureHash(pdg *MiningGraph) string {
 	// Reuse the subgraph hashing logic for the whole PDG.
 	// Build a canonical representation: sorted node labels + edge descriptors.
 	var nodeLabels []string

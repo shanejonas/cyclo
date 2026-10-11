@@ -165,8 +165,8 @@ func alternativeViolationsFor(sets []CallSet, rule DisjunctiveRule) []Alternativ
 }
 
 // AlattinRuleCandidates converts disjunctive-rule violations to candidates.
-func AlattinRuleCandidates(violations []AlternativeViolation, facts []*FuncFacts) []Candidate {
-	factByID := map[string]*FuncFacts{}
+func AlattinRuleCandidates(violations []AlternativeViolation, facts []*MiningFacts) []Candidate {
+	factByID := map[string]*MiningFacts{}
 	for _, f := range facts {
 		factByID[f.ID] = f
 	}

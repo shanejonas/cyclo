@@ -3,7 +3,7 @@ package patterns
 import "testing"
 
 func TestSpecificationCandidatesGroupsByRule(t *testing.T) {
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		{
 			ID: "pkg.FuncA",
 			SpecRules: []SpecificationHit{
@@ -41,7 +41,7 @@ func TestSpecificationCandidatesGroupsByRule(t *testing.T) {
 }
 
 func TestSpecificationCandidatesSkipsSingle(t *testing.T) {
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		{
 			ID: "pkg.FuncA",
 			SpecRules: []SpecificationHit{

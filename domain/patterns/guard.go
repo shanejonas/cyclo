@@ -15,7 +15,7 @@ const guardClauseScoreMilli = 500
 // the extractor found. Each candidate names the containing function as its
 // site (full body range, so range-based filters like --changed work); the
 // if-statement line is in the observation for precise location.
-func guardCandidates(facts []*FuncFacts) []Candidate {
+func guardCandidates(facts []*MiningFacts) []Candidate {
 	var out []Candidate
 	for _, f := range facts {
 		for _, hit := range f.GuardClauses {

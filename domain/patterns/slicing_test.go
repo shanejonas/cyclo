@@ -3,7 +3,7 @@ package patterns
 import "testing"
 
 // chainPdg builds a linear PDG: Param -> Op x (n-2) -> Return, all data edges.
-func chainPdg(n int) *Pdg {
+func chainPdg(n int) *MiningGraph {
 	nodes := make([]PdgNode, n)
 	edges := make([]PdgEdge, 0, n-1)
 	nodes[0] = PdgNode{Kind: Param, Line: 1}
@@ -13,11 +13,11 @@ func chainPdg(n int) *Pdg {
 	}
 	nodes[n-1] = PdgNode{Kind: Return, Line: n}
 	edges = append(edges, PdgEdge{From: n - 2, To: n - 1, Kind: Data})
-	return &Pdg{Nodes: nodes, Edges: edges}
+	return &MiningGraph{Nodes: nodes, Edges: edges}
 }
 
-func sliceTestFact(id string, pdg *Pdg) *FuncFacts {
-	return &FuncFacts{
+func sliceTestFact(id string, pdg *MiningGraph) *MiningFacts {
+	return &MiningFacts{
 		ID:   id,
 		Name: "testFunc",
 		Path: "test.go",
@@ -28,7 +28,7 @@ func sliceTestFact(id string, pdg *Pdg) *FuncFacts {
 
 func TestFindBarrierSlicesFlagsLarge(t *testing.T) {
 	// 25-node chain: barrier slice from return is 25 nodes >= 20.
-	facts := []*FuncFacts{sliceTestFact("pkg.f", chainPdg(25))}
+	facts := []*MiningFacts{sliceTestFact("pkg.f", chainPdg(25))}
 	findings := FindBarrierSlices(facts)
 	if len(findings) != 1 {
 		t.Fatalf("expected 1 finding, got %d", len(findings))
@@ -40,14 +40,14 @@ func TestFindBarrierSlicesFlagsLarge(t *testing.T) {
 
 func TestFindBarrierSlicesSkipsSmall(t *testing.T) {
 	// 5-node chain: below the 20-node threshold.
-	facts := []*FuncFacts{sliceTestFact("pkg.f", chainPdg(5))}
+	facts := []*MiningFacts{sliceTestFact("pkg.f", chainPdg(5))}
 	if findings := FindBarrierSlices(facts); len(findings) != 0 {
 		t.Errorf("expected no findings, got %d", len(findings))
 	}
 }
 
 func TestFindBarrierSlicesSkipsNilPdg(t *testing.T) {
-	facts := []*FuncFacts{{ID: "pkg.f", Name: "f", Path: "f.go"}}
+	facts := []*MiningFacts{{ID: "pkg.f", Name: "f", Path: "f.go"}}
 	if findings := FindBarrierSlices(facts); len(findings) != 0 {
 		t.Errorf("expected no findings, got %d", len(findings))
 	}
@@ -55,7 +55,7 @@ func TestFindBarrierSlicesSkipsNilPdg(t *testing.T) {
 
 func TestFindThinSlicesFlagsLongChain(t *testing.T) {
 	// 12-node chain: thin slice from return is 12 >= 10.
-	facts := []*FuncFacts{sliceTestFact("pkg.f", chainPdg(12))}
+	facts := []*MiningFacts{sliceTestFact("pkg.f", chainPdg(12))}
 	findings := FindThinSlices(facts)
 	if len(findings) != 1 {
 		t.Fatalf("expected 1 finding, got %d", len(findings))
@@ -63,7 +63,7 @@ func TestFindThinSlicesFlagsLongChain(t *testing.T) {
 }
 
 func TestFindThinSlicesSkipsShort(t *testing.T) {
-	facts := []*FuncFacts{sliceTestFact("pkg.f", chainPdg(5))}
+	facts := []*MiningFacts{sliceTestFact("pkg.f", chainPdg(5))}
 	if findings := FindThinSlices(facts); len(findings) != 0 {
 		t.Errorf("expected no findings, got %d", len(findings))
 	}
@@ -71,7 +71,7 @@ func TestFindThinSlicesSkipsShort(t *testing.T) {
 
 func TestFindChopsFlagsLarge(t *testing.T) {
 	// 25-node chain: chop from param to return covers all 25 >= 20.
-	facts := []*FuncFacts{sliceTestFact("pkg.f", chainPdg(25))}
+	facts := []*MiningFacts{sliceTestFact("pkg.f", chainPdg(25))}
 	findings := FindChops(facts)
 	if len(findings) != 1 {
 		t.Fatalf("expected 1 finding, got %d", len(findings))
@@ -82,14 +82,14 @@ func TestFindChopsFlagsLarge(t *testing.T) {
 }
 
 func TestFindChopsSkipsSmall(t *testing.T) {
-	facts := []*FuncFacts{sliceTestFact("pkg.f", chainPdg(5))}
+	facts := []*MiningFacts{sliceTestFact("pkg.f", chainPdg(5))}
 	if findings := FindChops(facts); len(findings) != 0 {
 		t.Errorf("expected no findings, got %d", len(findings))
 	}
 }
 
 func TestBarrierSliceCandidatesShape(t *testing.T) {
-	facts := []*FuncFacts{sliceTestFact("pkg.f", chainPdg(25))}
+	facts := []*MiningFacts{sliceTestFact("pkg.f", chainPdg(25))}
 	findings := FindBarrierSlices(facts)
 	cands := BarrierSliceCandidates(findings, facts)
 	if len(cands) != 1 {
@@ -108,7 +108,7 @@ func TestBarrierSliceCandidatesShape(t *testing.T) {
 }
 
 func TestThinSliceCandidatesShape(t *testing.T) {
-	facts := []*FuncFacts{sliceTestFact("pkg.f", chainPdg(12))}
+	facts := []*MiningFacts{sliceTestFact("pkg.f", chainPdg(12))}
 	findings := FindThinSlices(facts)
 	cands := ThinSliceCandidates(findings, facts)
 	if len(cands) != 1 {
@@ -123,7 +123,7 @@ func TestThinSliceCandidatesShape(t *testing.T) {
 }
 
 func TestChopCandidatesShape(t *testing.T) {
-	facts := []*FuncFacts{sliceTestFact("pkg.f", chainPdg(25))}
+	facts := []*MiningFacts{sliceTestFact("pkg.f", chainPdg(25))}
 	findings := FindChops(facts)
 	cands := ChopCandidates(findings, facts)
 	if len(cands) != 1 {

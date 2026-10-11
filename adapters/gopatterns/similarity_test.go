@@ -46,7 +46,7 @@ func TestReextractedSimilarity(t *testing.T) {
 func TestSelfSimilarity(t *testing.T) {
 	for _, f := range loadShapes(t) {
 		pdg := f.Pdg
-		if got := patterns.SimilarityMilli(patterns.NewWl(&pdg), patterns.NewWl(&pdg)); got != 1000 {
+		if got := patterns.SimilarityMilli(patterns.NewWl(patterns.MiningView(&pdg)), patterns.NewWl(patterns.MiningView(&pdg))); got != 1000 {
 			t.Errorf("%s self-similarity = %d‰, want 1000‰", f.Name, got)
 		}
 	}

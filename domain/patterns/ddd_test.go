@@ -3,7 +3,7 @@ package patterns
 import "testing"
 
 func TestAggregateCandidates(t *testing.T) {
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		{
 			ID:   "pkg.checkout",
 			Name: "checkout",
@@ -51,7 +51,7 @@ func TestAggregateCandidates(t *testing.T) {
 }
 
 func TestAggregateCandidatesSingleTypeSkipped(t *testing.T) {
-	facts := []*FuncFacts{{
+	facts := []*MiningFacts{{
 		ID:            "pkg.f",
 		Name:          "f",
 		Path:          "a.go",
@@ -64,7 +64,7 @@ func TestAggregateCandidatesSingleTypeSkipped(t *testing.T) {
 }
 
 func TestRepositoryCandidates(t *testing.T) {
-	facts := []*FuncFacts{{
+	facts := []*MiningFacts{{
 		ID:   "pkg.checkout",
 		Name: "checkout",
 		Path: "order.go",
@@ -88,7 +88,7 @@ func TestRepositoryCandidates(t *testing.T) {
 }
 
 func TestRepositoryCandidatesNoneSkipped(t *testing.T) {
-	facts := []*FuncFacts{{
+	facts := []*MiningFacts{{
 		ID:   "pkg.f",
 		Name: "f",
 		Path: "a.go",
@@ -103,7 +103,7 @@ func TestFactoryCandidatesOverFieldCapSkipped(t *testing.T) {
 	// 6 fields with logic in 2 functions would previously qualify, but the
 	// factory would need 6 params, violating the fn_params quality gate.
 	// The pattern stays dormant until param bundling is designed.
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		{
 			ID:   "pkg.a",
 			Name: "a",
@@ -129,7 +129,7 @@ func TestFactoryCandidatesOverFieldCapSkipped(t *testing.T) {
 }
 
 func TestFactoryCandidatesSingleFunctionSkipped(t *testing.T) {
-	facts := []*FuncFacts{{
+	facts := []*MiningFacts{{
 		ID:   "pkg.a",
 		Name: "a",
 		Path: "x.go",
@@ -146,7 +146,7 @@ func TestFactoryCandidatesSingleFunctionSkipped(t *testing.T) {
 func TestFactoryCandidatesNoLogicSkipped(t *testing.T) {
 	// Plain field assignment in 2+ functions: no construction logic,
 	// so no factory. This is the "just field shuffling" case Shane rejected.
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		{
 			ID:   "pkg.a",
 			Name: "a",
@@ -174,7 +174,7 @@ func TestFactoryCandidatesNoLogicSkipped(t *testing.T) {
 func TestFactoryCandidatesMixedLogicSkipped(t *testing.T) {
 	// Only one site has logic: the "pattern" isn't scattered, so no factory.
 	// Extracting would impose site A's validation on site B (behavior change).
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		{
 			ID:   "pkg.a",
 			Name: "a",
@@ -200,7 +200,7 @@ func TestFactoryCandidatesMixedLogicSkipped(t *testing.T) {
 }
 
 func TestFactoryCandidatesSmallLiteralSkipped(t *testing.T) {
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		{
 			ID:   "pkg.a",
 			Name: "a",

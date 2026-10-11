@@ -16,7 +16,7 @@ func TestASTFilterBenchmark(t *testing.T) {
 	// Build a corpus of PDGs with varying shapes. Pairs (i, i+1) for
 	// even i are clones; odd pairs are distractors.
 	const n = 500
-	pdgs := make(map[string]*Pdg, n)
+	pdgs := make(map[string]*MiningGraph, n)
 	names := make(map[string]string, n)
 	astTypes := make(map[string]map[string]int, n)
 	for i := 0; i < n; i++ {

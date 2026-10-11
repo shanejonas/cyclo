@@ -13,7 +13,7 @@ package patterns
 // ThinSlice returns the producer chain for a value at a PDG node.
 // Follows only Data edges backward, skipping control dependences.
 // Returns node indices, ordered from seed backward to producers.
-func ThinSlice(pdg *Pdg, seed int) []int {
+func ThinSlice(pdg *MiningGraph, seed int) []int {
 	radj := buildProducerGraph(pdg)
 	visited := map[int]bool{seed: true}
 	queue := []int{seed}
@@ -28,7 +28,7 @@ func ThinSlice(pdg *Pdg, seed int) []int {
 }
 
 // buildProducerGraph builds reverse data-edge adjacency (producers only).
-func buildProducerGraph(pdg *Pdg) map[int][]int {
+func buildProducerGraph(pdg *MiningGraph) map[int][]int {
 	radj := map[int][]int{}
 	for _, e := range pdg.Edges {
 		if e.Kind == Data {
@@ -39,7 +39,7 @@ func buildProducerGraph(pdg *Pdg) map[int][]int {
 }
 
 // visitProducers adds unvisited producer nodes to the queue.
-func visitProducers(queue []int, visited map[int]bool, prods []int, pdg *Pdg) []int {
+func visitProducers(queue []int, visited map[int]bool, prods []int, pdg *MiningGraph) []int {
 	for _, prod := range prods {
 		if !visited[prod] && isProducer(pdg.Nodes[prod]) {
 			visited[prod] = true
@@ -64,7 +64,7 @@ func isProducer(n PdgNode) bool {
 }
 
 // ThinSliceLines returns source lines for the thin slice.
-func ThinSliceLines(pdg *Pdg, seed int) []int {
+func ThinSliceLines(pdg *MiningGraph, seed int) []int {
 	nodes := ThinSlice(pdg, seed)
 	lines := make([]int, len(nodes))
 	for i, n := range nodes {

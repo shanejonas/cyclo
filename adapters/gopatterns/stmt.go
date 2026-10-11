@@ -9,6 +9,9 @@ import (
 )
 
 func (b *builder) stmt(s ast.Stmt) {
+	previous := b.origin
+	b.origin = s
+	defer func() { b.origin = previous }()
 	switch s := s.(type) {
 	case *ast.IfStmt:
 		b.ifStmt(s)

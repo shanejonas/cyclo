@@ -16,7 +16,7 @@ const enumDispatchScoreMilli = 500
 // as its site (full body range, so range-based filters like --changed
 // work); the switch line is in the observation and the FixSpec for
 // precise location.
-func enumDispatchCandidates(facts []*FuncFacts) []Candidate {
+func enumDispatchCandidates(facts []*MiningFacts) []Candidate {
 	var out []Candidate
 	for _, f := range facts {
 		for _, hit := range f.EnumDispatches {

@@ -14,13 +14,13 @@ func ctrlEdge(from, to, pos int) PdgEdge {
 	return PdgEdge{From: from, To: to, Kind: Ctrl, ArgPos: pos}
 }
 
-func runAlign(a, b *Pdg) Alignment {
+func runAlign(a, b *MiningGraph) Alignment {
 	return Align(a, NewWl(a), b, NewWl(b))
 }
 
 // permute shifts every node index by shift (mod n), like rstyle's
 // pdgtest::permuted.
-func permute(pdg *Pdg, shift int) *Pdg {
+func permute(pdg *MiningGraph, shift int) *MiningGraph {
 	n := len(pdg.Nodes)
 	nodes := make([]PdgNode, n)
 	for old, node := range pdg.Nodes {
@@ -35,7 +35,7 @@ func permute(pdg *Pdg, shift int) *Pdg {
 			ArgPos: e.ArgPos,
 		}
 	}
-	return &Pdg{Nodes: nodes, Edges: edges}
+	return &MiningGraph{Nodes: nodes, Edges: edges}
 }
 
 func holeKinds(al Alignment) [][3]string {
@@ -70,8 +70,8 @@ func TestHoleVarNaming(t *testing.T) {
 }
 
 // cmpGraph is loop { lit <op> } -> case, mirroring the Rust op-hole test.
-func cmpGraph(op string) *Pdg {
-	return &Pdg{
+func cmpGraph(op string) *MiningGraph {
+	return &MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: Loop},
 			{Kind: Lit, LitKind: "int", Detail: "3"},
@@ -106,9 +106,9 @@ func TestCanonicalComparisonOperatorsDifferAsOpHole(t *testing.T) {
 // emitLoop is the Go analogue of rstyle's pdgtest::emit_loop: a loop pushing
 // x.method() into out. SigClass is identical across the pair, so only the
 // callee id holes.
-func methodLoop(ty, method string) *Pdg {
+func methodLoop(ty, method string) *MiningGraph {
 	param := func(tyClass string) PdgNode { return PdgNode{Kind: Param, TyClass: tyClass} }
-	return &Pdg{
+	return &MiningGraph{
 		Nodes: []PdgNode{
 			param("[]_"),       // 0
 			param("*[]string"), // 1
@@ -148,8 +148,8 @@ func TestMethodCallYieldsMethodHole(t *testing.T) {
 }
 
 // callGraph is a single call of callee fed by one param.
-func callGraph(callee string) *Pdg {
-	return &Pdg{
+func callGraph(callee string) *MiningGraph {
+	return &MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: Param, TyClass: "int"},
 			{Kind: Call, CalleeID: callee, SigClass: "fn(int) -> int", TyClass: "int"},
@@ -188,8 +188,8 @@ func TestMethodVsFreeFnKind(t *testing.T) {
 }
 
 func TestLiteralHole(t *testing.T) {
-	lit := func(detail string) *Pdg {
-		return &Pdg{
+	lit := func(detail string) *MiningGraph {
+		return &MiningGraph{
 			Nodes: []PdgNode{
 				{Kind: Lit, LitKind: "string", Detail: detail},
 				{Kind: Return},
@@ -216,8 +216,8 @@ func TestLiteralHole(t *testing.T) {
 // fieldGraph is x.<field> where the field's type class differs: the Go
 // analogue of Rust's adt_diffs, which the port reduces to a TyClass
 // inequality.
-func fieldGraph(fieldTy string) *Pdg {
-	return &Pdg{
+func fieldGraph(fieldTy string) *MiningGraph {
+	return &MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: Param, TyClass: "T"},
 			{Kind: Field, Detail: "Name", TyClass: fieldTy},
@@ -244,8 +244,8 @@ func TestFieldTypeHole(t *testing.T) {
 }
 
 func TestRepeatedPairReusesHoleVar(t *testing.T) {
-	two := func(t1, t2 string) *Pdg {
-		return &Pdg{
+	two := func(t1, t2 string) *MiningGraph {
+		return &MiningGraph{
 			Nodes: []PdgNode{
 				{Kind: Param, TyClass: "T"},
 				{Kind: Field, Detail: "A", TyClass: t1},
@@ -270,7 +270,7 @@ func TestRepeatedPairReusesHoleVar(t *testing.T) {
 
 func TestCoverageMilli(t *testing.T) {
 	full := cmpGraph("<")
-	short := &Pdg{
+	short := &MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: Loop},
 			{Kind: Lit, LitKind: "int", Detail: "3"},
@@ -280,7 +280,7 @@ func TestCoverageMilli(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		name string
-		a, b *Pdg
+		a, b *MiningGraph
 		want uint32
 	}{
 		{"identical", full, cmpGraph("<"), 1000},
@@ -295,7 +295,7 @@ func TestCoverageMilli(t *testing.T) {
 
 func TestSymmetricGraphAlignmentDeterministic(t *testing.T) {
 	push := PdgNode{Kind: Call, CalleeID: "example.com/vec.Vec.Push", SigClass: "fn(int) -> ()"}
-	twin := &Pdg{
+	twin := &MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: Param, TyClass: "int"},
 			{Kind: Param, TyClass: "int"},
@@ -329,11 +329,11 @@ func TestSymmetricGraphAlignmentDeterministic(t *testing.T) {
 
 func TestEdgeInconsistentMatchRejected(t *testing.T) {
 	push := PdgNode{Kind: Call, CalleeID: "example.com/vec.Vec.Push", SigClass: "fn() -> ()"}
-	linked := &Pdg{
+	linked := &MiningGraph{
 		Nodes: []PdgNode{push, push},
 		Edges: []PdgEdge{dataEdge(0, 1, 0)},
 	}
-	loose := &Pdg{Nodes: []PdgNode{push, push}}
+	loose := &MiningGraph{Nodes: []PdgNode{push, push}}
 	c := newCtx(linked, NewWl(linked), loose, NewWl(loose))
 	both := newMatching(2, 2)
 	both.link(0, 0)
@@ -349,14 +349,14 @@ func TestEdgeInconsistentMatchRejected(t *testing.T) {
 }
 
 func TestDifferingSigClassStillPairsAsHole(t *testing.T) {
-	a := &Pdg{
+	a := &MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: Param, TyClass: "int"},
 			{Kind: Call, CalleeID: "example.com/p.f", SigClass: "fn(int) -> string", TyClass: "string"},
 		},
 		Edges: []PdgEdge{dataEdge(0, 1, 0)},
 	}
-	b := &Pdg{
+	b := &MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: Param, TyClass: "int"},
 			{Kind: Call, CalleeID: "example.com/p.f", SigClass: "fn(int) -> int", TyClass: "int"},
@@ -374,8 +374,8 @@ func TestDifferingSigClassStillPairsAsHole(t *testing.T) {
 }
 
 func TestHoleOrderingAndNumbering(t *testing.T) {
-	multi := func(fieldTy, methodCallee, freeCallee string) *Pdg {
-		return &Pdg{
+	multi := func(fieldTy, methodCallee, freeCallee string) *MiningGraph {
+		return &MiningGraph{
 			Nodes: []PdgNode{
 				{Kind: Param, TyClass: "T"},
 				{Kind: Field, Detail: "Name", TyClass: fieldTy},

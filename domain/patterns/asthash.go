@@ -25,7 +25,7 @@ import (
 const (
 	// astBypassThreshold is the minimum AST Jaccard similarity for a
 	// pair to bypass the characteristic-vector filter and go straight
-	// to the candidate set (then through LSH and WL as normal).
+	// to the candidate set (then through WL as normal).
 	astBypassThreshold = 0.8
 	// astPruneThreshold is the maximum AST Jaccard similarity for a
 	// pair to be eligible for pruning. Pruning additionally requires

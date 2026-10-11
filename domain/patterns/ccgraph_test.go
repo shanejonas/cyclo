@@ -44,7 +44,7 @@ func TestJaroWinklerThreshold(t *testing.T) {
 }
 
 // ccTestPdg builds a simple linear PDG with n nodes for CCGraph tests.
-func ccTestPdg(n int, lineBase int) *Pdg {
+func ccTestPdg(n int, lineBase int) *MiningGraph {
 	nodes := make([]PdgNode, n)
 	for i := range nodes {
 		nodes[i] = PdgNode{Kind: Op, Line: lineBase + i, Detail: "add:int"}
@@ -53,11 +53,11 @@ func ccTestPdg(n int, lineBase int) *Pdg {
 	for i := 0; i+1 < n; i++ {
 		edges = append(edges, PdgEdge{From: i, To: i + 1, Kind: Data})
 	}
-	return &Pdg{Nodes: nodes, Edges: edges}
+	return &MiningGraph{Nodes: nodes, Edges: edges}
 }
 
 func TestCCGraphClonesFindsSimilar(t *testing.T) {
-	pdgs := map[string]*Pdg{
+	pdgs := map[string]*MiningGraph{
 		"f1": ccTestPdg(20, 1),
 		"f2": ccTestPdg(20, 100),
 		"f3": ccTestPdg(5, 200), // too small / different shape
@@ -80,9 +80,9 @@ func TestCCGraphClonesFindsSimilar(t *testing.T) {
 	}
 }
 
-func TestCCGraphClonesNameFilter(t *testing.T) {
-	// Identical PDGs but very different names: Stage 2 should filter out.
-	pdgs := map[string]*Pdg{
+func TestCCGraphNumericalMatchBypassesNameFallback(t *testing.T) {
+	// Algorithm 1 admits numerical matches before the name fallback.
+	pdgs := map[string]*MiningGraph{
 		"f1": ccTestPdg(20, 1),
 		"f2": ccTestPdg(20, 100),
 	}
@@ -91,19 +91,19 @@ func TestCCGraphClonesNameFilter(t *testing.T) {
 		"f2": "zzzzzzz",
 	}
 	groups := CCGraphClones(pdgs, names)
-	if len(groups) != 0 {
-		t.Fatalf("expected no groups (name filter), got %v", groups)
+	if len(groups) != 1 {
+		t.Fatalf("numerical match incorrectly requires a name match: %v", groups)
 	}
 }
 
-func TestQualifiedNamesDoNotBypassNameFilter(t *testing.T) {
-	pdgs := map[string]*Pdg{"a": ccTestPdg(20, 1), "b": ccTestPdg(20, 100)}
+func TestQualifiedNumericalMatchBypassesNameFallback(t *testing.T) {
+	pdgs := map[string]*MiningGraph{"a": ccTestPdg(20, 1), "b": ccTestPdg(20, 100)}
 	names := map[string]string{
 		"a": "github.com/example/project/pkg.Widget.aaaaaaa",
 		"b": "github.com/example/project/pkg.Widget.zzzzzzz",
 	}
-	if got := CCGraphClones(pdgs, names); len(got) != 0 {
-		t.Fatalf("package/receiver prefix admits unrelated names: %v", got)
+	if got := CCGraphClones(pdgs, names); len(got) != 1 {
+		t.Fatalf("numerical match lost to different names: %v", got)
 	}
 	matcher := newNameMatcher(ccNameRunes([]string{names["a"], names["b"]}))
 	runes := ccNameRunes([]string{names["a"], names["b"]})
@@ -113,7 +113,7 @@ func TestQualifiedNamesDoNotBypassNameFilter(t *testing.T) {
 }
 
 func TestQualifiedNamesMatchAcrossPackagesAndReceivers(t *testing.T) {
-	pdgs := map[string]*Pdg{"a": ccTestPdg(20, 1), "b": ccTestPdg(20, 100)}
+	pdgs := map[string]*MiningGraph{"a": ccTestPdg(20, 1), "b": ccTestPdg(20, 100)}
 	names := map[string]string{"a": "example.org/a.Reader.fetchData", "b": "other.net/b.Writer.fetchDatum"}
 	if got := CCGraphClones(pdgs, names); len(got) != 1 {
 		t.Fatalf("similar method names lost across packages: %v", got)
@@ -121,7 +121,7 @@ func TestQualifiedNamesMatchAcrossPackagesAndReceivers(t *testing.T) {
 }
 
 func TestASTBypassStillAdmitsDifferentQualifiedNames(t *testing.T) {
-	pdgs := map[string]*Pdg{"a": ccTestPdg(20, 1), "b": ccTestPdg(20, 100)}
+	pdgs := map[string]*MiningGraph{"a": ccTestPdg(20, 1), "b": ccTestPdg(20, 100)}
 	names := map[string]string{"a": "example.org/pkg.A.aaaaaaa", "b": "example.org/pkg.B.zzzzzzz"}
 	shapes := map[string]map[string]int{"a": {"Return": 1, "Call": 2}, "b": {"Return": 1, "Call": 2}}
 	if got := CCGraphClonesWithAST(pdgs, names, shapes); len(got) != 1 {
@@ -133,13 +133,13 @@ func TestCCGraphClonesEmpty(t *testing.T) {
 	if got := CCGraphClones(nil, nil); got != nil {
 		t.Fatalf("expected nil for nil input, got %v", got)
 	}
-	if got := CCGraphClones(map[string]*Pdg{"f1": ccTestPdg(20, 1)}, nil); len(got) != 0 {
+	if got := CCGraphClones(map[string]*MiningGraph{"f1": ccTestPdg(20, 1)}, nil); len(got) != 0 {
 		t.Fatalf("expected no groups for single function, got %v", got)
 	}
 }
 
 func TestCCGraphClonesDeterministic(t *testing.T) {
-	pdgs := map[string]*Pdg{
+	pdgs := map[string]*MiningGraph{
 		"f1": ccTestPdg(20, 1),
 		"f2": ccTestPdg(20, 100),
 	}

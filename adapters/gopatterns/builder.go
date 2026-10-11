@@ -34,6 +34,9 @@ var kindToEffectBit = map[quality.Kind]uint16{
 // expression is a bare variable use (resolved through binds), blank, or has
 // no meaningful value node.
 func (b *builder) expr(e ast.Expr) int {
+	previous := b.origin
+	b.origin = e
+	defer func() { b.origin = previous }()
 	switch e := unparen(e).(type) {
 	case *ast.Ident:
 		return b.ident(e)

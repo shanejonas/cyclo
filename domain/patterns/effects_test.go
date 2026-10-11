@@ -60,12 +60,12 @@ func TestEffectDiffIgnoresNonCall(t *testing.T) {
 
 // TestCompatibleEffectsAllPure verifies that pure functions are compatible.
 func TestCompatibleEffectsAllPure(t *testing.T) {
-	mkFn := func() *FuncFacts {
-		return &FuncFacts{Pdg: &Pdg{Nodes: []PdgNode{
+	mkFn := func() *MiningFacts {
+		return &MiningFacts{Pdg: &MiningGraph{Nodes: []PdgNode{
 			{Kind: Call, CalleeID: "strings.Join", Effects: EffectNone},
 		}}}
 	}
-	fns := []*FuncFacts{mkFn(), mkFn()}
+	fns := []*MiningFacts{mkFn(), mkFn()}
 	if !compatibleEffects(fns) {
 		t.Error("expected pure functions to be compatible")
 	}
@@ -73,25 +73,25 @@ func TestCompatibleEffectsAllPure(t *testing.T) {
 
 // TestCompatibleEffectsMismatch verifies that IO vs pure is incompatible.
 func TestCompatibleEffectsMismatch(t *testing.T) {
-	ioFn := &FuncFacts{Pdg: &Pdg{Nodes: []PdgNode{
+	ioFn := &MiningFacts{Pdg: &MiningGraph{Nodes: []PdgNode{
 		{Kind: Call, CalleeID: "fmt.Println", Effects: EffectIO},
 	}}}
-	pureFn := &FuncFacts{Pdg: &Pdg{Nodes: []PdgNode{
+	pureFn := &MiningFacts{Pdg: &MiningGraph{Nodes: []PdgNode{
 		{Kind: Call, CalleeID: "strings.Join", Effects: EffectNone},
 	}}}
-	if compatibleEffects([]*FuncFacts{ioFn, pureFn}) {
+	if compatibleEffects([]*MiningFacts{ioFn, pureFn}) {
 		t.Error("expected IO vs pure to be incompatible")
 	}
 }
 
 // TestCompatibleEffectsBothIO verifies that two IO functions are compatible.
 func TestCompatibleEffectsBothIO(t *testing.T) {
-	mkFn := func(callee string) *FuncFacts {
-		return &FuncFacts{Pdg: &Pdg{Nodes: []PdgNode{
+	mkFn := func(callee string) *MiningFacts {
+		return &MiningFacts{Pdg: &MiningGraph{Nodes: []PdgNode{
 			{Kind: Call, CalleeID: callee, Effects: EffectIO},
 		}}}
 	}
-	fns := []*FuncFacts{mkFn("fmt.Println"), mkFn("os.Stdout.Write")}
+	fns := []*MiningFacts{mkFn("fmt.Println"), mkFn("os.Stdout.Write")}
 	if !compatibleEffects(fns) {
 		t.Error("expected two IO functions to be compatible")
 	}

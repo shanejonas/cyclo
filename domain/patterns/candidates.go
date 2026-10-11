@@ -7,11 +7,11 @@
 // Go adaptations (each noted at its use site):
 //   - The main entry is Mine, colliding with sigmine's layer-1 Mine; the
 //     layer-1 entry was renamed to MineGroups.
-//   - FuncFacts carries no receiver: Rust's `receiver == None` (associated
+//   - MiningFacts carries no receiver: Rust's `receiver == None` (associated
 //     function without self) check becomes "no SelfTy at all", which the
 //     types.len() < 2 check would already reject; the explicit test keeps
 //     the Rust structure.
-//   - FuncFacts.Implements is a bool: the interface method id is unknown, so
+//   - MiningFacts.Implements is a bool: the interface method id is unknown, so
 //     the "already abstracted" suppression names no interface, the "extend
 //     the existing trait" text is unreachable, and the same-crate versus
 //     external-trait distinction in generic_fn/parameterize collapses to
@@ -134,7 +134,7 @@ const (
 	DeviantBehavior CandidateKind = "deviant_behavior"
 	// CCGraphClone finds function-level clones via CCGraph (Zou et al.,
 	// ASE 2020): two-stage filtering (characteristic vectors + Jaro-Winkler
-	// name similarity), LSH-clustered WL vectors, and WL kernel similarity.
+	// name similarity), WL kernel similarity.
 	// This finds whole functions that do the same thing.
 	// Detection-only: the LLM judges whether to merge.
 	CCGraphClone CandidateKind = "ccgraph_clone"
@@ -327,7 +327,7 @@ type Mined struct {
 
 // candidateIndex holds the lookup tables over the corpus.
 type candidateIndex struct {
-	byID   map[string]*FuncFacts
+	byID   map[string]*MiningFacts
 	groups map[string]*SigGroup
 	// workspaceADTs are SelfTy values with facts in this corpus: the only
 	// types worth abstracting over.
@@ -340,9 +340,9 @@ type candidateIndex struct {
 	maxHoles int
 }
 
-func newCandidateIndex(facts []*FuncFacts, groups []SigGroup, params Params) *candidateIndex {
+func newCandidateIndex(facts []*MiningFacts, groups []SigGroup, params Params) *candidateIndex {
 	ix := &candidateIndex{
-		byID:            map[string]*FuncFacts{},
+		byID:            map[string]*MiningFacts{},
 		groups:          map[string]*SigGroup{},
 		workspaceADTs:   map[string]bool{},
 		calleeOwners:    map[string]string{},
@@ -373,7 +373,7 @@ func newCandidateIndex(facts []*FuncFacts, groups []SigGroup, params Params) *ca
 // "pkgpath.Type.Method" -> "Type" (see hasReceiver in align.go). Free
 // functions have no owner.
 // indexCalleeOwners records owners for every callee id in one PDG.
-func indexCalleeOwners(out map[string]string, pdg *Pdg) {
+func indexCalleeOwners(out map[string]string, pdg *MiningGraph) {
 	for _, n := range pdg.Nodes {
 		id := n.CalleeID
 		if id == "" {
@@ -385,7 +385,7 @@ func indexCalleeOwners(out map[string]string, pdg *Pdg) {
 	}
 }
 
-func calleeOwners(facts []*FuncFacts) map[string]string {
+func calleeOwners(facts []*MiningFacts) map[string]string {
 	out := map[string]string{}
 	for _, f := range facts {
 		if f == nil || f.Pdg == nil {
@@ -465,11 +465,11 @@ func shortGoPaths(owner string) string {
 	return out.String()
 }
 
-func makeSite(f *FuncFacts) Site {
+func makeSite(f *MiningFacts) Site {
 	return Site{Path: f.Path, Line: f.Line, EndLine: f.EndLine, ID: f.ID, Name: f.Name}
 }
 
-func sitesOfFacts(fns []*FuncFacts) []Site {
+func sitesOfFacts(fns []*MiningFacts) []Site {
 	sites := make([]Site, len(fns))
 	for i, f := range fns {
 		sites[i] = makeSite(f)
@@ -499,7 +499,7 @@ const (
 type verdict struct {
 	kind     verdictKind
 	group    *SigGroup
-	defs     []*FuncFacts
+	defs     []*MiningFacts
 	existing *existing
 }
 
@@ -531,7 +531,7 @@ func distinctInOrder(values []string) []string {
 // sameTraitMethod reports whether every def implements an interface method.
 // Go adaptation: rstyle returns the shared trait method id; the Go schema
 // records only that a method implements an interface, so the id is unknown.
-func sameTraitMethod(defs []*FuncFacts) bool {
+func sameTraitMethod(defs []*MiningFacts) bool {
 	if len(defs) == 0 {
 		return false
 	}
@@ -543,8 +543,8 @@ func sameTraitMethod(defs []*FuncFacts) bool {
 	return true
 }
 
-func lookupDefs(ix *candidateIndex, wanted []string) []*FuncFacts {
-	var defs []*FuncFacts
+func lookupDefs(ix *candidateIndex, wanted []string) []*MiningFacts {
+	var defs []*MiningFacts
 	for _, v := range wanted {
 		if f, ok := ix.byID[v]; ok {
 			defs = append(defs, f)
@@ -553,7 +553,7 @@ func lookupDefs(ix *candidateIndex, wanted []string) []*FuncFacts {
 	return defs
 }
 
-func ownerSet(defs []*FuncFacts) map[string]bool {
+func ownerSet(defs []*MiningFacts) map[string]bool {
 	types := map[string]bool{}
 	for _, d := range defs {
 		if d.SelfTy != "" {
@@ -569,7 +569,7 @@ func ownerSet(defs []*FuncFacts) map[string]bool {
 // is never extracted in practice, so cross-package groups are skipped.
 // Bare type names without a package path can't be distinguished, so they're
 // allowed through.
-func sameOwnerPackage(defs []*FuncFacts) bool {
+func sameOwnerPackage(defs []*MiningFacts) bool {
 	pkg := ""
 	for _, d := range defs {
 		if d.SelfTy == "" {
@@ -602,7 +602,7 @@ func ownerPkg(selfTy string) string {
 // schema records only SelfTy, so a receiver-less function is one with no
 // SelfTy at all. Such defs already fail the two-types check below; the
 // explicit test keeps the Rust structure.
-func noReceiver(defs []*FuncFacts) bool {
+func noReceiver(defs []*MiningFacts) bool {
 	for _, d := range defs {
 		if d.SelfTy != "" {
 			return false
@@ -612,7 +612,7 @@ func noReceiver(defs []*FuncFacts) bool {
 }
 
 // judgeSigGroup joins the defs' signature keys against the layer-1 groups.
-func judgeSigGroup(ix *candidateIndex, defs []*FuncFacts) verdict {
+func judgeSigGroup(ix *candidateIndex, defs []*MiningFacts) verdict {
 	keys := map[string]bool{}
 	for _, d := range defs {
 		keys[d.SigKey] = true
@@ -674,7 +674,7 @@ func showClass(classes map[string]bool) string {
 
 // effectMismatch notes when the implementations differ in observable effects
 // (one mutates, one is pure). Empty means uniform.
-func effectMismatch(defs []*FuncFacts) string {
+func effectMismatch(defs []*MiningFacts) string {
 	classes := make([]map[string]bool, len(defs))
 	for i, d := range defs {
 		classes[i] = d.EffectClass()
@@ -718,7 +718,7 @@ func sketch(key, name string) string {
 }
 
 // sharedName is the common short method name, or "method".
-func sharedName(defs []*FuncFacts) string {
+func sharedName(defs []*MiningFacts) string {
 	names := map[string]bool{}
 	for _, d := range defs {
 		names[shortName(d.Name)] = true
@@ -790,7 +790,7 @@ func traitRefactor(ev *candidateEvidence, methods []string, impls string) string
 // traitVerdict pairs a joined signature group with its definitions.
 type traitVerdict struct {
 	group *SigGroup
-	defs  []*FuncFacts
+	defs  []*MiningFacts
 }
 
 // candidateEvidence is the finished evidence for one candidate, shared by the
@@ -798,7 +798,7 @@ type traitVerdict struct {
 type candidateEvidence struct {
 	kind      CandidateKind
 	breakdown Breakdown
-	sites     []*FuncFacts
+	sites     []*MiningFacts
 	verdicts  []traitVerdict
 	summary   string
 	// existingTrait is the interface method id of a suppressed column in the
@@ -807,7 +807,7 @@ type candidateEvidence struct {
 	existingTrait string
 }
 
-func definitionSites(defs []*FuncFacts) []Site {
+func definitionSites(defs []*MiningFacts) []Site {
 	seen := map[string]bool{}
 	var out []Site
 	for _, d := range defs {
@@ -822,7 +822,7 @@ func definitionSites(defs []*FuncFacts) []Site {
 }
 
 func finish(ev *candidateEvidence) Candidate {
-	var allDefs []*FuncFacts
+	var allDefs []*MiningFacts
 	for _, v := range ev.verdicts {
 		allDefs = append(allDefs, v.defs...)
 	}
@@ -913,8 +913,8 @@ type outcome struct {
 	suppressed *Suppressed
 }
 
-func sitesOf(fns []*FuncFacts, cluster *Cluster) []*FuncFacts {
-	sites := make([]*FuncFacts, len(cluster.Members))
+func sitesOf(fns []*MiningFacts, cluster *Cluster) []*MiningFacts {
+	sites := make([]*MiningFacts, len(cluster.Members))
 	for i, m := range cluster.Members {
 		sites[i] = fns[m]
 	}
@@ -963,7 +963,7 @@ const minGenericCalls = 2
 // forwardsParams reports whether every call in f is fed by parameters alone:
 // a delegation shim.
 // callArgsAllParams reports whether every data input to a call is a parameter.
-func callArgsAllParams(pdg *Pdg, call int) bool {
+func callArgsAllParams(pdg *MiningGraph, call int) bool {
 	for _, e := range pdg.Edges {
 		if e.To == call && e.Kind == Data && pdg.Nodes[e.From].Kind != Param {
 			return false
@@ -972,7 +972,7 @@ func callArgsAllParams(pdg *Pdg, call int) bool {
 	return true
 }
 
-func forwardsParams(f *FuncFacts) bool {
+func forwardsParams(f *MiningFacts) bool {
 	pdg := f.Pdg
 	if pdg == nil {
 		return true
@@ -988,7 +988,7 @@ func forwardsParams(f *FuncFacts) bool {
 	return true
 }
 
-func callCount(f *FuncFacts) int {
+func callCount(f *MiningFacts) int {
 	if f.Pdg == nil {
 		return 0
 	}
@@ -1003,7 +1003,7 @@ func callCount(f *FuncFacts) int {
 
 // hasSubstance reports whether a body is worth generalizing. With the guard,
 // a single call counts too unless it is a pure parameter forward.
-func hasSubstance(ix *candidateIndex, f *FuncFacts) bool {
+func hasSubstance(ix *candidateIndex, f *MiningFacts) bool {
 	switch n := callCount(f); {
 	case n >= minGenericCalls:
 		return true
@@ -1014,12 +1014,12 @@ func hasSubstance(ix *candidateIndex, f *FuncFacts) bool {
 	}
 }
 
-func summaryOf(ix *candidateIndex, sites []*FuncFacts, cluster *Cluster) string {
+func summaryOf(ix *candidateIndex, sites []*MiningFacts, cluster *Cluster) string {
 	return fmt.Sprintf("%d functions share one dependence structure and differ only at %s",
 		len(sites), columnsText(ix, cluster.Columns))
 }
 
-func breakdownOf(sites []*FuncFacts, cluster *Cluster, liftMilli uint32) Breakdown {
+func breakdownOf(sites []*MiningFacts, cluster *Cluster, liftMilli uint32) Breakdown {
 	var sum uint32
 	for _, c := range cluster.CoverageMilli {
 		sum += c
@@ -1101,7 +1101,7 @@ func genericColumns(ix *candidateIndex, cluster *Cluster) (types, others []*Colu
 // genericFn proposes one generic definition over workspace types for a
 // cluster whose only holes are workspace types (and external callees).
 // Ranked below trait candidateEvidence (score halved).
-func genericFn(ix *candidateIndex, sites []*FuncFacts, cluster *Cluster) *Candidate {
+func genericFn(ix *candidateIndex, sites []*MiningFacts, cluster *Cluster) *Candidate {
 	// Go adaptation: rstyle suppresses only impls of a same-crate trait
 	// (external-trait impls are forced by it, so duplication stays real).
 	// The Go schema never knows the interface id, so any all-implementing
@@ -1154,7 +1154,7 @@ func hasSegment(segs []string, match func(string) bool) bool {
 }
 
 // inTestPath reports whether the function lives under a tests directory.
-func inTestPath(f *FuncFacts, segs []string) bool {
+func inTestPath(f *MiningFacts, segs []string) bool {
 	return hasSegment(segs, func(s string) bool { return s == "tests" }) ||
 		strings.HasPrefix(f.Path, "tests/") || strings.Contains(f.Path, "/tests/")
 }
@@ -1166,7 +1166,7 @@ func isFFIModule(segs []string) bool {
 	})
 }
 
-func isBoilerplate(f *FuncFacts) bool {
+func isBoilerplate(f *MiningFacts) bool {
 	segs := strings.FieldsFunc(f.ID, func(r rune) bool { return r == '.' || r == '/' })
 	main := len(segs) > 0 && segs[len(segs)-1] == "main"
 	return inTestPath(f, segs) || isFFIModule(segs) || main
@@ -1175,7 +1175,7 @@ func isBoilerplate(f *FuncFacts) bool {
 // parameterizable reports whether a cluster is worth a parameterize
 // suggestion: not boilerplate, not impls forced by an interface, and few
 // enough holes to be a helper's parameters.
-func parameterizable(sites []*FuncFacts, cluster *Cluster, maxHoles int) bool {
+func parameterizable(sites []*MiningFacts, cluster *Cluster, maxHoles int) bool {
 	forced := true
 	for _, f := range sites {
 		if !f.Implements {
@@ -1196,7 +1196,7 @@ func parameterizable(sites []*FuncFacts, cluster *Cluster, maxHoles int) bool {
 // parameterize proposes one helper taking the differing parts as parameters
 // for a cluster that is neither a trait nor a generic fn over workspace
 // types. Ranked below generic_fn (score thirded).
-func parameterize(ix *candidateIndex, sites []*FuncFacts, cluster *Cluster) *Candidate {
+func parameterize(ix *candidateIndex, sites []*MiningFacts, cluster *Cluster) *Candidate {
 	// Same Go adaptation as genericFn: the interface id is unknown.
 	if sameTraitMethod(sites) {
 		return nil
@@ -1235,7 +1235,7 @@ func parameterize(ix *candidateIndex, sites []*FuncFacts, cluster *Cluster) *Can
 
 // withoutTrait handles a cluster where no method hole joined a signature
 // group: a type-only generic fn, a hidden pattern, or nothing.
-func withoutTrait(ix *candidateIndex, sites []*FuncFacts, cluster *Cluster, hidden *string) outcome {
+func withoutTrait(ix *candidateIndex, sites []*MiningFacts, cluster *Cluster, hidden *string) outcome {
 	if hidden != nil {
 		if strings.HasPrefix(*hidden, "all ") {
 			return outcome{kind: outcomeHidden, suppressed: &Suppressed{
@@ -1254,7 +1254,7 @@ func withoutTrait(ix *candidateIndex, sites []*FuncFacts, cluster *Cluster, hidd
 	return outcome{kind: outcomeNothing}
 }
 
-func fromCluster(ix *candidateIndex, fns []*FuncFacts, cluster *Cluster) outcome {
+func fromCluster(ix *candidateIndex, fns []*MiningFacts, cluster *Cluster) outcome {
 	sites := sitesOf(fns, cluster)
 	var cols []*Column
 	for i := range cluster.Columns {
@@ -1284,7 +1284,7 @@ func fromCluster(ix *candidateIndex, fns []*FuncFacts, cluster *Cluster) outcome
 	}}
 }
 
-func ownersOf(defs []*FuncFacts) map[string]bool {
+func ownersOf(defs []*MiningFacts) map[string]bool {
 	return ownerSet(defs)
 }
 
@@ -1375,8 +1375,8 @@ func collectOutcomes(outcomes []outcome) Mined {
 
 // withPdgs keeps the facts that have a PDG, sorted by (path, line, id) so
 // mining never depends on input order.
-func withPdgs(facts []*FuncFacts) []*FuncFacts {
-	var fns []*FuncFacts
+func withPdgs(facts []*MiningFacts) []*MiningFacts {
+	var fns []*MiningFacts
 	for _, f := range facts {
 		if f != nil && f.Pdg != nil {
 			fns = append(fns, f)
@@ -1397,15 +1397,15 @@ func withPdgs(facts []*FuncFacts) []*FuncFacts {
 
 // Mine is the layer-2 entry: candidates and suppressed patterns for facts,
 // given the layer-1 signature groups and the clustering params.
-func Mine(facts []*FuncFacts, groups []SigGroup, params Params) Mined {
+func Mine(facts []*MiningFacts, groups []SigGroup, params Params) Mined {
 	return MineCached(facts, groups, params, nil)
 }
 
 // MineCached is Mine with an optional WL cache for incremental runs.
-func MineCached(facts []*FuncFacts, groups []SigGroup, params Params, cache *WlCache) Mined {
+func MineCached(facts []*MiningFacts, groups []SigGroup, params Params, cache *WlCache) Mined {
 	ix := newCandidateIndex(facts, groups, params)
 	fns := withPdgs(facts)
-	pdgs := make([]*Pdg, len(fns))
+	pdgs := make([]*MiningGraph, len(fns))
 	for i, f := range fns {
 		pdgs[i] = f.Pdg
 	}

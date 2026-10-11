@@ -32,7 +32,7 @@ type Options struct {
 	// HideImplements is the trait-hiding oracle: facts whose function id
 	// contains one of these patterns lose their implements link ("*" hides
 	// all), so their methods look like ordinary inherent ones. (Rust matches
-	// the trait method id; Go's FuncFacts keeps implements as a bool, so the
+	// the trait method id; Go's MiningFacts keeps implements as a bool, so the
 	// function id is the closest available key.)
 	HideImplements []string
 	// Params tunes clustering; the zero value means DefaultParams(), mirroring
@@ -68,11 +68,11 @@ func Build(groups []SigGroup, minScoreMilli uint32, top *int) PatternsReport {
 // Run is the full pipeline over driver facts: prepare (merge duplicate
 // targets, hide implements), layer 1 (signature groups), layer 2
 // (candidates), then filter and rank.
-func Run(facts []*FuncFacts, options Options) PatternsReport {
+func RunMining(facts []*MiningFacts, options Options) PatternsReport {
 	prepared := hideImplements(mergeFacts(facts), options.HideImplements)
 	groups := MineGroups(prepared) // layer 1: sigmine
 	// Layer 2: candidates. NOTE: candidates.go is ported in parallel with the
-	// contract `func Mine(facts []*FuncFacts, groups []SigGroup, params Params) Mined`,
+	// contract `func Mine(facts []*MiningFacts, groups []SigGroup, params Params) Mined`,
 	// which collides with sigmine.go's `func Mine`; see the commit report.
 	mined := MineCached(prepared, groups, defaultParams(options.Params), options.WlCache)
 	// Type switches: same-method arms want interface dispatch, also
@@ -97,7 +97,7 @@ func Run(facts []*FuncFacts, options Options) PatternsReport {
 // singleFunctionBuilder pairs a pattern kind with its candidate builder.
 type singleFunctionBuilder struct {
 	kind  CandidateKind
-	build func(prepared []*FuncFacts, options Options) []Candidate
+	build func(prepared []*MiningFacts, options Options) []Candidate
 }
 
 // singleFunctionBuilders runs in FixKindOrder so detection respects
@@ -105,40 +105,40 @@ type singleFunctionBuilder struct {
 // created before value objects bundle them, factories run after the
 // type-creating passes. Detection-only kinds sort last.
 var singleFunctionBuilders = []singleFunctionBuilder{
-	{GuardClause, func(prepared []*FuncFacts, options Options) []Candidate { return guardCandidates(prepared) }},
-	{PrimitiveObsession, func(prepared []*FuncFacts, options Options) []Candidate {
+	{GuardClause, func(prepared []*MiningFacts, options Options) []Candidate { return guardCandidates(prepared) }},
+	{PrimitiveObsession, func(prepared []*MiningFacts, options Options) []Candidate {
 		return primitiveObsessionCandidates(prepared)
 	}},
-	{ValueObject, func(prepared []*FuncFacts, options Options) []Candidate { return valueObjectCandidates(prepared) }},
-	{Factory, func(prepared []*FuncFacts, options Options) []Candidate { return factoryCandidates(prepared) }},
-	{Specification, func(prepared []*FuncFacts, options Options) []Candidate { return specificationCandidates(prepared) }},
-	{MissingIdentity, func(prepared []*FuncFacts, options Options) []Candidate {
+	{ValueObject, func(prepared []*MiningFacts, options Options) []Candidate { return valueObjectCandidates(prepared) }},
+	{Factory, func(prepared []*MiningFacts, options Options) []Candidate { return factoryCandidates(prepared) }},
+	{Specification, func(prepared []*MiningFacts, options Options) []Candidate { return specificationCandidates(prepared) }},
+	{MissingIdentity, func(prepared []*MiningFacts, options Options) []Candidate {
 		return missingIdentityCandidates(options.MissingIdentities)
 	}},
-	{EntityIdentity, func(prepared []*FuncFacts, options Options) []Candidate { return entityIdentityCandidates(prepared) }},
-	{DomainService, func(prepared []*FuncFacts, options Options) []Candidate {
+	{EntityIdentity, func(prepared []*MiningFacts, options Options) []Candidate { return entityIdentityCandidates(prepared) }},
+	{DomainService, func(prepared []*MiningFacts, options Options) []Candidate {
 		return domainServiceCandidates(options.DomainServices)
 	}},
-	{AnemicModel, func(prepared []*FuncFacts, options Options) []Candidate {
+	{AnemicModel, func(prepared []*MiningFacts, options Options) []Candidate {
 		return anemicModelCandidates(options.AnemicModels, options.DomainServices)
 	}},
-	{MutableIdentity, func(prepared []*FuncFacts, options Options) []Candidate { return mutableIdentityCandidates(prepared) }},
-	{Aggregate, func(prepared []*FuncFacts, options Options) []Candidate { return aggregateCandidates(prepared) }},
-	{Repository, func(prepared []*FuncFacts, options Options) []Candidate { return repositoryCandidates(prepared) }},
-	{NilErr, func(prepared []*FuncFacts, options Options) []Candidate { return nilErrCandidates(prepared) }},
-	{ForceTypeAssert, func(prepared []*FuncFacts, options Options) []Candidate { return forceTypeAssertCandidates(prepared) }},
-	{TypedNil, func(prepared []*FuncFacts, options Options) []Candidate { return typedNilCandidates(prepared) }},
-	{DependenceCluster, func(prepared []*FuncFacts, options Options) []Candidate {
+	{MutableIdentity, func(prepared []*MiningFacts, options Options) []Candidate { return mutableIdentityCandidates(prepared) }},
+	{Aggregate, func(prepared []*MiningFacts, options Options) []Candidate { return aggregateCandidates(prepared) }},
+	{Repository, func(prepared []*MiningFacts, options Options) []Candidate { return repositoryCandidates(prepared) }},
+	{NilErr, func(prepared []*MiningFacts, options Options) []Candidate { return nilErrCandidates(prepared) }},
+	{ForceTypeAssert, func(prepared []*MiningFacts, options Options) []Candidate { return forceTypeAssertCandidates(prepared) }},
+	{TypedNil, func(prepared []*MiningFacts, options Options) []Candidate { return typedNilCandidates(prepared) }},
+	{DependenceCluster, func(prepared []*MiningFacts, options Options) []Candidate {
 		clusters := FindDepClusters(prepared)
 		return DepClusterCandidates(clusters, prepared)
 	}},
-	{MinedRule, func(prepared []*FuncFacts, options Options) []Candidate {
+	{MinedRule, func(prepared []*MiningFacts, options Options) []Candidate {
 		sets := BuildCallSets(prepared)
 		rules := MineRules(sets)
 		violations := FindViolations(sets, rules)
 		return MinedRuleCandidates(violations, prepared)
 	}},
-	{DeviantBehavior, func(prepared []*FuncFacts, options Options) []Candidate {
+	{DeviantBehavior, func(prepared []*MiningFacts, options Options) []Candidate {
 		// Collect all error check sites across functions.
 		var allSites []ErrorCheckSite
 		for _, f := range prepared {
@@ -152,7 +152,7 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 		violations := FindBeliefViolations(allSites, beliefs)
 		return DeviantBehaviorCandidates(violations, prepared)
 	}},
-	{CCGraphClone, func(prepared []*FuncFacts, options Options) []Candidate {
+	{CCGraphClone, func(prepared []*MiningFacts, options Options) []Candidate {
 		groups := options.cloneGroups
 		out := CCGraphCloneCandidates(groups, prepared)
 		// Bridge clone detection to abstraction proposing: run the
@@ -163,34 +163,34 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 		out = append(out, CloneGroupParameterizeCandidates(prepared, groups, params)...)
 		return out
 	}},
-	{InconsistentClone, func(prepared []*FuncFacts, options Options) []Candidate {
+	{InconsistentClone, func(prepared []*MiningFacts, options Options) []Candidate {
 		pdgs, _, _ := ccGraphInputs(prepared)
 		divergent := FindInconsistentClones(options.cloneGroups, pdgs)
 		return InconsistentCloneCandidates(divergent, prepared)
 	}},
-	{TaintFlowKind, func(prepared []*FuncFacts, options Options) []Candidate {
+	{TaintFlowKind, func(prepared []*MiningFacts, options Options) []Candidate {
 		flows := FindTaintFlows(prepared)
 		return TaintFlowCandidates(flows, prepared)
 	}},
-	{BarrierSliceKind, func(prepared []*FuncFacts, options Options) []Candidate {
+	{BarrierSliceKind, func(prepared []*MiningFacts, options Options) []Candidate {
 		findings := FindBarrierSlices(prepared)
 		return BarrierSliceCandidates(findings, prepared)
 	}},
-	{ThinSliceKind, func(prepared []*FuncFacts, options Options) []Candidate {
+	{ThinSliceKind, func(prepared []*MiningFacts, options Options) []Candidate {
 		findings := FindThinSlices(prepared)
 		return ThinSliceCandidates(findings, prepared)
 	}},
-	{ChopKind, func(prepared []*FuncFacts, options Options) []Candidate {
+	{ChopKind, func(prepared []*MiningFacts, options Options) []Candidate {
 		findings := FindChops(prepared)
 		return ChopCandidates(findings, prepared)
 	}},
-	{AlattinRule, func(prepared []*FuncFacts, options Options) []Candidate {
+	{AlattinRule, func(prepared []*MiningFacts, options Options) []Candidate {
 		sets := BuildCallSets(prepared)
 		rules := MineDisjunctiveRules(sets)
 		violations := FindAlternativeViolations(sets, rules)
 		return AlattinRuleCandidates(violations, prepared)
 	}},
-	{Obligation, func(prepared []*FuncFacts, options Options) []Candidate {
+	{Obligation, func(prepared []*MiningFacts, options Options) []Candidate {
 		violations := FindObligationViolations(prepared)
 		return ObligationCandidates(violations, prepared)
 	}},
@@ -199,9 +199,8 @@ var singleFunctionBuilders = []singleFunctionBuilder{
 // addSingleFunctionCandidates appends fixed-score candidates that need no
 // clustering. Builders run in FixKindOrder (see singleFunctionBuilders)
 // so detection respects pattern dependencies.
-func addSingleFunctionCandidates(mined *Mined, prepared []*FuncFacts, options Options) {
-	pdgs, names, astTypes := ccGraphInputs(prepared)
-	options.cloneGroups = CCGraphClonesWithAST(pdgs, names, astTypes)
+func addSingleFunctionCandidates(mined *Mined, prepared []*MiningFacts, options Options) {
+	options.cloneGroups = defaultCloneGroups(prepared)
 	for _, b := range singleFunctionBuilders {
 		if cands := b.build(prepared, options); len(cands) > 0 {
 			mined.Candidates = append(mined.Candidates, cands...)
@@ -246,8 +245,8 @@ func JSON(report *PatternsReport) (string, error) {
 
 // mergeFacts dedupes facts by id, mirroring rstyle's facts::merge: lib and
 // test targets compile the same functions, so one id must not mine twice.
-func mergeFacts(facts []*FuncFacts) []*FuncFacts {
-	merged := make([]*FuncFacts, len(facts))
+func mergeFacts(facts []*MiningFacts) []*MiningFacts {
+	merged := make([]*MiningFacts, len(facts))
 	copy(merged, facts)
 	sort.SliceStable(merged, func(i, j int) bool { return factID(merged[i]) < factID(merged[j]) })
 	out := merged[:0]
@@ -259,7 +258,7 @@ func mergeFacts(facts []*FuncFacts) []*FuncFacts {
 	return out
 }
 
-func factID(f *FuncFacts) string {
+func factID(f *MiningFacts) string {
 	if f == nil {
 		return ""
 	}
@@ -269,8 +268,8 @@ func factID(f *FuncFacts) string {
 // hideImplements forgets implements links whose function id contains one of
 // the patterns ("*" hides all), mirroring rstyle's prep::hide_implements.
 // Facts are copied, never mutated in place.
-func hideImplements(facts []*FuncFacts, patterns []string) []*FuncFacts {
-	prepared := make([]*FuncFacts, len(facts))
+func hideImplements(facts []*MiningFacts, patterns []string) []*MiningFacts {
+	prepared := make([]*MiningFacts, len(facts))
 	for i, f := range facts {
 		if f == nil || !f.Implements || !hiddenLink(f.ID, patterns) {
 			prepared[i] = f

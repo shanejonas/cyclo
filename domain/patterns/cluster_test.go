@@ -9,7 +9,7 @@ import (
 // chainGraph builds: Param -> Call(sig[0]) -> ... -> Return, data-chained.
 // Labels carry only kinds and signature classes, so two chains with the same
 // sig multiset are structurally identical.
-func chainGraph(sigs ...string) *Pdg {
+func chainGraph(sigs ...string) *MiningGraph {
 	nodes := []PdgNode{{Kind: Param, TyClass: "_"}}
 	for _, s := range sigs {
 		nodes = append(nodes, PdgNode{Kind: Call, SigClass: s, CalleeID: s})
@@ -19,7 +19,7 @@ func chainGraph(sigs ...string) *Pdg {
 	for i := 0; i+1 < len(nodes); i++ {
 		edges = append(edges, PdgEdge{From: i, To: i + 1, Kind: Data, ArgPos: 0})
 	}
-	return &Pdg{Nodes: nodes, Edges: edges}
+	return &MiningGraph{Nodes: nodes, Edges: edges}
 }
 
 const (
@@ -29,8 +29,8 @@ const (
 
 // Sliding window over one differing call: adjacent pairs score 675-725,
 // distance-2 pairs 550, distance-3 pairs 425 (probed against the WL port).
-func windowGraphs() []*Pdg {
-	return []*Pdg{
+func windowGraphs() []*MiningGraph {
+	return []*MiningGraph{
 		chainGraph(sigF, sigF, sigF, sigF, sigF, sigF),
 		chainGraph(sigF, sigF, sigF, sigF, sigF, sigG),
 		chainGraph(sigF, sigF, sigF, sigF, sigG, sigG),
@@ -91,7 +91,7 @@ func TestMedoidNotChained(t *testing.T) {
 // The window pair (0,2) scores exactly 550: the threshold is inclusive.
 func TestThresholdBoundary(t *testing.T) {
 	graphs := windowGraphs()
-	pair := []*Pdg{graphs[0], graphs[2]}
+	pair := []*MiningGraph{graphs[0], graphs[2]}
 
 	at := clusterParams()
 	at.ThresholdMilli = 550
@@ -113,7 +113,7 @@ func TestThresholdBoundary(t *testing.T) {
 
 func TestUnrelatedFunctionsDoNotCluster(t *testing.T) {
 	graphs := windowGraphs()
-	if clusters := ClusterPdgs([]*Pdg{graphs[0], graphs[3]}, clusterParams()); len(clusters) != 0 {
+	if clusters := ClusterPdgs([]*MiningGraph{graphs[0], graphs[3]}, clusterParams()); len(clusters) != 0 {
 		t.Fatalf("got %d clusters for dissimilar functions, want 0", len(clusters))
 	}
 }
@@ -128,7 +128,7 @@ func TestClusterEmptyInput(t *testing.T) {
 // so a floor above that dissolves the cluster.
 func TestCoverageFloor(t *testing.T) {
 	graphs := windowGraphs()
-	pair := []*Pdg{graphs[0], graphs[1]}
+	pair := []*MiningGraph{graphs[0], graphs[1]}
 
 	loose := clusterParams()
 	if clusters := ClusterPdgs(pair, loose); len(clusters) != 1 {
@@ -145,7 +145,7 @@ func TestCoverageFloor(t *testing.T) {
 // (Still stub-bound: Align reports 0, so only a floor of 0 selects.)
 func TestPairCoverageExperiment(t *testing.T) {
 	graphs := windowGraphs()
-	pair := []*Pdg{graphs[0], graphs[3]} // sim 425, below any WL threshold here
+	pair := []*MiningGraph{graphs[0], graphs[3]} // sim 425, below any WL threshold here
 
 	wlOff := Params{ThresholdMilli: 1001, MinCoverageMilli: 0}
 	if clusters := ClusterPdgs(pair, wlOff); len(clusters) != 0 {
@@ -161,8 +161,8 @@ func TestPairCoverageExperiment(t *testing.T) {
 
 // withPrivateCalls pads a graph with two calls whose signature class is
 // unique to tag, so its two rarest call classes are shared with nobody.
-func withPrivateCalls(pdg *Pdg, tag int) *Pdg {
-	out := &Pdg{Nodes: append([]PdgNode{}, pdg.Nodes...), Edges: pdg.Edges}
+func withPrivateCalls(pdg *MiningGraph, tag int) *MiningGraph {
+	out := &MiningGraph{Nodes: append([]PdgNode{}, pdg.Nodes...), Edges: pdg.Edges}
 	for k := 0; k < 2; k++ {
 		sig := fmt.Sprintf("priv:%d:%d", tag, k)
 		out.Nodes = append(out.Nodes, PdgNode{Kind: Call, SigClass: sig, CalleeID: sig})
@@ -173,7 +173,7 @@ func withPrivateCalls(pdg *Pdg, tag int) *Pdg {
 // A tiny corpus compares every pair even when no rare call class is shared.
 func TestSmallCorpusComparesAllPairs(t *testing.T) {
 	base := windowGraphs()
-	graphs := []*Pdg{withPrivateCalls(base[0], 0), withPrivateCalls(base[1], 1)}
+	graphs := []*MiningGraph{withPrivateCalls(base[0], 0), withPrivateCalls(base[1], 1)}
 	if pairs := candidatePairs(blockKeys(graphs)); len(pairs) != 0 {
 		t.Fatalf("blocking found %d pairs, want 0 (private keys are unshared)", len(pairs))
 	}
@@ -185,7 +185,7 @@ func TestSmallCorpusComparesAllPairs(t *testing.T) {
 // A corpus past allPairsLimit falls back to blocking: with per-function
 // private keys, every block is a singleton and no pair is compared.
 func TestLargeCorpusFallsBackToBlocking(t *testing.T) {
-	var graphs []*Pdg
+	var graphs []*MiningGraph
 	for i := 0; i <= allPairsLimit; i++ {
 		graphs = append(graphs, withPrivateCalls(windowGraphs()[0], i))
 	}

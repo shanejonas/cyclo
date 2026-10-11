@@ -17,18 +17,24 @@ func loadShapes(t *testing.T) []FuncPdg {
 	return ex.Funcs
 }
 
-func findPdg(t *testing.T, pdgs []FuncPdg, name string) FuncPdg {
+type matchingFixture struct {
+	Pdg    patterns.MiningGraph
+	Name   string
+	SelfTy string
+}
+
+func findPdg(t *testing.T, pdgs []FuncPdg, name string) matchingFixture {
 	t.Helper()
 	for _, f := range pdgs {
 		if strings.HasSuffix(f.Name, "."+name) {
-			return f
+			return matchingFixture{Pdg: *patterns.MiningView(&f.Pdg), Name: f.Name, SelfTy: f.SelfTy}
 		}
 	}
 	t.Fatalf("function %s not extracted", name)
-	return FuncPdg{}
+	return matchingFixture{}
 }
 
-func countKind(pdg *patterns.Pdg, kind patterns.NodeKind) int {
+func countKind(pdg *patterns.MiningGraph, kind patterns.NodeKind) int {
 	n := 0
 	for _, node := range pdg.Nodes {
 		if node.Kind == kind {
@@ -38,7 +44,7 @@ func countKind(pdg *patterns.Pdg, kind patterns.NodeKind) int {
 	return n
 }
 
-func hasEdge(pdg *patterns.Pdg, fromKind, toKind patterns.NodeKind, edgeKind patterns.EdgeKind) bool {
+func hasEdge(pdg *patterns.MiningGraph, fromKind, toKind patterns.NodeKind, edgeKind patterns.EdgeKind) bool {
 	index := map[int]patterns.NodeKind{}
 	for i, n := range pdg.Nodes {
 		index[i] = n.Kind

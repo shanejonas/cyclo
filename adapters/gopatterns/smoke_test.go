@@ -26,7 +26,7 @@ func TestMinerSmoke(t *testing.T) {
 	var facts []*patterns.FuncFacts
 	for _, fp := range pdgs {
 		var params []string
-		for _, n := range fp.Pdg.Nodes {
+		for _, n := range patterns.MiningView(&fp.Pdg).Nodes {
 			if n.Kind == patterns.Param {
 				params = append(params, n.TyClass)
 			}

@@ -69,7 +69,7 @@ type Cluster struct {
 }
 
 // classesOf returns the sorted set of call classes in a graph.
-func classesOf(pdg *Pdg) []string {
+func classesOf(pdg *MiningGraph) []string {
 	seen := map[string]bool{}
 	for _, n := range pdg.Nodes {
 		if n.Kind == Call {
@@ -86,7 +86,7 @@ func classesOf(pdg *Pdg) []string {
 
 // blockKeys returns the rarest call classes (across the corpus) of every
 // function: at most blockKeysCount, rarest first, ties broken by class name.
-func blockKeys(pdgs []*Pdg) [][]string {
+func blockKeys(pdgs []*MiningGraph) [][]string {
 	freq := map[string]int{}
 	sets := make([][]string, len(pdgs))
 	for i, p := range pdgs {
@@ -164,7 +164,7 @@ func candidatePairs(keys [][]string) [][2]int {
 
 // pairsToCompare returns every pair for small corpora, and the pairs that
 // share a blocking key otherwise.
-func pairsToCompare(pdgs []*Pdg) [][2]int {
+func pairsToCompare(pdgs []*MiningGraph) [][2]int {
 	if len(pdgs) > allPairsLimit {
 		return candidatePairs(blockKeys(pdgs))
 	}
@@ -181,7 +181,7 @@ func pairsToCompare(pdgs []*Pdg) [][2]int {
 // threshold, or (experiment) the pair-coverage floor. CCGraph two-stage
 // filtering: characteristic vector cosine similarity is checked before the
 // expensive WL kernel.
-func pairSelected(pdgs []*Pdg, wls []*Wl, a, b int, params Params) bool {
+func pairSelected(pdgs []*MiningGraph, wls []*Wl, a, b int, params Params) bool {
 	if !Comparable(wls[a], wls[b]) {
 		return false
 	}
@@ -206,7 +206,7 @@ func pairSelected(pdgs []*Pdg, wls []*Wl, a, b int, params Params) bool {
 }
 
 // buildAdjacency links the pairs the threshold selects.
-func buildAdjacency(pdgs []*Pdg, wls []*Wl, pairs [][2]int, params Params) map[int]map[int]bool {
+func buildAdjacency(pdgs []*MiningGraph, wls []*Wl, pairs [][2]int, params Params) map[int]map[int]bool {
 	adjacency := map[int]map[int]bool{}
 	for _, p := range pairs {
 		a, b := p[0], p[1]
@@ -288,7 +288,7 @@ type joinedMember struct {
 	alignment Alignment
 }
 
-func joinMember(pdgs []*Pdg, wls []*Wl, template, member int) joinedMember {
+func joinMember(pdgs []*MiningGraph, wls []*Wl, template, member int) joinedMember {
 	return joinedMember{
 		index:     member,
 		alignment: Align(pdgs[template], wls[template], pdgs[member], wls[member]),
@@ -445,7 +445,7 @@ func rankTemplates(wls []*Wl, group []int) []int {
 // tryTemplate aligns group members against one template, keeping those
 // reaching the coverage floor. It returns the joined members and their
 // total coverage.
-func tryTemplate(pdgs []*Pdg, wls []*Wl, group []int, template int, params Params) ([]joinedMember, uint64) {
+func tryTemplate(pdgs []*MiningGraph, wls []*Wl, group []int, template int, params Params) ([]joinedMember, uint64) {
 	var joined []joinedMember
 	var totalCov uint64
 	for _, v := range group {
@@ -476,7 +476,7 @@ func makeCluster(template int, joined []joinedMember) Cluster {
 
 // bestTemplate tries each candidate template and returns the one yielding
 // the most joined members (ties broken by total coverage).
-func bestTemplate(pdgs []*Pdg, wls []*Wl, group []int, ranked []int, params Params) (Cluster, int) {
+func bestTemplate(pdgs []*MiningGraph, wls []*Wl, group []int, ranked []int, params Params) (Cluster, int) {
 	var best Cluster
 	bestCount := 0
 	var bestCoverage uint64
@@ -498,7 +498,7 @@ func bestTemplate(pdgs []*Pdg, wls []*Wl, group []int, ranked []int, params Para
 // coarser control projection, a central member may score high on similarity
 // while a peripheral pair aligns better with each other. It returns false
 // when nothing joins, so the caller can retire just the seed.
-func buildCluster(pdgs []*Pdg, wls []*Wl, group []int, params Params) (Cluster, bool) {
+func buildCluster(pdgs []*MiningGraph, wls []*Wl, group []int, params Params) (Cluster, bool) {
 	ranked := rankTemplates(wls, group)
 	tries := 3
 	if len(ranked) < tries {
@@ -530,8 +530,8 @@ func seedGroup(adjacency map[int]map[int]bool, free map[int]bool, seed int) []in
 // prepare canonicalizes every graph and hashes it, mirroring Rust's
 // canonicalize-then-Wl::new prologue. With a non-nil cache, WL refinements
 // for unchanged functions are reused instead of recomputed.
-func prepare(pdgs []*Pdg, params Params, cache *WlCache) ([]*Pdg, []*Wl) {
-	canonical := make([]*Pdg, len(pdgs))
+func prepare(pdgs []*MiningGraph, params Params, cache *WlCache) ([]*MiningGraph, []*Wl) {
+	canonical := make([]*MiningGraph, len(pdgs))
 	for i, p := range pdgs {
 		canonical[i] = Canonicalize(p, params.Normalize)
 	}
@@ -550,13 +550,13 @@ func prepare(pdgs []*Pdg, params Params, cache *WlCache) ([]*Pdg, []*Wl) {
 // ClusterPdgs finds clusters of structurally parallel functions, largest
 // first. Each function lands in at most one cluster; members must align with
 // the template above the coverage floor.
-func ClusterPdgs(pdgs []*Pdg, params Params) []Cluster {
+func ClusterPdgs(pdgs []*MiningGraph, params Params) []Cluster {
 	return ClusterPdgsCached(pdgs, params, nil)
 }
 
 // ClusterPdgsCached is ClusterPdgs with an optional WL cache for incremental
 // runs. A nil cache computes every refinement fresh.
-func ClusterPdgsCached(pdgs []*Pdg, params Params, cache *WlCache) []Cluster {
+func ClusterPdgsCached(pdgs []*MiningGraph, params Params, cache *WlCache) []Cluster {
 	canonical, wls := prepare(pdgs, params, cache)
 	adjacency := buildAdjacency(canonical, wls, pairsToCompare(canonical), params)
 	free := map[int]bool{}

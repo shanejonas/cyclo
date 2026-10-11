@@ -91,7 +91,7 @@ type Alignment struct {
 // refinements, the cross-graph colors, and the deterministic DFS ordinals.
 // It ports Rust's align::Ctx.
 type ctx struct {
-	pa, pb *Pdg
+	pa, pb *MiningGraph
 	wa, wb *Wl
 	ca, cb []uint64
 	oa, ob []int
@@ -99,7 +99,7 @@ type ctx struct {
 
 // newCtx ports Ctx::new: the cross colors are the deepest refinement level
 // both graphs support.
-func newCtx(pa *Pdg, wa *Wl, pb *Pdg, wb *Wl) *ctx {
+func newCtx(pa *MiningGraph, wa *Wl, pb *MiningGraph, wb *Wl) *ctx {
 	h := levels(wa, wb)
 	return &ctx{
 		pa: pa, pb: pb,
@@ -807,17 +807,17 @@ func alignVariant(c *ctx, v Variant, record bool) (Alignment, []Stage) {
 }
 
 // Align aligns two PDGs: the default (Baseline) pipeline variant.
-func Align(pa *Pdg, wa *Wl, pb *Pdg, wb *Wl) Alignment {
+func Align(pa *MiningGraph, wa *Wl, pb *MiningGraph, wb *Wl) Alignment {
 	al, _ := alignVariant(newCtx(pa, wa, pb, wb), Baseline, false)
 	return al
 }
 
 // AlignStaged is Align, also reporting the matching after every step.
-func AlignStaged(pa *Pdg, wa *Wl, pb *Pdg, wb *Wl) (Alignment, []Stage) {
+func AlignStaged(pa *MiningGraph, wa *Wl, pb *MiningGraph, wb *Wl) (Alignment, []Stage) {
 	return alignVariant(newCtx(pa, wa, pb, wb), Baseline, true)
 }
 
 // AlignVariant runs one pipeline variant, for the ablation.
-func AlignVariant(pa *Pdg, wa *Wl, pb *Pdg, wb *Wl, v Variant) (Alignment, []Stage) {
+func AlignVariant(pa *MiningGraph, wa *Wl, pb *MiningGraph, wb *Wl, v Variant) (Alignment, []Stage) {
 	return alignVariant(newCtx(pa, wa, pb, wb), v, true)
 }

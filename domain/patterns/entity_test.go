@@ -3,7 +3,7 @@ package patterns
 import "testing"
 
 func TestEntityIdentityCandidates(t *testing.T) {
-	facts := []*FuncFacts{{
+	facts := []*MiningFacts{{
 		ID:   "test.compare",
 		Name: "compare",
 		Path: "test.go",
@@ -56,7 +56,7 @@ func TestMissingIdentityCandidates(t *testing.T) {
 }
 
 func TestMutableIdentityCandidatesDetectionOnly(t *testing.T) {
-	facts := []*FuncFacts{{
+	facts := []*MiningFacts{{
 		ID:   "test.update",
 		Name: "update",
 		Path: "test.go",

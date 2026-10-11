@@ -21,7 +21,7 @@ const typeSwitchScoreMilli = 450
 // site (full body range, so range-based filters like --changed work); the
 // switch-statement line is in the observation and the FixSpec for precise
 // location.
-func typeSwitchCandidates(facts []*FuncFacts) []Candidate {
+func typeSwitchCandidates(facts []*MiningFacts) []Candidate {
 	var out []Candidate
 	for _, f := range facts {
 		for _, hit := range f.TypeSwitches {

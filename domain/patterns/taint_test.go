@@ -3,12 +3,12 @@ package patterns
 import "testing"
 
 // testTaintPdg builds a PDG from nodes and edges for taint tests.
-func testTaintPdg(nodes []PdgNode, edges []PdgEdge) *Pdg {
-	return &Pdg{Nodes: nodes, Edges: edges}
+func testTaintPdg(nodes []PdgNode, edges []PdgEdge) *MiningGraph {
+	return &MiningGraph{Nodes: nodes, Edges: edges}
 }
 
-func testTaintFacts(pdg *Pdg) []*FuncFacts {
-	return []*FuncFacts{{ID: "pkg.Handler", Name: "Handler", Path: "a.go", Pdg: pdg}}
+func testTaintFacts(pdg *MiningGraph) []*MiningFacts {
+	return []*MiningFacts{{ID: "pkg.Handler", Name: "Handler", Path: "a.go", Pdg: pdg}}
 }
 
 func TestTaintQueryToExecIsFlagged(t *testing.T) {

@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func cacheTestPdg() *Pdg {
-	return &Pdg{
+func cacheTestPdg() *MiningGraph {
+	return &MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: Branch, Line: 10},
 			{Kind: Call, CalleeID: "fmt.Println", SigClass: "fn(string) -> ()", Line: 11},

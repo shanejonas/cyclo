@@ -126,8 +126,8 @@ func FindBeliefViolations(sites []ErrorCheckSite, beliefs []CallBelief) []Belief
 }
 
 // DeviantBehaviorCandidates converts violations to pattern candidates.
-func DeviantBehaviorCandidates(violations []BeliefViolation, facts []*FuncFacts) []Candidate {
-	factByID := map[string]*FuncFacts{}
+func DeviantBehaviorCandidates(violations []BeliefViolation, facts []*MiningFacts) []Candidate {
+	factByID := map[string]*MiningFacts{}
 	for _, f := range facts {
 		factByID[f.ID] = f
 	}

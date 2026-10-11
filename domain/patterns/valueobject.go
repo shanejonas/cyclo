@@ -12,7 +12,7 @@ import (
 //
 // Unlike the mined candidates, these need no PDG clustering: the signal is
 // parameter co-occurrence, so the detection is a direct post-pass over
-// FuncFacts. Fixed score, like guard clauses.
+// MiningFacts. Fixed score, like guard clauses.
 
 // valueObjectScoreMilli is the fixed score for value-object proposals.
 // They are suggestions, not corrections, so they rank below guard clauses.
@@ -32,13 +32,13 @@ func paramKey(p ParamInfo) string {
 // clump is a set of param keys shared by a group of functions.
 type clump struct {
 	keys  map[string]bool
-	facts map[*FuncFacts]bool
+	facts map[*MiningFacts]bool
 }
 
 // valueObjectCandidates finds data clumps: groups of primitive params that
 // appear together in at least minClumpFuncs functions. Each clump proposes
 // one immutable value object.
-func valueObjectCandidates(facts []*FuncFacts) []Candidate {
+func valueObjectCandidates(facts []*MiningFacts) []Candidate {
 	fps := indexFuncParams(facts)
 	clumps := findClumps(fps)
 	clumps = maximalClumps(clumps)
@@ -47,13 +47,13 @@ func valueObjectCandidates(facts []*FuncFacts) []Candidate {
 
 // funcParams pairs a function with its primitive param key set.
 type funcParams struct {
-	fact *FuncFacts
+	fact *MiningFacts
 	keys map[string]bool
 }
 
 // indexFuncParams builds the param key set for each function with enough
 // primitive params.
-func indexFuncParams(facts []*FuncFacts) []funcParams {
+func indexFuncParams(facts []*MiningFacts) []funcParams {
 	var fps []funcParams
 	for _, f := range facts {
 		if len(f.Params) < minClumpSize {
@@ -98,7 +98,7 @@ func recordIntersection(byKey map[string]*clump, a, b funcParams) {
 	key := sortedKeys(inter)
 	c, ok := byKey[key]
 	if !ok {
-		c = &clump{keys: inter, facts: make(map[*FuncFacts]bool)}
+		c = &clump{keys: inter, facts: make(map[*MiningFacts]bool)}
 		byKey[key] = c
 	}
 	c.facts[a.fact] = true

@@ -4,7 +4,7 @@ import "testing"
 
 func TestBarrierSliceExcludesBarrier(t *testing.T) {
 	// 0 -> 1 -> 2 (data). Barrier on 1: slice from 2 is just {2}.
-	pdg := &Pdg{
+	pdg := &MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: "Param", Line: 1},
 			{Kind: "Op", Line: 2},
@@ -24,7 +24,7 @@ func TestBarrierSliceExcludesBarrier(t *testing.T) {
 func TestBarrierSliceBlocksTransitive(t *testing.T) {
 	// 0 -> 1 -> 2 -> 3. Barrier on 2: slice from 3 is {3}.
 	// Nodes 0 and 1 are only reachable through the barrier.
-	pdg := &Pdg{
+	pdg := &MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: "Param", Line: 1},
 			{Kind: "Op", Line: 2},
@@ -46,7 +46,7 @@ func TestBarrierSliceBlocksTransitive(t *testing.T) {
 func TestBarrierSliceKeepsOpenPaths(t *testing.T) {
 	// Diamond: 0 -> 1 -> 3 and 0 -> 2 -> 3. Barrier on 1:
 	// slice from 3 is {0, 2, 3} — the path through 2 stays open.
-	pdg := &Pdg{
+	pdg := &MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: "Param", Line: 1},
 			{Kind: "Op", Line: 2},
@@ -77,7 +77,7 @@ func TestBarrierSliceKeepsOpenPaths(t *testing.T) {
 
 func TestBarrierSliceNoBarriers(t *testing.T) {
 	// With no barriers, behaves like a plain backward slice.
-	pdg := &Pdg{
+	pdg := &MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: "Param", Line: 1},
 			{Kind: "Op", Line: 2},
@@ -93,7 +93,7 @@ func TestBarrierSliceNoBarriers(t *testing.T) {
 }
 
 func TestBarrierSliceLines(t *testing.T) {
-	pdg := &Pdg{
+	pdg := &MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: "Param", Line: 1},
 			{Kind: "Op", Line: 2},
@@ -111,7 +111,7 @@ func TestBarrierSliceLines(t *testing.T) {
 }
 
 func TestLinesToBarriers(t *testing.T) {
-	pdg := &Pdg{
+	pdg := &MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: "Param", Line: 10},
 			{Kind: "Op", Line: 20},

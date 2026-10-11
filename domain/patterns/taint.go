@@ -142,7 +142,7 @@ func matchTaintSink(n PdgNode) *taintSink {
 // propagateTaint marks tainted nodes via forward dataflow to a fixpoint.
 // Source calls start tainted; taint flows along data edges; sanitizer calls
 // stay clean and break the chain.
-func propagateTaint(pdg *Pdg) map[int]bool {
+func propagateTaint(pdg *MiningGraph) map[int]bool {
 	tainted := seedTaintSources(pdg)
 	succ := dataSuccessors(pdg)
 	for changed := true; changed; {
@@ -152,7 +152,7 @@ func propagateTaint(pdg *Pdg) map[int]bool {
 }
 
 // seedTaintSources marks source call nodes as tainted.
-func seedTaintSources(pdg *Pdg) map[int]bool {
+func seedTaintSources(pdg *MiningGraph) map[int]bool {
 	tainted := map[int]bool{}
 	for i, n := range pdg.Nodes {
 		if isTaintSource(n) {
@@ -163,7 +163,7 @@ func seedTaintSources(pdg *Pdg) map[int]bool {
 }
 
 // dataSuccessors builds adjacency lists for data edges only.
-func dataSuccessors(pdg *Pdg) [][]int {
+func dataSuccessors(pdg *MiningGraph) [][]int {
 	succ := make([][]int, len(pdg.Nodes))
 	for _, e := range pdg.Edges {
 		if e.Kind == Data {
@@ -175,7 +175,7 @@ func dataSuccessors(pdg *Pdg) [][]int {
 
 // propagateTaintStep performs one forward propagation pass.
 // Returns true if any new node was marked tainted.
-func propagateTaintStep(pdg *Pdg, succ [][]int, tainted map[int]bool) bool {
+func propagateTaintStep(pdg *MiningGraph, succ [][]int, tainted map[int]bool) bool {
 	changed := false
 	for from, tos := range succ {
 		if taintSpreads(pdg, tainted, from, tos) {
@@ -187,7 +187,7 @@ func propagateTaintStep(pdg *Pdg, succ [][]int, tainted map[int]bool) bool {
 
 // taintSpreads marks untainted non-sanitizer successors of a tainted node.
 // Returns true if any new node was marked.
-func taintSpreads(pdg *Pdg, tainted map[int]bool, from int, tos []int) bool {
+func taintSpreads(pdg *MiningGraph, tainted map[int]bool, from int, tos []int) bool {
 	if !tainted[from] {
 		return false
 	}
@@ -204,7 +204,7 @@ func taintSpreads(pdg *Pdg, tainted map[int]bool, from int, tos []int) bool {
 
 // sinkArgTainted reports whether a dangerous argument of sink node idx
 // receives tainted data.
-func sinkArgTainted(pdg *Pdg, idx int, sink *taintSink, tainted map[int]bool) bool {
+func sinkArgTainted(pdg *MiningGraph, idx int, sink *taintSink, tainted map[int]bool) bool {
 	for _, e := range pdg.Edges {
 		if taintedSinkEdge(pdg, e, idx, sink, tainted) {
 			return true
@@ -215,7 +215,7 @@ func sinkArgTainted(pdg *Pdg, idx int, sink *taintSink, tainted map[int]bool) bo
 
 // taintedSinkEdge reports whether e is a tainted data edge into a
 // dangerous argument of the sink.
-func taintedSinkEdge(pdg *Pdg, e PdgEdge, idx int, sink *taintSink, tainted map[int]bool) bool {
+func taintedSinkEdge(pdg *MiningGraph, e PdgEdge, idx int, sink *taintSink, tainted map[int]bool) bool {
 	if e.Kind != Data || e.To != idx || !tainted[e.From] {
 		return false
 	}
@@ -234,7 +234,7 @@ func intInSlice(v int, s []int) bool {
 
 // findTaintSource traces back from a tainted node to a source call,
 // returning its line and callee. Best-effort: first source found.
-func findTaintSource(pdg *Pdg, tainted map[int]bool, from int) (line int, callee string) {
+func findTaintSource(pdg *MiningGraph, tainted map[int]bool, from int) (line int, callee string) {
 	visited := map[int]bool{from: true}
 	queue := taintedPredecessors(pdg, tainted, from, visited)
 	for len(queue) > 0 {
@@ -254,7 +254,7 @@ func findTaintSource(pdg *Pdg, tainted map[int]bool, from int) (line int, callee
 
 // taintedPredecessors returns tainted data-predecessors of node, excluding
 // already-visited ones.
-func taintedPredecessors(pdg *Pdg, tainted map[int]bool, to int, visited map[int]bool) []int {
+func taintedPredecessors(pdg *MiningGraph, tainted map[int]bool, to int, visited map[int]bool) []int {
 	var out []int
 	for _, e := range pdg.Edges {
 		if e.Kind == Data && e.To == to && tainted[e.From] && !visited[e.From] {
@@ -265,7 +265,7 @@ func taintedPredecessors(pdg *Pdg, tainted map[int]bool, to int, visited map[int
 }
 
 // FindTaintFlows finds tainted-data-to-sink flows in each function.
-func FindTaintFlows(facts []*FuncFacts) []TaintFlow {
+func FindTaintFlows(facts []*MiningFacts) []TaintFlow {
 	var out []TaintFlow
 	for _, f := range facts {
 		if f.Pdg == nil {
@@ -296,8 +296,8 @@ func FindTaintFlows(facts []*FuncFacts) []TaintFlow {
 
 // TaintFlowCandidates converts taint flows to pattern candidates.
 // Detection-only: the fix depends on context, so FixSpec is nil.
-func TaintFlowCandidates(flows []TaintFlow, facts []*FuncFacts) []Candidate {
-	factByID := map[string]*FuncFacts{}
+func TaintFlowCandidates(flows []TaintFlow, facts []*MiningFacts) []Candidate {
+	factByID := map[string]*MiningFacts{}
 	for _, f := range facts {
 		factByID[f.ID] = f
 	}

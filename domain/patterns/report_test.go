@@ -9,8 +9,8 @@ import (
 
 func intPtr(n int) *int { return &n }
 
-func testFact(id, name, sigKey, selfTy string) *FuncFacts {
-	return &FuncFacts{
+func testFact(id, name, sigKey, selfTy string) *MiningFacts {
+	return &MiningFacts{
 		ID:     id,
 		Name:   name,
 		Path:   "src/lib.go",
@@ -147,13 +147,13 @@ func TestJSONRendersSnakeCaseKeys(t *testing.T) {
 }
 
 func TestRunDedupesFacts(t *testing.T) {
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		testFact("pkg.Dog.Bark", "Dog.Bark", "fn() string", "Dog"),
 		testFact("pkg.Dog.Growl", "Dog.Growl", "fn() string", "Dog"),
 	}
-	doubled := append(append([]*FuncFacts{}, facts...), facts...)
-	once := Run(facts, Options{})
-	twice := Run(doubled, Options{})
+	doubled := append(append([]*MiningFacts{}, facts...), facts...)
+	once := RunMining(facts, Options{})
+	twice := RunMining(doubled, Options{})
 	if !reflect.DeepEqual(once, twice) {
 		t.Fatalf("doubled facts changed the report:\nonce: %+v\ntwice: %+v", once, twice)
 	}
@@ -169,13 +169,13 @@ func TestRunDedupesFacts(t *testing.T) {
 }
 
 func TestRunHideImplementsOracle(t *testing.T) {
-	facts := []*FuncFacts{
+	facts := []*MiningFacts{
 		{ID: "pkg.Dog.Speak", Name: "Dog.Speak", Path: "src/dog.go", Line: 3,
 			SigKey: "fn() string", SelfTy: "Dog", Implements: true},
 		{ID: "pkg.Cat.Speak", Name: "Cat.Speak", Path: "src/cat.go", Line: 5,
 			SigKey: "fn() string", SelfTy: "Cat"},
 	}
-	withHide := Run(facts, Options{HideImplements: []string{"Speak"}})
+	withHide := RunMining(facts, Options{HideImplements: []string{"Speak"}})
 	if len(withHide.SignatureGroups) != 1 {
 		t.Fatalf("hidden implements should form one group, got %d", len(withHide.SignatureGroups))
 	}
@@ -183,12 +183,12 @@ func TestRunHideImplementsOracle(t *testing.T) {
 		t.Fatalf("group should hold both inherent methods, got %+v",
 			withHide.SignatureGroups[0].Members)
 	}
-	withoutHide := Run(facts, Options{})
+	withoutHide := RunMining(facts, Options{})
 	if len(withoutHide.SignatureGroups) != 0 {
 		t.Fatalf("unhidden implements should leave one inherent type, got %+v",
 			withoutHide.SignatureGroups)
 	}
-	star := Run(facts, Options{HideImplements: []string{"*"}})
+	star := RunMining(facts, Options{HideImplements: []string{"*"}})
 	if len(star.SignatureGroups) != 1 {
 		t.Fatalf(`"*" should hide all implements links`)
 	}
@@ -197,7 +197,7 @@ func TestRunHideImplementsOracle(t *testing.T) {
 func TestMergeFactsDedupesByID(t *testing.T) {
 	a := testFact("pkg.a", "a", "fn()", "A")
 	b := testFact("pkg.b", "b", "fn()", "B")
-	merged := mergeFacts([]*FuncFacts{b, a, b, nil})
+	merged := mergeFacts([]*MiningFacts{b, a, b, nil})
 	var ids []string
 	for _, f := range merged {
 		ids = append(ids, factID(f))
@@ -209,15 +209,15 @@ func TestMergeFactsDedupesByID(t *testing.T) {
 }
 
 func TestHideImplementsCopiesFacts(t *testing.T) {
-	f := &FuncFacts{ID: "pkg.Dog.Speak", Implements: true}
-	out := hideImplements([]*FuncFacts{f}, []string{"Speak"})
+	f := &MiningFacts{ID: "pkg.Dog.Speak", Implements: true}
+	out := hideImplements([]*MiningFacts{f}, []string{"Speak"})
 	if out[0].Implements {
 		t.Fatal("implements link should be hidden")
 	}
 	if !f.Implements {
 		t.Fatal("hideImplements must not mutate the caller's facts")
 	}
-	if got := hideImplements([]*FuncFacts{f}, nil); got[0].Implements != true {
+	if got := hideImplements([]*MiningFacts{f}, nil); got[0].Implements != true {
 		t.Fatal("empty patterns must hide nothing")
 	}
 }

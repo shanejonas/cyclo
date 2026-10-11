@@ -54,8 +54,8 @@ func TestCallScopeRefinesLabels(t *testing.T) {
 // F1 and F3 share all data ops but F3 nests an extra Branch.
 // The doubled control-edge weight must rank the same-logic pair higher,
 // with a wider margin than the unweighted kernel.
-func shapePDG(control NodeKind, dataOp string, callee string) *Pdg {
-	return &Pdg{
+func shapePDG(control NodeKind, dataOp string, callee string) *MiningGraph {
+	return &MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: control, Line: 1},
 			callNode(callee, "fn(string) -> string"),
@@ -74,8 +74,8 @@ func shapePDG(control NodeKind, dataOp string, callee string) *Pdg {
 // nestedPDG shares F1's data ops but has a very different control skeleton
 // (Loop nesting instead of a flat Branch): a structural control difference
 // the weighting must penalize more than F2's single data-op label change.
-func nestedPDG() *Pdg {
-	return &Pdg{
+func nestedPDG() *MiningGraph {
+	return &MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: Loop, Line: 1},
 			callNode("fmt.Sprintf", "fn(string) -> string"),
@@ -139,8 +139,8 @@ func TestWeightedSimilarityBreaksTies(t *testing.T) {
 // structure calling stdlib vs local with the same signature class scores
 // below identical.
 func TestCallScopeLowersCrossScopeSimilarity(t *testing.T) {
-	mk := func(callee string) *Pdg {
-		return &Pdg{
+	mk := func(callee string) *MiningGraph {
+		return &MiningGraph{
 			Nodes: []PdgNode{
 				{Kind: Branch, Line: 1},
 				callNode(callee, "fn(string) -> ()"),

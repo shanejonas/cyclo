@@ -38,7 +38,7 @@ type DepCluster struct {
 }
 
 // FindDepClusters finds dependence clusters (large SCCs) in function PDGs.
-func FindDepClusters(facts []*FuncFacts) []DepCluster {
+func FindDepClusters(facts []*MiningFacts) []DepCluster {
 	var out []DepCluster
 	for _, f := range facts {
 		if f.Pdg == nil || len(f.Pdg.Nodes) == 0 {
@@ -72,7 +72,7 @@ func isCluster(scc []int, totalNodes int) bool {
 }
 
 // clusterLines returns the sorted source lines for a cluster.
-func clusterLines(pdg *Pdg, nodes []int) []int {
+func clusterLines(pdg *MiningGraph, nodes []int) []int {
 	lines := make([]int, len(nodes))
 	for i, n := range nodes {
 		lines[i] = pdg.Nodes[n].Line
@@ -83,14 +83,14 @@ func clusterLines(pdg *Pdg, nodes []int) []int {
 
 // stronglyConnected finds all strongly connected components using Tarjan's
 // algorithm. Returns components with 2+ nodes (singletons aren't clusters).
-func stronglyConnected(pdg *Pdg) [][]int {
+func stronglyConnected(pdg *MiningGraph) [][]int {
 	t := newTarjan(pdg)
 	t.run()
 	return filterSCCs(t.sccs)
 }
 
 // newTarjan creates a Tarjan state for the PDG.
-func newTarjan(pdg *Pdg) *tarjan {
+func newTarjan(pdg *MiningGraph) *tarjan {
 	n := len(pdg.Nodes)
 	adj := make([][]int, n)
 	for _, e := range pdg.Edges {
@@ -182,8 +182,8 @@ func (t *tarjan) popSCC(v int) {
 }
 
 // DepClusterCandidates converts clusters to pattern candidates.
-func DepClusterCandidates(clusters []DepCluster, facts []*FuncFacts) []Candidate {
-	factByID := map[string]*FuncFacts{}
+func DepClusterCandidates(clusters []DepCluster, facts []*MiningFacts) []Candidate {
+	factByID := map[string]*MiningFacts{}
 	for _, f := range facts {
 		factByID[f.ID] = f
 	}

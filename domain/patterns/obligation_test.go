@@ -3,8 +3,8 @@ package patterns
 import "testing"
 
 // pdg builds a PDG from nodes and edges for obligation tests.
-func testObligationPdg(nodes []PdgNode, edges []PdgEdge) *Pdg {
-	return &Pdg{Nodes: nodes, Edges: edges}
+func testObligationPdg(nodes []PdgNode, edges []PdgEdge) *MiningGraph {
+	return &MiningGraph{Nodes: nodes, Edges: edges}
 }
 
 func TestObligationDeferCloseNoViolation(t *testing.T) {
@@ -22,7 +22,7 @@ func TestObligationDeferCloseNoViolation(t *testing.T) {
 			{From: 2, To: 3, Kind: Data, ArgPos: 0}, // defer wraps call
 		},
 	)
-	facts := []*FuncFacts{{ID: "pkg.F", Pdg: pdg}}
+	facts := []*MiningFacts{{ID: "pkg.F", Pdg: pdg}}
 	if v := FindObligationViolations(facts); len(v) != 0 {
 		t.Errorf("expected no violations, got %v", v)
 	}
@@ -39,7 +39,7 @@ func TestObligationMissingDeferIsViolation(t *testing.T) {
 			{From: 0, To: 1, Kind: Data, ArgPos: 0},
 		},
 	)
-	facts := []*FuncFacts{{ID: "pkg.F", Pdg: pdg}}
+	facts := []*MiningFacts{{ID: "pkg.F", Pdg: pdg}}
 	violations := FindObligationViolations(facts)
 	if len(violations) != 1 {
 		t.Fatalf("expected 1 violation, got %d", len(violations))
@@ -61,7 +61,7 @@ func TestObligationNonResourceIgnored(t *testing.T) {
 		},
 		nil,
 	)
-	facts := []*FuncFacts{{ID: "pkg.F", Pdg: pdg}}
+	facts := []*MiningFacts{{ID: "pkg.F", Pdg: pdg}}
 	if v := FindObligationViolations(facts); len(v) != 0 {
 		t.Errorf("expected no violations, got %v", v)
 	}
@@ -82,7 +82,7 @@ func TestObligationMutexDeferUnlockNoViolation(t *testing.T) {
 			{From: 2, To: 3, Kind: Data, ArgPos: 0}, // defer wraps call
 		},
 	)
-	facts := []*FuncFacts{{ID: "pkg.F", Pdg: pdg}}
+	facts := []*MiningFacts{{ID: "pkg.F", Pdg: pdg}}
 	if v := FindObligationViolations(facts); len(v) != 0 {
 		t.Errorf("expected no violations, got %v", v)
 	}
@@ -99,7 +99,7 @@ func TestObligationMutexMissingUnlockIsViolation(t *testing.T) {
 			{From: 0, To: 1, Kind: Data, ArgPos: 0},
 		},
 	)
-	facts := []*FuncFacts{{ID: "pkg.F", Pdg: pdg}}
+	facts := []*MiningFacts{{ID: "pkg.F", Pdg: pdg}}
 	violations := FindObligationViolations(facts)
 	if len(violations) != 1 {
 		t.Fatalf("expected 1 violation, got %d", len(violations))
@@ -124,7 +124,7 @@ func TestObligationUnrelatedDeferNoMatch(t *testing.T) {
 			{From: 2, To: 3, Kind: Data, ArgPos: 0},
 		},
 	)
-	facts := []*FuncFacts{{ID: "pkg.F", Pdg: pdg}}
+	facts := []*MiningFacts{{ID: "pkg.F", Pdg: pdg}}
 	if v := FindObligationViolations(facts); len(v) != 1 {
 		t.Errorf("expected 1 violation, got %v", v)
 	}

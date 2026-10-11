@@ -1,5 +1,7 @@
 package patterns
 
+import "github.com/shanejonas/cyclo/domain/pdg"
+
 // ParamInfo is a function parameter's name and primitive type name
 // (e.g. {Name: "amount", Type: "int"}). Only basic types are recorded;
 // named types are already domain types and need no proposal.
@@ -8,10 +10,10 @@ type ParamInfo struct {
 	Type string
 }
 
-// FuncFacts is the Go equivalent of rstyle's facts::FnFacts for the patterns
+// FunctionFacts is the Go equivalent of rstyle's facts::FnFacts for the patterns
 // miner: a function's identity, its PDG, and the effect summary used for the
 // effect-mismatch check. The extractor (adapters/gopatterns) builds these.
-type FuncFacts struct {
+type FunctionFacts[G any] struct {
 	// ID is the stable function id (package path + name, like FuncID).
 	ID string
 	// Name is the short function name for display.
@@ -25,9 +27,9 @@ type FuncFacts struct {
 	// SuppressedKinds are pattern kinds suppressed via //lint:ignore or
 	// // cyclo-allow on this function.
 	SuppressedKinds []string
-	// Pdg is the function's program dependence graph. Nil means the body
+	// Pdg is the function's graph. Nil means the body
 	// was not extracted (filtered out of mining, like rstyle's pdg: None).
-	Pdg *Pdg
+	Pdg *G
 	// AstTypes is the multiset of AST node type names for the function
 	// body (see AstNodeMultiset). Used by the CCGraph Stage 0 AST
 	// pre-filter. Nil means the AST was not fingerprinted.
@@ -186,7 +188,7 @@ type SpecificationHit struct {
 // EffectClass returns the observable-effect class set for the mismatch check:
 // effect kind names plus "mutation" when Mutates, mirroring rstyle's
 // candidates::effect_class. Empty set means pure.
-func (f *FuncFacts) EffectClass() map[string]bool {
+func (f *FunctionFacts[G]) EffectClass() map[string]bool {
 	classes := map[string]bool{}
 	for _, kind := range f.EffectKinds {
 		classes[kind] = true
@@ -196,3 +198,7 @@ func (f *FuncFacts) EffectClass() map[string]bool {
 	}
 	return classes
 }
+
+// FuncFacts carries the canonical IR. MiningFacts is a temporary matching view.
+type FuncFacts = FunctionFacts[pdg.Graph]
+type MiningFacts = FunctionFacts[MiningGraph]

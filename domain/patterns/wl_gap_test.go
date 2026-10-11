@@ -4,8 +4,8 @@ import "testing"
 
 // gapBase is a 10-node PDG modeling a realistic function: validate, branch,
 // loop with two calls, return.
-func gapBase() *Pdg {
-	return &Pdg{
+func gapBase() *MiningGraph {
+	return &MiningGraph{
 		Nodes: []PdgNode{
 			{Kind: Param, TyClass: "string", Line: 1},
 			{Kind: Call, CalleeID: "strings.TrimSpace", SigClass: "fn(string) -> string", Line: 2},
@@ -35,8 +35,8 @@ func gapBase() *Pdg {
 }
 
 // dropNode returns a copy of pdg with node idx removed (and its edges).
-func dropNode(pdg *Pdg, idx int) *Pdg {
-	out := &Pdg{}
+func dropNode(pdg *MiningGraph, idx int) *MiningGraph {
+	out := &MiningGraph{}
 	for i, n := range pdg.Nodes {
 		if i != idx {
 			out.Nodes = append(out.Nodes, n)
@@ -60,8 +60,8 @@ func dropNode(pdg *Pdg, idx int) *Pdg {
 
 // addNoise appends a detached Op node (an inserted statement with no
 // data flow to the rest, like a logging call).
-func addNoise(pdg *Pdg, n int) *Pdg {
-	out := &Pdg{
+func addNoise(pdg *MiningGraph, n int) *MiningGraph {
+	out := &MiningGraph{
 		Nodes: append([]PdgNode{}, pdg.Nodes...),
 		Edges: append([]PdgEdge{}, pdg.Edges...),
 	}
@@ -78,7 +78,7 @@ func TestGappedCloneSimilarities(t *testing.T) {
 	wb := NewWl(base)
 	cases := []struct {
 		name string
-		pdg  *Pdg
+		pdg  *MiningGraph
 	}{
 		{"identical", gapBase()},
 		{"minus1", dropNode(base, 7)},              // drop the arith op
@@ -102,7 +102,7 @@ func TestGappedClonesAboveThreshold(t *testing.T) {
 	wb := NewWl(base)
 	for _, c := range []struct {
 		name string
-		pdg  *Pdg
+		pdg  *MiningGraph
 	}{
 		{"minus1", dropNode(base, 7)},
 		{"plus1", addNoise(base, 1)},
